@@ -19,7 +19,7 @@ Usage: `straw <NONE/VC/VC_SQRT/KR> <hicFile> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/F
 ## Python hook
 Straw can be called from Python by using Boost <http://www.boost.org/>
 
-The files (Jamroot), (straw.py), and (straw-python.cpp) are used for the hook. (straw-python.cpp) is essentially the same as (straw.cpp)
+The files [Jamroot](Jamroot), [straw.py](straw.py), and [straw-python.cpp](straw-python.cpp) are used for the hook. [straw-python.cpp](straw-python.cpp) is essentially the same as [straw.cpp](straw.cpp)
 
 1. Get Boost:  http://www.boost.org/doc/libs/1_61_0/more/getting_started/unix-variants.html#get-boost
 2. Compile bjam:  http://www.boost.org/doc/libs/1_49_0/more/getting_started/unix-variants.html#prepare-to-use-a-boost-library-binary
