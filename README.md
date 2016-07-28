@@ -16,6 +16,13 @@ Must be compiled with the -lz flag to include the zlib.h library:
 
 Usage: `straw <NONE/VC/VC_SQRT/KR> <hicFile> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize> `
 
+For questions, please use
+[the Google Group](https://groups.google.com/forum/#!forum/3d-genomics).
+
+If you use this tool in your work, please cite 
+
+**Neva C. Durand, James T. Robinson, Muhammad S. Shamim, Ido Machol, Jill P. Mesirov, Eric S. Lander, and Erez Lieberman Aiden. "Juicebox provides a visualization system for Hi-C contact maps with unlimited zoom." Cell Systems 3(1), 2016.**
+
 ## Python hook
 Straw can be called from Python by using Boost <http://www.boost.org/>
 
