@@ -21,7 +21,9 @@ Straw can be called from Python by using Boost <http://www.boost.org/>
 
 The files [Jamroot](Jamroot), [straw.py](straw.py), and [straw-python.cpp](straw-python.cpp) are used for the hook. [straw-python.cpp](straw-python.cpp) is essentially the same as [straw.cpp](straw.cpp)
 
-1. Get Boost:  http://www.boost.org/doc/libs/1_61_0/more/getting_started/unix-variants.html#get-boost
-2. Compile bjam:  http://www.boost.org/doc/libs/1_49_0/more/getting_started/unix-variants.html#prepare-to-use-a-boost-library-binary
+1. Get Boost:  
+  http://www.boost.org/doc/libs/1_61_0/more/getting_started/unix-variants.html#get-boost
+2. Compile bjam:  
+  http://www.boost.org/doc/libs/1_49_0/more/getting_started/unix-variants.html#prepare-to-use-a-boost-library-binary
 (just do --with-libraries python)
 3. Type "bjam" in the directory with the files (assuming you've put boost and bjam in your path).
