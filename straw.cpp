@@ -30,7 +30,7 @@
 #include <vector>
 #include <streambuf>
 #include "zlib.h"
-//#include "straw.h"
+#include "straw.h"
 using namespace std;
 
 /*
