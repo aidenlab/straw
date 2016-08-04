@@ -27,7 +27,7 @@ project
 
 # Declare the three extension modules.  You can specify multiple
 # source files after the colon separated by spaces.
-python-extension straw_ext : straw-python.cpp ;
+python-extension straw_ext : main-python.cpp straw.cpp ;
 
 # Put the extension and Boost.Python DLL in the current directory, so
 # that running script by hand works.

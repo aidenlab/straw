@@ -7,7 +7,7 @@
 *.o
 *.so
 *.dylib
-juicebox-quick-dump
+straw
 
 # Packages #
 ############
@@ -41,3 +41,7 @@ Thumbs.db
 # Emacs files #
 ###############
 *~
+
+# R files #
+###########
+.R*

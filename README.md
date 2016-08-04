@@ -21,7 +21,7 @@ If you use this tool in your work, please cite
 
 ## C++
 Straw must be compiled with the -lz flag to include the zlib.h library:
-`g++ -lz -o straw straw.cpp`
+`g++ -lz -o straw main.cpp straw.cpp`
 
 Usage: `straw <NONE/VC/VC_SQRT/KR> <hicFile> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize> `
 
@@ -31,16 +31,16 @@ Straw is compatible with R via the Rcpp library.  Usage is very similar to the a
 ```
 library(Rcpp)
 sourceCpp("straw-R.cpp")
-straw("NONE drosophila.hic arm_2L arm_2L BP 100000")
+straw_R("NONE drosophila.hic arm_2L arm_2L BP 100000")
 ```
 
 ## Python 
 Straw can be called from Python by using Boost <http://www.boost.org/>
 
 The files [Jamroot](Jamroot), [straw.py](straw.py), and 
-[straw-python.cpp](straw-python.cpp) are used to hook the C++ to Python. 
-[straw-python.cpp](straw-python.cpp) is essentially the same as 
-[straw.cpp](straw.cpp)
+[main-python.cpp](main-python.cpp) are used to hook the C++ to Python. 
+[main-python.cpp](main-python.cpp) is essentially the same as 
+[main.cpp](main.cpp)
 
 1. Get Boost:  
   http://www.boost.org/doc/libs/1_61_0/more/getting_started/unix-variants.html#get-boost

@@ -23,12 +23,14 @@
 */
 #include <iostream>
 #include <fstream>
+#include <iostream>
 #include <sstream>
 #include <map>
 #include <set>
-#include <streambuf>
 #include <vector>
+#include <streambuf>
 #include "zlib.h"
+//#include "straw.h"
 using namespace std;
 
 /*
@@ -46,19 +48,6 @@ struct membuf : std::streambuf
   membuf(char* begin, char* end) {
     this->setg(begin, begin, end);
   }
-};
-
-// pointer structure for reading blocks or matrices, holds the size and position 
-struct indexEntry {
-  int size;
-  long position;
-};
-
-// sparse matrix entry
-struct contactRecord {
-  int binX;
-  int binY;
-  float counts;
 };
 
 // version number
@@ -135,7 +124,7 @@ long readHeader(ifstream& fin, string chr1, string chr2, int &c1pos1, int &c1pos
 // reads the footer from the master pointer location. takes in the chromosomes, norm, unit (BP or FRAG) and resolution or 
 // binsize, and sets the file position of the matrix and the normalization vectors for those chromosomes at the given
 // normalization and resolution
-void readFooter(ifstream& fin, long master, int c1, int c2, string norm, string unit, int resolution, int &mySize, long &myFilePos, int &c1NormSizeInBytes, long &c1NormFilePosition, int &c2NormSizeInBytes, long &c2NormFilePosition) {
+void readFooter(ifstream& fin, long master, int c1, int c2, string norm, string unit, int resolution, long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry) {
   fin.seekg(master, ios::beg);
   int nBytes;
   fin.read((char*)&nBytes, sizeof(int));
@@ -156,7 +145,6 @@ void readFooter(ifstream& fin, long master, int c1, int c2, string norm, string 
     fin.read((char*)&sizeinbytes, sizeof(int));
     if (str == key) {
       myFilePos = fpos;
-      mySize = sizeinbytes;
       found=true;
     }
   }
@@ -234,13 +222,13 @@ void readFooter(ifstream& fin, long master, int c1, int c2, string norm, string 
     int sizeInBytes;
     fin.read((char*)&sizeInBytes, sizeof(int));
     if (chrIdx == c1 && normtype == norm && unit1 == unit && resolution1 == resolution) {
-      c1NormFilePosition=filePosition;
-      c1NormSizeInBytes=sizeInBytes;
+      c1NormEntry.position=filePosition;
+      c1NormEntry.size=sizeInBytes;
       found1 = true;
     }
     if (chrIdx == c2 && normtype == norm && unit1 == unit && resolution1 == resolution) {
-      c2NormFilePosition=filePosition;
-      c2NormSizeInBytes=sizeInBytes;
+      c2NormEntry.position=filePosition;
+      c2NormEntry.size=sizeInBytes;
       found2 = true;
     }
   }
@@ -479,11 +467,11 @@ vector<contactRecord> readBlock(ifstream& fin, int blockNumber) {
 }
 
 // reads the normalization vector from the file at the specified location
-vector<double> readNormalizationVector(ifstream& fin, int size, long position) {
-  char buffer[size];
-  fin.seekg(position, ios::beg);
-  fin.read(buffer, size);
-  membuf sbuf(buffer, buffer + size);
+vector<double> readNormalizationVector(ifstream& fin, indexEntry entry) {
+  char buffer[entry.size];
+  fin.seekg(entry.position, ios::beg);
+  fin.read(buffer, entry.size);
+  membuf sbuf(buffer, buffer + entry.size);
   istream bufferin(&sbuf);
   int nValues;
   bufferin.read((char*)&nValues, sizeof(int));
@@ -502,39 +490,25 @@ vector<double> readNormalizationVector(ifstream& fin, int size, long position) {
   return values;
 }
 
-int main(int argc, char *argv[])
+void straw(string norm, string fname, int binsize, string chr1loc, string chr2loc, string unit)
 {
-  if (argc != 7) {
-    cerr << "Not enough arguments" << endl;
-    cerr << "Usage: juicebox-quick-dump <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
-    exit(1);
-  }
-
-  string norm=argv[1];
   if (!(norm=="NONE"||norm=="VC"||norm=="VC_SQRT"||norm=="KR")) {
     cerr << "Norm specified incorrectly, must be one of <NONE/VC/VC_SQRT/KR>" << endl; 
     cerr << "Usage: juicebox-quick-dump <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
-    exit(1);
+    return;
   }
-
-  string unit=argv[5];
   if (!(unit=="BP"||unit=="FRAG")) {
     cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl; 
     cerr << "Usage: juicebox-quick-dump <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
-    exit(1);
+    return;
   }
 
-  string size=argv[6];
-  int binsize=stoi(size);
-
-  ifstream fin(argv[2], fstream::in);
+  ifstream fin(fname, fstream::in);
   if (!fin) {
-    cerr << "File " << argv[2] << " cannot be opened for reading" << endl;
-    exit(1);
+    cerr << "File " << fname << " cannot be opened for reading" << endl;
+    return;
   }
-
-  string ch=argv[3];
-  stringstream ss(ch);
+  stringstream ss(chr1loc);
   string chr1, chr2, x, y;
   int c1pos1=-100, c1pos2=-100, c2pos1=-100, c2pos2=-100;
   getline(ss, chr1, ':');
@@ -542,9 +516,7 @@ int main(int argc, char *argv[])
     c1pos1 = stoi(x);
     c1pos2 = stoi(y);
   }
-
-  ch=argv[4];
-  stringstream ss1(ch);
+  stringstream ss1(chr2loc);
   getline(ss1, chr2, ':');
   if (getline(ss1, x, ':') && getline(ss1, y, ':')) {
     c2pos1 = stoi(x);
@@ -579,18 +551,18 @@ int main(int argc, char *argv[])
     regionIndices[3] = c2pos2 / binsize;
   }
 
-  int mySize, c1NormSizeInBytes, c2NormSizeInBytes;
-  long myFilePos, c1NormFilePosition, c2NormFilePosition;
+  indexEntry c1NormEntry, c2NormEntry;
+  long myFilePos;
 
   // readFooter will assign the above variables
-  readFooter(fin, master, c1, c2, norm, unit, binsize, mySize, myFilePos, c1NormSizeInBytes, c1NormFilePosition, c2NormSizeInBytes, c2NormFilePosition);
+  readFooter(fin, master, c1, c2, norm, unit, binsize, myFilePos, c1NormEntry, c2NormEntry); 
 
   vector<double> c1Norm;
   vector<double> c2Norm;
 
   if (norm != "NONE") {
-    c1Norm = readNormalizationVector(fin, c1NormSizeInBytes, c1NormFilePosition);
-    c2Norm = readNormalizationVector(fin, c2NormSizeInBytes, c2NormFilePosition);
+    c1Norm = readNormalizationVector(fin, c1NormEntry);
+    c2Norm = readNormalizationVector(fin, c2NormEntry);
   }
   int blockBinCount, blockColumnCount;
   // readMatrix will assign blockBinCount and blockColumnCount
@@ -621,5 +593,7 @@ int main(int argc, char *argv[])
       }
     }
   }
+
 }
+
 
