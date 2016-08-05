@@ -40,7 +40,7 @@ using namespace std;
 
   Currently only supporting matrices.
 
-  Usage: juicebox-quick-dump <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize> 
+  Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize> 
  */
 // this is for creating a stream from a byte array for ease of use
 struct membuf : std::streambuf
@@ -121,9 +121,10 @@ long readHeader(ifstream& fin, string chr1, string chr2, int &c1pos1, int &c1pos
   return master;
 }
 
-// reads the footer from the master pointer location. takes in the chromosomes, norm, unit (BP or FRAG) and resolution or 
-// binsize, and sets the file position of the matrix and the normalization vectors for those chromosomes at the given
-// normalization and resolution
+// reads the footer from the master pointer location. takes in the chromosomes,
+// norm, unit (BP or FRAG) and resolution or binsize, and sets the file 
+// position of the matrix and the normalization vectors for those chromosomes 
+// at the given normalization and resolution
 void readFooter(ifstream& fin, long master, int c1, int c2, string norm, string unit, int resolution, long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry) {
   fin.seekg(master, ios::beg);
   int nBytes;
@@ -494,12 +495,12 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
 {
   if (!(norm=="NONE"||norm=="VC"||norm=="VC_SQRT"||norm=="KR")) {
     cerr << "Norm specified incorrectly, must be one of <NONE/VC/VC_SQRT/KR>" << endl; 
-    cerr << "Usage: juicebox-quick-dump <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
+    cerr << "Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
     return;
   }
   if (!(unit=="BP"||unit=="FRAG")) {
     cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl; 
-    cerr << "Usage: juicebox-quick-dump <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
+    cerr << "Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
     return;
   }
 
