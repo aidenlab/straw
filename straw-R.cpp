@@ -1,18 +1,18 @@
 /*
   The MIT License (MIT)
- 
+
   Copyright (c) 2011-2016 Broad Institute, Aiden Lab
- 
+
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
  in the Software without restriction, including without limitation the rights
  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  copies of the Software, and to permit persons to whom the Software is
  furnished to do so, subject to the following conditions:
- 
+
  The above copyright notice and this permission notice shall be included in
  all copies or substantial portions of the Software.
- 
+
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -40,9 +40,9 @@ using namespace std;
 
   Currently only supporting matrices.
 
-  Usage: juicebox-quick-dump <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize> 
+  Usage: juicebox-quick-dump <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>
  */
-// pointer structure for reading blocks or matrices, holds the size and position 
+// pointer structure for reading blocks or matrices, holds the size and position
 struct indexEntry {
   int size;
   long position;
@@ -134,7 +134,7 @@ long readHeader(ifstream& fin, string chr1, string chr2, int &c1pos1, int &c1pos
   return master;
 }
 
-// reads the footer from the master pointer location. takes in the chromosomes, norm, unit (BP or FRAG) and resolution or 
+// reads the footer from the master pointer location. takes in the chromosomes, norm, unit (BP or FRAG) and resolution or
 // binsize, and sets the file position of the matrix and the normalization vectors for those chromosomes at the given
 // normalization and resolution
 void readFooter(ifstream& fin, long master, int c1, int c2, string norm, string unit, int resolution, long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry) {
@@ -145,7 +145,7 @@ void readFooter(ifstream& fin, long master, int c1, int c2, string norm, string 
   stringstream ss;
   ss << c1 << "_" << c2;
   string key = ss.str();
-  
+
   int nEntries;
   fin.read((char*)&nEntries, sizeof(int));
   bool found = false;
@@ -165,10 +165,10 @@ void readFooter(ifstream& fin, long master, int c1, int c2, string norm, string 
     cerr << "File doesn't have the given chr_chr map" << endl;
     exit(1);
   }
-  
+
   if (norm=="NONE") return; // no need to read norm vector index
- 
-  // read in and ignore expected value maps; don't store; reading these to 
+
+  // read in and ignore expected value maps; don't store; reading these to
   // get to norm vector index
   int nExpectedValues;
   fin.read((char*)&nExpectedValues, sizeof(int));
@@ -251,7 +251,7 @@ void readFooter(ifstream& fin, long master, int c1, int c2, string norm, string 
   }
 }
 
-// reads the raw binned contact matrix at specified resolution, setting the block bin count and block column count 
+// reads the raw binned contact matrix at specified resolution, setting the block bin count and block column count
 bool readMatrixZoomData(ifstream& fin, string myunit, int mybinsize, int &myBlockBinCount, int &myBlockColumnCount) {
   string unit;
   getline(fin, unit, '\0' ); // unit
@@ -268,14 +268,14 @@ bool readMatrixZoomData(ifstream& fin, string myunit, int mybinsize, int &myBloc
   fin.read((char*)&blockBinCount, sizeof(int));
   int blockColumnCount;
   fin.read((char*)&blockColumnCount, sizeof(int));
-  
+
   bool storeBlockData = false;
   if (myunit==unit && mybinsize==binSize) {
     myBlockBinCount = blockBinCount;
     myBlockColumnCount = blockColumnCount;
     storeBlockData = true;
   }
-  
+
   int nBlocks;
   fin.read((char*)&nBlocks, sizeof(int));
 
@@ -321,7 +321,7 @@ set<int> getBlockNumbersForRegionFromBinPosition(int* regionIndices, int blockBi
    int col2 = (regionIndices[1] + 1) / blockBinCount;
    int row1 = regionIndices[2] / blockBinCount;
    int row2 = (regionIndices[3] + 1) / blockBinCount;
-   
+
    set<int> blocksSet;
    // first check the upper triangular matrix
    for (int r = row1; r <= row2; r++) {
@@ -392,7 +392,7 @@ vector<contactRecord> readBlock(ifstream& fin, int blockNumber) {
       record.counts = counts;
       v[i] = record;
     }
-  } 
+  }
   else {
     int binXOffset, binYOffset;
     bufferin.read((char*)&binXOffset, sizeof(int));
@@ -421,7 +421,7 @@ vector<contactRecord> readBlock(ifstream& fin, int blockNumber) {
 	    short c;
 	    bufferin.read((char*)&c, sizeof(short));
 	    counts = c;
-	  } 
+	  }
 	  else {
 	    bufferin.read((char*)&counts, sizeof(float));
 	  }
@@ -459,7 +459,7 @@ vector<contactRecord> readBlock(ifstream& fin, int blockNumber) {
 	    v[index]=record;
 	    index++;
 	  }
-	} 
+	}
 	else {
 	  bufferin.read((char*)&counts, sizeof(float));
 	  if (counts != 0x7fc00000) { // not sure this works
@@ -503,23 +503,23 @@ vector<double> readNormalizationVector(ifstream& fin, indexEntry entry) {
   return values;
 }
 
-void straw(string norm, string fname, int binsize, string chr1loc, string chr2loc, string unit)
+RcppExport SEXP straw(string norm, string fname, int binsize, string chr1loc, string chr2loc, string unit)
 {
   if (!(norm=="NONE"||norm=="VC"||norm=="VC_SQRT"||norm=="KR")) {
-    cerr << "Norm specified incorrectly, must be one of <NONE/VC/VC_SQRT/KR>" << endl; 
+    cerr << "Norm specified incorrectly, must be one of <NONE/VC/VC_SQRT/KR>" << endl;
     cerr << "Usage: juicebox-quick-dump <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
-    return;
+    stop("\n");
   }
   if (!(unit=="BP"||unit=="FRAG")) {
-    cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl; 
+    cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl;
     cerr << "Usage: juicebox-quick-dump <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
-    return;
+    stop("\n");
   }
 
   ifstream fin(fname, fstream::in);
   if (!fin) {
     cerr << "File " << fname << " cannot be opened for reading" << endl;
-    return;
+    stop("\n");
   }
   stringstream ss(chr1loc);
   string chr1, chr2, x, y;
@@ -534,10 +534,10 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
   if (getline(ss1, x, ':') && getline(ss1, y, ':')) {
     c2pos1 = stoi(x);
     c2pos2 = stoi(y);
-  }  
+  }
   int chr1ind, chr2ind;
   long master = readHeader(fin, chr1, chr2, c1pos1, c1pos2, c2pos1, c2pos2, chr1ind, chr2ind);
-  
+
   int c1=min(chr1ind,chr2ind);
   int c2=max(chr1ind,chr2ind);
   int origRegionIndices[4]; // as given by user
@@ -568,7 +568,7 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
   long myFilePos;
 
   // readFooter will assign the above variables
-  readFooter(fin, master, c1, c2, norm, unit, binsize, myFilePos, c1NormEntry, c2NormEntry); 
+  readFooter(fin, master, c1, c2, norm, unit, binsize, myFilePos, c1NormEntry, c2NormEntry);
 
   vector<double> c1Norm;
   vector<double> c2Norm;
@@ -579,18 +579,20 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
   }
   int blockBinCount, blockColumnCount;
   // readMatrix will assign blockBinCount and blockColumnCount
-  readMatrix(fin, myFilePos, unit, binsize, blockBinCount, blockColumnCount); 
+  readMatrix(fin, myFilePos, unit, binsize, blockBinCount, blockColumnCount);
 
-  set<int> blockNumbers = getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount, c1==c2); 
+  set<int> blockNumbers = getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount, c1==c2);
 
   // getBlockIndices
   vector<contactRecord> records;
+  vector<int> xActual_vec, yActual_vec;
+  vector<float> counts_vec;
   for (set<int>::iterator it=blockNumbers.begin(); it!=blockNumbers.end(); ++it) {
     // get contacts in this block
     records = readBlock(fin, *it);
     for (vector<contactRecord>::iterator it2=records.begin(); it2!=records.end(); ++it2) {
       contactRecord rec = *it2;
-      
+
       int xActual = rec.binX * binsize;
       int yActual = rec.binY * binsize;
       float counts = rec.counts;
@@ -602,15 +604,18 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
 	   yActual >= origRegionIndices[2] && yActual <= origRegionIndices[3]) ||
 	  // or check regions that overlap with lower left
 	  ((c1==c2) && yActual >= origRegionIndices[0] && yActual <= origRegionIndices[1] && xActual >= origRegionIndices[2] && xActual <= origRegionIndices[3])) {
-	printf("%d\t%d\t%.14g\n", xActual, yActual, counts);
+	  //printf("%d\t%d\t%.14g\n", xActual, yActual, counts);
+    xActual_vec.push_back(xActual);
+    yActual_vec.push_back(yActual);
+    counts_vec.push_back(counts);
       }
     }
   }
-
+  return Rcpp::DataFrame::create(Rcpp::Named("x") = xActual_vec, Rcpp::Named("y") = yActual_vec, Rcpp::Named("counts") = counts_vec);
 }
 
 // [[Rcpp::export]]
-void straw_R(String argv)
+RcppExport SEXP straw_R(String argv)
 {
 
   string norm, fname, chr1loc, chr2loc, unit, size;
@@ -625,6 +630,5 @@ void straw_R(String argv)
   iss >> size;
 
   binsize=stoi(size);
-  straw(norm, fname, binsize, chr1loc, chr2loc, unit);
+  return straw(norm, fname, binsize, chr1loc, chr2loc, unit);
 }
-
