@@ -31,7 +31,19 @@ Straw is compatible with R via the Rcpp library.  Usage is very similar to the a
 ```
 library(Rcpp)
 sourceCpp("straw-R.cpp")
-straw_R("NONE drosophila.hic arm_2L arm_2L BP 100000")
+A<-straw_R("NONE /Users/nchernia/Downloads/drosophila.hic arm_2L arm_2L BP 100000")
+```
+In the above example, A is a data frame containing the counts information:
+
+```
+> head(A)
+        x        y counts
+1  800000  4700000     77
+2       0        0  41105
+3 5500000  8100000     82
+4 2700000  8300000     85
+5 5700000 17700000     11
+6 3000000 16500000     27
 ```
 
 ## Python 
