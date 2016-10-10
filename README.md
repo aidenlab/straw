@@ -25,6 +25,7 @@ Straw must be compiled with the -lz flag to include the zlib.h library:
 
 Usage: `straw <NONE/VC/VC_SQRT/KR> <hicFile> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize> `
 
+Users have also reported needing this flag: -std=c++11
 ## R
 Straw is compatible with R via the Rcpp library.  Usage is very similar to the above.  Future versions might use a different signature to call the function.
 
