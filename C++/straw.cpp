@@ -133,7 +133,7 @@ void readFooter(ifstream& fin, long master, int c1, int c2, string norm, string 
   stringstream ss;
   ss << c1 << "_" << c2;
   string key = ss.str();
-  
+
   int nEntries;
   fin.read((char*)&nEntries, sizeof(int));
   bool found = false;
@@ -284,13 +284,17 @@ bool readMatrixZoomData(ifstream& fin, string myunit, int mybinsize, int &myBloc
 
 // goes to the specified file pointer and finds the raw contact matrix at specified resolution, calling readMatrixZoomData.
 // sets blockbincount and blockcolumncount
-void readMatrix(ifstream& fin, int myFilePosition, string unit, int resolution, int &myBlockBinCount, int &myBlockColumnCount) {
+void readMatrix(ifstream& fin, long myFilePosition, string unit, int resolution, int &myBlockBinCount, int &myBlockColumnCount) {
   fin.seekg(myFilePosition, ios::beg);
   int c1,c2;
   fin.read((char*)&c1, sizeof(int)); //chr1
   fin.read((char*)&c2, sizeof(int)); //chr2
   int nRes;
   fin.read((char*)&nRes, sizeof(int));
+  cerr << "nres " << nRes << endl;
+  cerr << "c1 " << c1 << endl;
+  cerr << "c2 " << c2 << endl;
+
   int i=0;
   bool found=false;
   while (i<nRes && !found) {
@@ -567,8 +571,9 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
   }
   int blockBinCount, blockColumnCount;
   // readMatrix will assign blockBinCount and blockColumnCount
+  cerr << "hr" <<endl;
   readMatrix(fin, myFilePos, unit, binsize, blockBinCount, blockColumnCount); 
-
+  cerr << "hr3" <<endl;
   set<int> blockNumbers = getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount, c1==c2); 
 
   // getBlockIndices
