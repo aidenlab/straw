@@ -1,16 +1,7 @@
 # straw: Extract data quickly from Juicebox via straw
 Straw is a fast C++ implementation of reading/dump for .hic files.
  
-It works by reading the .hic file, finding the appropriate matrix and slice
-of data, and printing the text in sparse upper triangular format.
-
-It is not as fully featured as the Juicebox command line tools Java version;
-in particular, it doesn't store the pointer data for all the matrices, only
-the one queried. It also doesn't currently support reading from a URL rather
-than a local file. Future versions may look more like the Java implementation. 
-Currently only supporting matrices (not vectors).
-
-Please see the below sections on compiling for C++, Python, and R.
+Please see [the wiki](wiki) for more documentation.
 
 For questions, please use
 [the Google Group](https://groups.google.com/forum/#!forum/3d-genomics).
