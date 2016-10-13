@@ -291,9 +291,6 @@ void readMatrix(ifstream& fin, long myFilePosition, string unit, int resolution,
   fin.read((char*)&c2, sizeof(int)); //chr2
   int nRes;
   fin.read((char*)&nRes, sizeof(int));
-  cerr << "nres " << nRes << endl;
-  cerr << "c1 " << c1 << endl;
-  cerr << "c2 " << c2 << endl;
 
   int i=0;
   bool found=false;
@@ -571,9 +568,7 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
   }
   int blockBinCount, blockColumnCount;
   // readMatrix will assign blockBinCount and blockColumnCount
-  cerr << "hr" <<endl;
   readMatrix(fin, myFilePos, unit, binsize, blockBinCount, blockColumnCount); 
-  cerr << "hr3" <<endl;
   set<int> blockNumbers = getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount, c1==c2); 
 
   // getBlockIndices
