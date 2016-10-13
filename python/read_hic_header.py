@@ -54,3 +54,13 @@ for x in range(0, nChrs):
   name = readcstr(req)
   length = struct.unpack('<i',req.read(4))[0]
   print '  {0}  {1}'.format(name, length)
+nBpRes = struct.unpack('<i',req.read(4))[0]
+print "Base pair-delimited resolutions: "
+for x in range(0, nBpRes):
+  res = struct.unpack('<i',req.read(4))[0]
+  print '   {0}'.format(res)
+nFrag = struct.unpack('<i',req.read(4))[0]
+print "Fragment-delimited resolutions: "
+for x in range(0, nFrag):
+  res = struct.unpack('<i',req.read(4))[0]
+  print '   {0}'.format(res)
