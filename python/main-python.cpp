@@ -33,7 +33,9 @@ void straw_python(string argv)
 
   string norm, fname, chr1loc, chr2loc, unit, size;
   int binsize;
-
+  vector<int> x;
+  vector<int> y;
+  vector<float> counts;
   istringstream iss(argv);
   iss >> norm;
   iss >> fname;
@@ -43,7 +45,11 @@ void straw_python(string argv)
   iss >> size;
 
   binsize=stoi(size);
-  straw(norm, fname, binsize, chr1loc, chr2loc, unit);
+  straw(norm, fname, binsize, chr1loc, chr2loc, unit, x, y, counts);
+  int length=x.size();
+  for (int i=0; i<length; i++) {
+    printf("%d\t%d\t%.14g\n", x[i], y[i], counts[i]);   
+  }
 }
 
 BOOST_PYTHON_MODULE(straw_ext)
