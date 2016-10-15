@@ -296,7 +296,7 @@ bool readMatrixZoomData(ifstream& fin, string myunit, int mybinsize, int &myBloc
 
 // goes to the specified file pointer and finds the raw contact matrix at specified resolution, calling readMatrixZoomData.
 // sets blockbincount and blockcolumncount
-void readMatrix(ifstream& fin, int myFilePosition, string unit, int resolution, int &myBlockBinCount, int &myBlockColumnCount) {
+void readMatrix(ifstream& fin, long myFilePosition, string unit, int resolution, int &myBlockBinCount, int &myBlockColumnCount) {
   fin.seekg(myFilePosition, ios::beg);
   int c1,c2;
   fin.read((char*)&c1, sizeof(int)); //chr1
