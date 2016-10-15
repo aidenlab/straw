@@ -27,13 +27,33 @@
 #include <sstream>
 #include "straw.h"
 using namespace std;
+using namespace boost::python;
 
-void straw_python(string argv)
+struct Bins 
 {
+  list x;
+  list y;
+  list counts;
+};
 
+// Converts a C++ vector to a python list
+template <class T>
+list toPythonList(std::vector<T> vector) {
+  typename std::vector<T>::iterator iter;
+  list mylist;
+  for (iter = vector.begin(); iter != vector.end(); ++iter) {
+    mylist.append(*iter);
+  }
+  return mylist;
+}
+
+Bins straw_python(string argv)
+{
+  vector<int> x;
+  vector<int> y;
+  vector<float> counts;
   string norm, fname, chr1loc, chr2loc, unit, size;
   int binsize;
-
   istringstream iss(argv);
   iss >> norm;
   iss >> fname;
@@ -41,13 +61,26 @@ void straw_python(string argv)
   iss >> chr2loc;
   iss >> unit;
   iss >> size;
-
+  
   binsize=stoi(size);
-  straw(norm, fname, binsize, chr1loc, chr2loc, unit);
+  straw(norm, fname, binsize, chr1loc, chr2loc, unit, x, y, counts);
+  Bins b;
+  b.x = toPythonList(x);
+  b.y = toPythonList(y);
+  b.counts = toPythonList(counts);
+  return b;
+  //int length=x.size();
+    //for (int i=0; i<length; i++) {
+      //  printf("%d\t%d\t%.14g\n", x[i], y[i], counts[i]);   
+    //}
 }
 
 BOOST_PYTHON_MODULE(straw_ext)
 {
   using namespace boost::python;
   def("straw", straw_python);
+  class_<Bins>("Bins")
+    .def_readonly("x", &Bins::x)
+    .def_readonly("y", &Bins::y)
+    .def_readonly("counts", &Bins::counts);
 }

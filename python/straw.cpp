@@ -491,7 +491,7 @@ vector<double> readNormalizationVector(ifstream& fin, indexEntry entry) {
   return values;
 }
 
-void straw(string norm, string fname, int binsize, string chr1loc, string chr2loc, string unit)
+void straw(string norm, string fname, int binsize, string chr1loc, string chr2loc, string unit, vector<int> &xActual, vector<int> &yActual, vector<float> &counts)
 {
   if (!(norm=="NONE"||norm=="VC"||norm=="VC_SQRT"||norm=="KR")) {
     cerr << "Norm specified incorrectly, must be one of <NONE/VC/VC_SQRT/KR>" << endl; 
@@ -579,18 +579,21 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
     for (vector<contactRecord>::iterator it2=records.begin(); it2!=records.end(); ++it2) {
       contactRecord rec = *it2;
       
-      int xActual = rec.binX * binsize;
-      int yActual = rec.binY * binsize;
-      float counts = rec.counts;
+      int x = rec.binX * binsize;
+      int y = rec.binY * binsize;
+      float c = rec.counts;
       if (norm != "NONE") {
-	counts = counts / (c1Norm[rec.binX] * c2Norm[rec.binY]);
+	c = c / (c1Norm[rec.binX] * c2Norm[rec.binY]);
       }
-//      cout << xActual << " " << yActual << " " << counts << endl;
-      if ((xActual >= origRegionIndices[0] && xActual <= origRegionIndices[1] &&
-	   yActual >= origRegionIndices[2] && yActual <= origRegionIndices[3]) ||
+
+      if ((x >= origRegionIndices[0] && x <= origRegionIndices[1] &&
+	   y >= origRegionIndices[2] && y <= origRegionIndices[3]) ||
 	  // or check regions that overlap with lower left
-	  ((c1==c2) && yActual >= origRegionIndices[0] && yActual <= origRegionIndices[1] && xActual >= origRegionIndices[2] && xActual <= origRegionIndices[3])) {
-	printf("%d\t%d\t%.14g\n", xActual, yActual, counts);
+	  ((c1==c2) && y >= origRegionIndices[0] && y <= origRegionIndices[1] && x >= origRegionIndices[2] && x <= origRegionIndices[3])) {
+	xActual.push_back(x);
+	yActual.push_back(y);
+	counts.push_back(c);
+	//printf("%d\t%d\t%.14g\n", x, y, c);
       }
     }
   }

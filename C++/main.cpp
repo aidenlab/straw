@@ -40,6 +40,13 @@ int main(int argc, char *argv[])
   string unit=argv[5];
   string size=argv[6];
   int binsize=stoi(size);
+  vector<int> x;
+  vector<int> y;
+  vector<float> counts;
 
-  straw(norm, fname, binsize, chr1loc, chr2loc, unit);
+  straw(norm, fname, binsize, chr1loc, chr2loc, unit, x, y, counts);
+  int length=x.size();
+  for (int i=0; i<length; i++) {
+    printf("%d\t%d\t%.14g\n", x[i], y[i], counts[i]);   
+  }
 }
