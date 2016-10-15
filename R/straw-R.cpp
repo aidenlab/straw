@@ -80,13 +80,15 @@ bool readMagicString(ifstream& fin) {
 long readHeader(ifstream& fin, string chr1, string chr2, int &c1pos1, int &c1pos2, int &c2pos1, int &c2pos2, int &chr1ind, int &chr2ind) {
   if (!readMagicString(fin)) {
     cerr << "Hi-C magic string is missing, does not appear to be a hic file" << endl;
-    exit(1);
+    stop("\n");
+    // exit(1);
   }
 
   fin.read((char*)&version, sizeof(int));
   if (version < 6) {
     cerr << "Version " << version << " no longer supported" << endl;
-    exit(1);
+    stop("\n");
+    // exit(1);
   }
   long master;
   fin.read((char*)&master, sizeof(long));
@@ -129,7 +131,8 @@ long readHeader(ifstream& fin, string chr1, string chr2, int &c1pos1, int &c1pos
   }
   if (!found1 || !found2) {
     cerr << "One of the chromosomes wasn't found in the file. Check that the chromosome name matches the genome." << endl;
-    exit(1);
+    stop("\n");
+    // exit(1);
   }
   return master;
 }
@@ -163,7 +166,8 @@ void readFooter(ifstream& fin, long master, int c1, int c2, string norm, string 
   }
   if (!found) {
     cerr << "File doesn't have the given chr_chr map" << endl;
-    exit(1);
+    stop("\n");
+    // exit(1);
   }
 
   if (norm=="NONE") return; // no need to read norm vector index
@@ -247,7 +251,8 @@ void readFooter(ifstream& fin, long master, int c1, int c2, string norm, string 
   }
   if (!found1 || !found2) {
     cerr << "File did not contain " << norm << " normalization vectors for one or both chromosomes at " << resolution << " " << unit << endl;
-    exit(1);
+    stop("\n");
+    // exit(1);
   }
 }
 
@@ -311,7 +316,8 @@ void readMatrix(ifstream& fin, long myFilePosition, string unit, int resolution,
   }
   if (!found) {
     cerr << "Error finding block data" << endl;
-    exit(1);
+    stop("\n");
+    // exit(1);
   }
 }
 // gets the blocks that need to be read for this slice of the data.  needs blockbincount, blockcolumncount, and whether
