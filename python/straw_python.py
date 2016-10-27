@@ -1,5 +1,6 @@
 #Reads the genome name from the hic header and the program will output  x, y, and count
-#Can take in a .hic file or URL that points to .hic file
+#Can only take in a .hic file
+from __future__ import absolute_import, division, print_function, unicode_literals
 import sys
 import struct
 import urllib
@@ -14,7 +15,8 @@ def readcstr(f):
     while True:
         b = f.read(1)
         if b is None or b == b"\0":
-            return str(buf,encoding="utf-8", errors="strict")
+            # return str(buf,encoding="utf-8", errors="strict")
+            return buf.decode("utf-8")
         else:
             buf += b
             # buf.append(b)
@@ -198,6 +200,7 @@ def getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockC
     row1=int(regionIndices[2]/blockBinCount)
     row2=int((regionIndices[3]+1)/blockBinCount)
     blocksSet=set()
+    # print(str(col1)+"\t"+str(col2)+"\t"+str(row1)+"\t"+str(row2))
     for r in range(row1, row2+1):
         for c in range(col1, col2+1):
             blockNumber=r*blockColumnCount+c
@@ -207,6 +210,7 @@ def getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockC
             for c in range(row1, row2+1):
                 blockNumber=r*blockColumnCount+c
                 blocksSet.add(blockNumber)
+    # print(str(blocksSet))
     return blocksSet
 
 #FUN(fin, blockNumber)
@@ -378,6 +382,7 @@ def straw(norm, req, binsize, chr1loc, chr2loc, unit):
     counts=[]
     for i_set in (blockNumbers):
         records=readBlock(req, i_set)
+        # print(str(records))
         for j in range(len(records)):
             rec=records[j]
             x=rec['binX']*binsize
@@ -406,9 +411,11 @@ chr2loc = sys.argv[4]
 unit = sys.argv[5]
 binsize = int(sys.argv[6])
 magic_string = ""
-try: req = urllib.urlopen(infile)
-except:
-  req=open(infile, 'rb')
+# try: req=open(infile, 'rb')
+# except:
+#   req = urllib.urlopen(infile)
+req=open(infile, 'rb')
 result = straw(norm, req, binsize, chr1loc, chr2loc, unit)
 for i in range(len(result[0])):
     print("{0}\t{1}\t{2}".format(result[0][i], result[1][i], result[2][i]))
+    i
