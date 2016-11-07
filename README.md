@@ -6,7 +6,7 @@ Please see [the wiki](https://github.com/theaidenlab/straw/wiki) for more docume
 For questions, please use
 [the Google Group](https://groups.google.com/forum/#!forum/3d-genomics).
 
-Ongoing development work is carried out by <a href="http://www.cherniavsky.net/neva/">Neva C. Durand</a> and <a href="https://github.com/mikeaalv">Yue Wu</a>.
+Ongoing development work is carried out by <a href="http://www.cherniavsky.net/neva/">Neva C. Durand</a> and <a href="https://mikeaalv.github.io/">Yue Wu</a>.
 
 If you use this tool in your work, please cite 
 
