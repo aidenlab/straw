@@ -1,18 +1,18 @@
 /*
   The MIT License (MIT)
- 
+
   Copyright (c) 2011-2016 Broad Institute, Aiden Lab
- 
+
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
  in the Software without restriction, including without limitation the rights
  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  copies of the Software, and to permit persons to whom the Software is
  furnished to do so, subject to the following conditions:
- 
+
  The above copyright notice and this permission notice shall be included in
  all copies or substantial portions of the Software.
- 
+
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -29,8 +29,11 @@
 #include <set>
 #include <vector>
 #include <streambuf>
+#include <string>
 #include "zlib.h"
 #include "straw.h"
+#include <curl/curl.h>
+// #include <unistd.h>
 using namespace std;
 
 /*
@@ -40,7 +43,7 @@ using namespace std;
 
   Currently only supporting matrices.
 
-  Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize> 
+  Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>
  */
 // this is for creating a stream from a byte array for ease of use
 struct membuf : std::streambuf
@@ -55,6 +58,7 @@ int version;
 
 // map of block numbers to pointers
 map <int, indexEntry> blockMap;
+
 
 // returns whether or not this is valid HiC file
 bool readMagicString(ifstream& fin) {
@@ -122,8 +126,8 @@ long readHeader(ifstream& fin, string chr1, string chr2, int &c1pos1, int &c1pos
 }
 
 // reads the footer from the master pointer location. takes in the chromosomes,
-// norm, unit (BP or FRAG) and resolution or binsize, and sets the file 
-// position of the matrix and the normalization vectors for those chromosomes 
+// norm, unit (BP or FRAG) and resolution or binsize, and sets the file
+// position of the matrix and the normalization vectors for those chromosomes
 // at the given normalization and resolution
 void readFooter(ifstream& fin, long master, int c1, int c2, string norm, string unit, int resolution, long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry) {
   fin.seekg(master, ios::beg);
@@ -133,7 +137,7 @@ void readFooter(ifstream& fin, long master, int c1, int c2, string norm, string 
   stringstream ss;
   ss << c1 << "_" << c2;
   string key = ss.str();
-  
+
   int nEntries;
   fin.read((char*)&nEntries, sizeof(int));
   bool found = false;
@@ -153,10 +157,10 @@ void readFooter(ifstream& fin, long master, int c1, int c2, string norm, string 
     cerr << "File doesn't have the given chr_chr map" << endl;
     exit(1);
   }
-  
+
   if (norm=="NONE") return; // no need to read norm vector index
- 
-  // read in and ignore expected value maps; don't store; reading these to 
+
+  // read in and ignore expected value maps; don't store; reading these to
   // get to norm vector index
   int nExpectedValues;
   fin.read((char*)&nExpectedValues, sizeof(int));
@@ -239,7 +243,7 @@ void readFooter(ifstream& fin, long master, int c1, int c2, string norm, string 
   }
 }
 
-// reads the raw binned contact matrix at specified resolution, setting the block bin count and block column count 
+// reads the raw binned contact matrix at specified resolution, setting the block bin count and block column count
 bool readMatrixZoomData(ifstream& fin, string myunit, int mybinsize, int &myBlockBinCount, int &myBlockColumnCount) {
   string unit;
   getline(fin, unit, '\0' ); // unit
@@ -256,14 +260,14 @@ bool readMatrixZoomData(ifstream& fin, string myunit, int mybinsize, int &myBloc
   fin.read((char*)&blockBinCount, sizeof(int));
   int blockColumnCount;
   fin.read((char*)&blockColumnCount, sizeof(int));
-  
+
   bool storeBlockData = false;
   if (myunit==unit && mybinsize==binSize) {
     myBlockBinCount = blockBinCount;
     myBlockColumnCount = blockColumnCount;
     storeBlockData = true;
   }
-  
+
   int nBlocks;
   fin.read((char*)&nBlocks, sizeof(int));
 
@@ -309,7 +313,7 @@ set<int> getBlockNumbersForRegionFromBinPosition(int* regionIndices, int blockBi
    int col2 = (regionIndices[1] + 1) / blockBinCount;
    int row1 = regionIndices[2] / blockBinCount;
    int row2 = (regionIndices[3] + 1) / blockBinCount;
-   
+
    set<int> blocksSet;
    // first check the upper triangular matrix
    for (int r = row1; r <= row2; r++) {
@@ -380,7 +384,7 @@ vector<contactRecord> readBlock(ifstream& fin, int blockNumber) {
       record.counts = counts;
       v[i] = record;
     }
-  } 
+  }
   else {
     int binXOffset, binYOffset;
     bufferin.read((char*)&binXOffset, sizeof(int));
@@ -409,7 +413,7 @@ vector<contactRecord> readBlock(ifstream& fin, int blockNumber) {
 	    short c;
 	    bufferin.read((char*)&c, sizeof(short));
 	    counts = c;
-	  } 
+	  }
 	  else {
 	    bufferin.read((char*)&counts, sizeof(float));
 	  }
@@ -447,7 +451,7 @@ vector<contactRecord> readBlock(ifstream& fin, int blockNumber) {
 	    v[index]=record;
 	    index++;
 	  }
-	} 
+	}
 	else {
 	  bufferin.read((char*)&counts, sizeof(float));
 	  if (counts != 0x7fc00000) { // not sure this works
@@ -494,20 +498,42 @@ vector<double> readNormalizationVector(ifstream& fin, indexEntry entry) {
 void straw(string norm, string fname, int binsize, string chr1loc, string chr2loc, string unit, vector<int> &xActual, vector<int> &yActual, vector<float> &counts)
 {
   if (!(norm=="NONE"||norm=="VC"||norm=="VC_SQRT"||norm=="KR")) {
-    cerr << "Norm specified incorrectly, must be one of <NONE/VC/VC_SQRT/KR>" << endl; 
+    cerr << "Norm specified incorrectly, must be one of <NONE/VC/VC_SQRT/KR>" << endl;
     cerr << "Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
     return;
   }
   if (!(unit=="BP"||unit=="FRAG")) {
-    cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl; 
+    cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl;
     cerr << "Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
     return;
   }
-
   ifstream fin(fname, fstream::in);
   if (!fin) {
     cerr << "File " << fname << " cannot be opened for reading" << endl;
-    return;
+    cout<<"try url"<<endl;
+    CURL *curl;
+    CURLcode res;
+    curl = curl_easy_init();
+    if(curl){
+      curl_easy_setopt(curl, CURLOPT_URL, fname.c_str());
+      curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+      FILE *furl=fopen("hic_temp.hic","wb");
+      curl_easy_setopt(curl, CURLOPT_WRITEDATA, furl);
+      // curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, write_data);
+      curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+      // curl_easy_setopt(curl, CURLOPT_HEADER, 1L);
+      res = curl_easy_perform(curl);
+      fclose(furl);
+      if(res != CURLE_OK){
+        cerr<<"curl_easy_perform() failed:"<<curl_easy_strerror(res)<<endl;
+        return;
+      }
+      curl_easy_cleanup(curl);
+      string filename="hic_temp.hic";
+      fin.close();
+      fin.clear();
+      fin.open(filename, fstream::in);
+    }
   }
   stringstream ss(chr1loc);
   string chr1, chr2, x, y;
@@ -522,10 +548,10 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
   if (getline(ss1, x, ':') && getline(ss1, y, ':')) {
     c2pos1 = stoi(x);
     c2pos2 = stoi(y);
-  }  
+  }
   int chr1ind, chr2ind;
   long master = readHeader(fin, chr1, chr2, c1pos1, c1pos2, c2pos1, c2pos2, chr1ind, chr2ind);
-  
+
   int c1=min(chr1ind,chr2ind);
   int c2=max(chr1ind,chr2ind);
   int origRegionIndices[4]; // as given by user
@@ -556,7 +582,7 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
   long myFilePos;
 
   // readFooter will assign the above variables
-  readFooter(fin, master, c1, c2, norm, unit, binsize, myFilePos, c1NormEntry, c2NormEntry); 
+  readFooter(fin, master, c1, c2, norm, unit, binsize, myFilePos, c1NormEntry, c2NormEntry);
 
   vector<double> c1Norm;
   vector<double> c2Norm;
@@ -567,9 +593,9 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
   }
   int blockBinCount, blockColumnCount;
   // readMatrix will assign blockBinCount and blockColumnCount
-  readMatrix(fin, myFilePos, unit, binsize, blockBinCount, blockColumnCount); 
+  readMatrix(fin, myFilePos, unit, binsize, blockBinCount, blockColumnCount);
 
-  set<int> blockNumbers = getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount, c1==c2); 
+  set<int> blockNumbers = getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount, c1==c2);
 
   // getBlockIndices
   vector<contactRecord> records;
@@ -578,7 +604,7 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
     records = readBlock(fin, *it);
     for (vector<contactRecord>::iterator it2=records.begin(); it2!=records.end(); ++it2) {
       contactRecord rec = *it2;
-      
+
       int x = rec.binX * binsize;
       int y = rec.binY * binsize;
       float c = rec.counts;
@@ -597,7 +623,4 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
       }
     }
   }
-
 }
-
-
