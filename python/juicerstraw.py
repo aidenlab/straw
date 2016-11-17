@@ -1,8 +1,10 @@
+#this is the module file
 #Reads the genome name from the hic header and the program will output  x, y, and count
 #Can only take in a .hic file
 from __future__ import absolute_import, division, print_function, unicode_literals
 import sys
 import struct
+# import urllib
 import wget
 import zlib
 blockMap = dict()
@@ -25,15 +27,14 @@ def readcstr(f):
 def readHeader(req, chr1, chr2, posilist):
     magic_string = struct.unpack('<3s', req.read(3))[0]
     req.read(1)
-    # print(str(magic_string),"\n")
     if (magic_string != b"HIC"):
         print('This does not appear to be a HiC file magic string is incorrect')
-        sys.exit(1)
+        return -1
     global version
     version = struct.unpack('<i',req.read(4))[0]
     if (version < 6):
         print("Version {0} no longer supported".format(str(version)))
-        sys.exit(1)
+        return -1
     # print('HiC version:' + '  {0}'.format(str(version)))
     master = struct.unpack('<q',req.read(8))[0]
     genome = b""
@@ -71,7 +72,7 @@ def readHeader(req, chr1, chr2, posilist):
               posilist[3]=length
     if ((not found1) or (not found2)):
       print("One of the chromosomes wasn't found in the file. Check that the chromosome name matches the genome.\n")
-      sys.exit(1)
+      return -1
     return [master, chr1ind, chr2ind, posilist[0], posilist[1], posilist[2], posilist[3]]
 
 #FUN(fin, master, c1, c2, norm, unit, resolution) Retrun [myFilePos, c1NormEntry, c2NormEntry]
@@ -138,7 +139,7 @@ def readFooter(req, master, c1, c2, norm, unit, resolution):
             found2=True
     if ((not found1) or (not found2)):
         print("File did not contain {0} normalization vectors for one or both chromosomes at {1} {2}\n".format(norm, resolution, unit))
-        sys.exit(1)
+        return -1
     return [myFilePos, c1NormEntry, c2NormEntry]
 
 #FUN(fin, unit, resolution) Return [storeBlockData, myBlockBinCount, myBlockColumnCount]
@@ -174,10 +175,12 @@ def readMatrixZoomData(req, myunit, mybinsize):
 
 #FUN(fin, myFilePos, unit, binsize) Return [blockBinCount, blockColumnCount]
 def readMatrix(req, myFilePos, unit, binsize):
+    # print(str(req), "\t", str(myFilePos),"\t", str(unit), "\t", str(binsize))
     req.seek(myFilePos)
     c1 = struct.unpack('<i',req.read(4))[0]
     c2 = struct.unpack('<i',req.read(4))[0]
     nRes = struct.unpack('<i',req.read(4))[0]
+    # print(str(c1),"\t",str(c2),"\t",str(nRes),"\n")
     i = 0
     found = False
     blockBinCount = -1
@@ -191,7 +194,7 @@ def readMatrix(req, myFilePos, unit, binsize):
         i=i+1
     if (not found):
         print("Error finding block data\n")
-        sys.exit(1)
+        return -1
     return [blockBinCount, blockColumnCount]
 
 #FUN(regionIndices, blockBinCount, blockColumnCount, intra) Return blocksSet
@@ -319,10 +322,10 @@ def readNormalizationVector(req, entry):
 def straw(norm, req, binsize, chr1loc, chr2loc, unit):
     if (not (norm=="NONE" or norm=="VC" or norm=="VC_SQRT" or norm=="KR")):
         print("Norm specified incorrectly, must be one of <NONE/VC/VC_SQRT/KR>\nUsage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>\n")
-        sys.exit(1)
+        return -1
     if (not (unit=="BP" or unit=="FRAG")):
         print("Norm specified incorrectly, must be one of <BP/FRAG>\nUsage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>\n")
-        sys.exit(1)
+        return -1
     c1pos1=-100
     c1pos2=-100
     c2pos1=-100
@@ -338,6 +341,8 @@ def straw(norm, req, binsize, chr1loc, chr2loc, unit):
         c2pos1=chr2_arra[1]
         c2pos2=chr2_arra[2]
     list1 = readHeader(req, chr1, chr2, [c1pos1, c1pos2, c2pos1, c2pos2])
+    if(list1==-1):
+        return -1;
     master=list1[0]
     chr1ind=list1[1]
     chr2ind=list1[2]
@@ -368,6 +373,8 @@ def straw(norm, req, binsize, chr1loc, chr2loc, unit):
         regionIndices.append(int(c2pos1/binsize))
         regionIndices.append(int(c2pos2/binsize))
     list1 = readFooter(req, master, c1, c2, norm, unit, binsize)
+    if(list1==-1):
+        return -1
     myFilePos=list1[0]
     c1NormEntry=list1[1]
     c2NormEntry=list1[2]
@@ -375,6 +382,8 @@ def straw(norm, req, binsize, chr1loc, chr2loc, unit):
         c1Norm = readNormalizationVector(req, c1NormEntry)
         c2Norm = readNormalizationVector(req, c2NormEntry)
     list1 = readMatrix(req, myFilePos, unit, binsize)
+    # if(list1==-1):
+    #     return -1
     blockBinCount=list1[0]
     blockColumnCount=list1[1]
     blockNumbers = getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount, c1==c2)
@@ -401,23 +410,14 @@ def straw(norm, req, binsize, chr1loc, chr2loc, unit):
 	            counts.append(c)
     return [xActual, yActual, counts]
 
-#main part start
-if (len(sys.argv) != 7):
-  sys.stderr.write('Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>\n')
-  sys.exit(1)
-norm = sys.argv[1]
-infile = sys.argv[2]
-chr1loc = sys.argv[3]
-chr2loc = sys.argv[4]
-unit = sys.argv[5]
-binsize = int(sys.argv[6])
-magic_string = ""
-try: req=open(infile, 'rb')
-except:
-    filename=wget.download(infile)
-    req=open(filename,'rb')
-
-result = straw(norm, req, binsize, chr1loc, chr2loc, unit)
-for i in range(len(result[0])):
-    print("{0}\t{1}\t{2}".format(result[0][i], result[1][i], result[2][i]))
-    i
+def juicerstraw(norm,infile,chr1loc,chr2loc,unit,binsize):
+    binsize = int(binsize)
+    magic_string = ""
+    try: req=open(infile, 'rb')
+    except:
+        filename=wget.download(infile)
+        req=open(filename,'rb')
+    result = straw(norm, req, binsize, chr1loc, chr2loc, unit)
+    if (result == -1):
+        return;
+    return result
