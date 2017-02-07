@@ -427,7 +427,11 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
         # try URL first. 10K should be sufficient for header
         headers={'range' : 'bytes=0-10000'}
         r=requests.get(infile, headers=headers)
-        req=StringIO.StringIO(r.content)
+        if (r.status_code >=400):
+            print("Error accessing " + infile) 
+            print("HTTP status code " + str(r.status_code))
+            return -1
+        req=StringIO.StringIO(r.content)        
     else:
         req=open(infile, 'rb')
     
