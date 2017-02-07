@@ -364,7 +364,7 @@ def readBlock(req, size):
             w = struct.unpack('<h',uncompressedBytes[temp:(temp+2)])[0]
             temp=temp+2
             for i in range(nPts):
-                row=i/w
+                row=int(i/w)
                 col=i-row*w
                 bin1=int(binXOffset+col)
                 bin2=int(binYOffset+row)
