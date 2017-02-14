@@ -44,11 +44,11 @@ def __readcstr(f):
     while True:
         b = f.read(1)
         if b is None or b == b"\0":
-            # return str(buf,encoding="utf-8", errors="strict")
             return buf.decode("utf-8")
+        elif b == "":
+            raise EOFError("Buffer unexpectedly empty while trying to read null-terminated string")
         else:
             buf += b
-            # buf.append(b)
 
 def readHeader(req, chr1, chr2, posilist):
     """ Reads the header
@@ -424,14 +424,17 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
     """
     magic_string = ""
     if (infile.startswith("http")):
-        # try URL first. 10K should be sufficient for header
-        headers={'range' : 'bytes=0-10000'}
-        r=requests.get(infile, headers=headers)
+        # try URL first. 100K should be sufficient for header
+        headers={'range' : 'bytes=0-100000', 'x-amz-meta-requester' : 'straw'}
+        s = requests.Session()
+        r=s.get(infile, headers=headers)
         if (r.status_code >=400):
             print("Error accessing " + infile) 
             print("HTTP status code " + str(r.status_code))
             return -1
         req=StringIO.StringIO(r.content)        
+        myrange=r.headers['content-range'].split('/')
+        totalbytes=myrange[1]
     else:
         req=open(infile, 'rb')
     
@@ -459,7 +462,6 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
     list1 = readHeader(req, chr1, chr2, [c1pos1, c1pos2, c2pos1, c2pos2])
 
     master=list1[0]
-
     chr1ind=list1[1]
     chr2ind=list1[2]
     c1pos1=int(list1[3])
@@ -491,9 +493,10 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
 
     # Get footer: from master to end of file
     if (infile.startswith("http")):
-        headers={'range' : 'bytes={0}-'.format(master)}
-        r=requests.get(infile, headers=headers);
-        #print(r.headers['Content-Length'])
+        headers={'range' : 'bytes={0}-{1}'.format(master, totalbytes) , 'x-amz-meta-requester' : 'straw'}
+        #print("Requesting {} bytes".format(int(totalbytes)-master))
+        r=s.get(infile, headers=headers);
+        #print("Received {} bytes".format(r.headers['Content-Length']))
         req=StringIO.StringIO(r.content);
     else:
         req.seek(master)
@@ -506,14 +509,14 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
     if (norm != "NONE"):
         if (infile.startswith("http")):
             endrange='bytes={0}-{1}'.format(c1NormEntry['position'],c1NormEntry['position']+c1NormEntry['size'])
-            headers={'range' : endrange}             
-            r=requests.get(infile, headers=headers);
+            headers={'range' : endrange, 'x-amz-meta-requester' : 'straw'}
+            r=s.get(infile, headers=headers);
             req=StringIO.StringIO(r.content);
             c1Norm = readNormalizationVector(req)
 
             endrange='bytes={0}-{1}'.format(c2NormEntry['position'],c2NormEntry['position']+c2NormEntry['size'])
-            headers={'range' : endrange}
-            r=requests.get(infile, headers=headers)
+            headers={'range' : endrange, 'x-amz-meta-requester' : 'straw'}
+            r=s.get(infile, headers=headers)
             req=StringIO.StringIO(r.content)
             c2Norm = readNormalizationVector(req)
         else:
@@ -523,9 +526,8 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
             c2Norm = readNormalizationVector(req, c2NormEntry)
 
     if (infile.startswith("http")):
-#        list1 = readMatrixHttp(infile, myFilePos, unit, binsize)
-        headers={'range' : 'bytes={0}-'.format(myFilePos)}
-        r=requests.get(infile, headers=headers, stream=True)
+        headers={'range' : 'bytes={0}-'.format(myFilePos), 'x-amz-meta-requester' : 'straw'}
+        r=s.get(infile, headers=headers, stream=True)
         list1 = readMatrix(r.raw, unit, binsize)
     else:
         req.seek(myFilePos)
@@ -537,6 +539,7 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
     yActual=[]
     xActual=[]
     counts=[]
+
     for i_set in (blockNumbers):
         idx=dict()
         if(i_set in blockMap):
@@ -549,8 +552,8 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
         else:
             if (infile.startswith("http")):
                 endrange='bytes={0}-{1}'.format(idx['position'], idx['position']+idx['size'])
-                headers={'range' : endrange}
-                r=requests.get(infile, headers=headers);
+                headers={'range' : endrange, 'x-amz-meta-requester' : 'straw'}
+                r=s.get(infile, headers=headers);
                 req=StringIO.StringIO(r.content);
             else:
                 req.seek(idx['position'])
@@ -564,7 +567,7 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
             if (norm != "NONE"):
                 a=c1Norm[rec['binX']]*c2Norm[rec['binY']]
                 if (a!=0.0):
-                    c=c/(c1Norm[rec['binX']]*c2Norm[rec['binY']])
+                    c=(c/(c1Norm[rec['binX']]*c2Norm[rec['binY']]))
                 else:
                     c="inf"
             if ((x>=origRegionIndices[0] and x<=origRegionIndices[1] and y>=origRegionIndices[2] and y<=origRegionIndices[3]) or ((c1==c2) and y>=origRegionIndices[0] and y<=origRegionIndices[1] and x>= origRegionIndices[2] and x<=origRegionIndices[3])):
