@@ -521,9 +521,9 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
             c2Norm = readNormalizationVector(req)
         else:
             req.seek(c1NormEntry['position'])
-            c1Norm = readNormalizationVector(req, c2NormEntry)
+            c1Norm = readNormalizationVector(req)
             req.seek(c2NormEntry['position'])
-            c2Norm = readNormalizationVector(req, c2NormEntry)
+            c2Norm = readNormalizationVector(req)
 
     if (infile.startswith("http")):
         headers={'range' : 'bytes={0}-'.format(myFilePos), 'x-amz-meta-requester' : 'straw'}
