@@ -42,12 +42,12 @@ struct contactRecord {
 };
 
 bool readMagicString(std::ifstream& fin);
-long readHeader(std::ifstream& fin, std::string chr1, std::string chr2, int &c1pos1, int &c1pos2, int &c2pos1, int &c2pos2, int &chr1ind, int &chr2ind);
-void readFooter(std::ifstream& fin, long master, int c1, int c2, std::string norm, std::string unit, int resolution, long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry);
-bool readMatrixZoomData(std::ifstream& fin, std::string myunit, int mybinsize, int &myBlockBinCount, int &myBlockColumnCount);
-void readMatrix(std::ifstream& fin, int myFilePosition, std::string unit, int resolution, int &myBlockBinCount, int &myBlockColumnCount);
+long readHeader(std::istream& fin, std::string chr1, std::string chr2, int &c1pos1, int &c1pos2, int &c2pos1, int &c2pos2, int &chr1ind, int &chr2ind);
+void readFooter(std::istream& fin, long master, int c1, int c2, std::string norm, std::string unit, int resolution, long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry);
+bool readMatrixZoomData(std::istream& fin, std::string myunit, int mybinsize, int &myBlockBinCount, int &myBlockColumnCount);
+void readMatrix(std::istream& fin, int myFilePosition, std::string unit, int resolution, int &myBlockBinCount, int &myBlockColumnCount);
 std::set<int> getBlockNumbersForRegionFromBinPosition(int* regionIndices, int blockBinCount, int blockColumnCount, bool intra);
-std::vector<contactRecord> readBlock(std::ifstream& fin, int blockNumber);
-std::vector<double> readNormalizationVector(std::ifstream& fin, indexEntry entry);
+std::vector<contactRecord> readBlock(std::istream& fin, int blockNumber);
+std::vector<double> readNormalizationVector(std::istream& fin, indexEntry entry);
 void straw(std::string norm, std::string fname, int binsize, std::string chr1loc, std::string chr2loc, std::string unit, std::vector<int>& xActual, std::vector<int>& yActual, std::vector<float>& counts);
 #endif
