@@ -96,7 +96,7 @@ WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
     return 0;
   }
  
-  memcpy(&(mem->memory[mem->size]), contents, realsize);
+  std::memcpy(&(mem->memory[mem->size]), contents, realsize);
   mem->size += realsize;
   mem->memory[mem->size] = 0;
  
@@ -713,7 +713,7 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
   CURL *curl;
 
   long master;
-  if (strncmp(fname.c_str(), prefix.c_str(), prefix.size()) == 0) {
+  if (std::strncmp(fname.c_str(), prefix.c_str(), prefix.size()) == 0) {
     isHttp = true;
     char * buffer;
     curl = initCURL(fname.c_str());
