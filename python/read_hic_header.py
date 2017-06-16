@@ -2,7 +2,8 @@
 #Can take in a .hic file or URL that points to .hic file
 import sys
 import struct
-import urllib
+import requests
+import StringIO
 
 def readcstr(f):
     buf = bytearray()
@@ -19,15 +20,26 @@ if (len(sys.argv) != 2):
 
 infile = sys.argv[1]
 magic_string = ""
-try: req = urllib.urlopen(infile)
-except:
-  req=open(infile, 'r')
-c=req.read(1)
-while (c != '\0'):
-    magic_string += c
-    c=req.read(1)
-if (magic_string != "HIC"):
-    print 'This does not appear to be a HiC file; magic string is incorrect'
+
+if (infile.startswith("http")):
+    # try URL first. 100K should be sufficient for header
+    headers={'range' : 'bytes=0-100000', 'x-amz-meta-requester' : 'straw'}
+    s = requests.Session()
+    r=s.get(infile, headers=headers)
+    if (r.status_code >=400):
+        print("Error accessing " + infile) 
+        print("HTTP status code " + str(r.status_code))
+        sys.exit(1)
+    req=StringIO.StringIO(r.content)        
+    myrange=r.headers['content-range'].split('/')
+    totalbytes=myrange[1]
+else:
+    req=open(infile, 'rb')
+
+magic_string = struct.unpack('<3s', req.read(3))[0]
+req.read(1)
+if (magic_string != b"HIC"):
+    print('This does not appear to be a HiC file magic string is incorrect')
     sys.exit(1)
 version = struct.unpack('<i',req.read(4))[0]
 print 'HiC version:'
