@@ -422,6 +422,10 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
        unit(str): One of BP or FRAG
        binsize(int): Resolution, i.e. 25000 for 25K
     """
+    # clear the global variable blockMap so that it won't keep the data from previous calls
+    for blockNum in blockMap.keys():
+        blockMap.pop(blockNum)
+
     magic_string = ""
     if (infile.startswith("http")):
         # try URL first. 100K should be sufficient for header
