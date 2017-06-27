@@ -1,0 +1,370 @@
+{
+	"auto_complete":
+	{
+		"selected_items":
+		[
+			[
+				"time",
+				"timestamps"
+			]
+		]
+	},
+	"buffers":
+	[
+		{
+			"file": "straw.h",
+			"settings":
+			{
+				"buffer_size": 2574,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"contents": "/*\n  The MIT License (MIT)\n \n  Copyright (c) 2011-2016 Broad Institute, Aiden Lab\n \n Permission is hereby granted, free of charge, to any person obtaining a copy\n of this software and associated documentation files (the \"Software\"), to deal\n in the Software without restriction, including without limitation the rights\n to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n copies of the Software, and to permit persons to whom the Software is\n furnished to do so, subject to the following conditions:\n \n The above copyright notice and this permission notice shall be included in\n all copies or substantial portions of the Software.\n \n THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN\n THE SOFTWARE.\n*/\n#include <cstring>\n#include <iostream>\n#include <fstream>\n#include <iostream>\n#include <sstream>\n#include <map>\n#include <set>\n#include <vector>\n#include <streambuf>\n#include <curl/curl.h>\n#include \"zlib.h\"\n#include \"straw.h\"\n\n#include <time.h>\nusing namespace std;\n\n/*\n  Straw: fast C++ implementation of dump. Not as fully featured as the\n  Java version. Reads the .hic file, finds the appropriate matrix and slice\n  of data, and outputs as text in sparse upper triangular format.\n\n  Currently only supporting matrices.\n\n  Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize> \n */\n// this is for creating a stream from a byte array for ease of use\nstruct membuf : std::streambuf\n{\n  membuf(char* begin, char* end) {\n    this->setg(begin, begin, end);\n  }\n};\n\n// for holding data from URL call\nstruct MemoryStruct {\n  char *memory;\n  size_t size;\n};\n\n// version number\nint version;\n\n// map of block numbers to pointers\nmap <int, indexEntry> blockMap;\n\nlong total_bytes;\n\nsize_t hdf(char* b, size_t size, size_t nitems, void *userdata) {\n  size_t numbytes = size * nitems;\n  b[numbytes+1]='\\0';\n  string s(b);\n  int found = s.find(\"Content-Range\");\n  if (found !=  string::npos) {\n    int found2 = s.find(\"/\");\n    //Content-Range: bytes 0-100000/891471462\n    if (found2 != string::npos) {\n      string total=s.substr(found2+1);\n      total_bytes = stol(total);\n    }\n  }\n\n  return numbytes;\n}\n\n// callback for libcurl. data written to this buffer\nstatic size_t\nWriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)\n{\n  clock_t t1, t2; //<<<<<<<<<<<<<\n  t1 = clock();   //<<<<<<<<<<<<<\n\n  size_t realsize = size * nmemb;\n  struct MemoryStruct *mem = (struct MemoryStruct *)userp;\n \n  mem->memory = static_cast<char*>(realloc(mem->memory, mem->size + realsize + 1));\n  if(mem->memory == NULL) {\n    /* out of memory! */ \n    printf(\"not enough memory (realloc returned NULL)\\n\");\n    return 0;\n  }\n \n  std::memcpy(&(mem->memory[mem->size]), contents, realsize);\n  mem->size += realsize;\n  mem->memory[mem->size] = 0;\n \n\n  t2 = clock();\n  float diff = ((float)t2-(float)t1);//<<<<<<<<<<<<\n  float sec = diff/CLOCKS_PER_SEC;//<<<<<<<<<<<<\n  cout << \"callback function took \" << sec << \"seconds to run\" << endl; //<<<<<<<<<<\n\n  return realsize;\n}\n\n// get a buffer that can be used as an input stream from the URL\nchar* getData(CURL *curl, long position, int chunksize) {\n  std::ostringstream oss;\n  struct MemoryStruct chunk; \n\n  chunk.memory = static_cast<char*>(malloc(1)); \n  chunk.size = 0;    /* no data at this point */ \n  oss << position << \"-\" << position + chunksize;\n  curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);\n  curl_easy_setopt(curl, CURLOPT_RANGE, oss.str().c_str());\n  CURLcode res = curl_easy_perform(curl);\n  if (res != CURLE_OK) {\n    fprintf(stderr, \"curl_easy_perform() failed: %s\\n\",\n\t    curl_easy_strerror(res));    \n  }\n  //  printf(\"%lu bytes retrieved\\n\", (long)chunk.size);\n\n  return chunk.memory;\n}\n\n// initialize the CURL stream\nCURL* initCURL(const char* url) {\n  CURL* curl = curl_easy_init();\n  if(curl) {\n    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);\n    curl_easy_setopt(curl, CURLOPT_URL, url);\n    //curl_easy_setopt (curl, CURLOPT_VERBOSE, 1L); \n    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);\n    curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, hdf);\n    curl_easy_setopt(curl, CURLOPT_USERAGENT, \"straw\");\n  }\n  return curl;\n}\n\n// returns whether or not this is valid HiC file\nbool readMagicString(istream& fin) {\n  string str;\n  getline(fin, str, '\\0' );\n  return str[0]=='H' && str[1]=='I' && str[2]=='C';\n}\n\n// reads the header, storing the positions of the normalization vectors and returning the master pointer\nlong readHeader(istream& fin, string chr1, string chr2, int &c1pos1, int &c1pos2, int &c2pos1, int &c2pos2, int &chr1ind, int &chr2ind) {\n  if (!readMagicString(fin)) {\n    cerr << \"Hi-C magic string is missing, does not appear to be a hic file\" << endl;\n    exit(1);\n  }\n\n  fin.read((char*)&version, sizeof(int));\n  if (version < 6) {\n    cerr << \"Version \" << version << \" no longer supported\" << endl;\n    exit(1);\n  }\n  long master;\n  fin.read((char*)&master, sizeof(long));\n  string genome;\n  getline(fin, genome, '\\0' );\n  int nattributes;\n  fin.read((char*)&nattributes, sizeof(int));\n\n  // reading and ignoring attribute-value dictionary\n  for (int i=0; i<nattributes; i++) {\n    string key, value;\n    getline(fin, key, '\\0');\n    getline(fin, value, '\\0');\n  }\n  int nChrs;\n  fin.read((char*)&nChrs, sizeof(int));\n  // chromosome map for finding matrix\n  bool found1 = false;\n  bool found2 = false;\n  for (int i=0; i<nChrs; i++) {\n    string name;\n    int length;\n    getline(fin, name, '\\0');\n    fin.read((char*)&length, sizeof(int));\n    if (name==chr1) {\n      found1=true;\n      chr1ind = i;\n      if (c1pos1 == -100) {\n\tc1pos1 = 0;\n\tc1pos2 = length;\n      }\n    }\n    if (name==chr2) {\n      found2=true;\n      chr2ind = i;\n      if (c2pos1 == -100) {\n\tc2pos1 = 0;\n\tc2pos2 = length;\n      }\n    }\n  }\n  if (!found1 || !found2) {\n    cerr << \"One of the chromosomes wasn't found in the file. Check that the chromosome name matches the genome.\" << endl;\n    exit(1);\n  }\n  return master;\n}\n\n// reads the footer from the master pointer location. takes in the chromosomes,\n// norm, unit (BP or FRAG) and resolution or binsize, and sets the file \n// position of the matrix and the normalization vectors for those chromosomes \n// at the given normalization and resolution\nvoid readFooter(istream& fin, long master, int c1, int c2, string norm, string unit, int resolution, long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry) {\n  int nBytes;\n  fin.read((char*)&nBytes, sizeof(int));\n  stringstream ss;\n  ss << c1 << \"_\" << c2;\n  string key = ss.str();\n  \n  int nEntries;\n  fin.read((char*)&nEntries, sizeof(int));\n  bool found = false;\n  for (int i=0; i<nEntries; i++) {\n    string str;\n    getline(fin, str, '\\0');\n    long fpos;\n    fin.read((char*)&fpos, sizeof(long));\n    int sizeinbytes;\n    fin.read((char*)&sizeinbytes, sizeof(int));\n    if (str == key) {\n      myFilePos = fpos;\n      found=true;\n    }\n  }\n  if (!found) {\n    cerr << \"File doesn't have the given chr_chr map\" << endl;\n    exit(1);\n  }\n\n  if (norm==\"NONE\") return; // no need to read norm vector index\n \n  // read in and ignore expected value maps; don't store; reading these to \n  // get to norm vector index\n  int nExpectedValues;\n  fin.read((char*)&nExpectedValues, sizeof(int));\n  for (int i=0; i<nExpectedValues; i++) {\n    string str;\n    getline(fin, str, '\\0'); //unit\n    int binSize;\n    fin.read((char*)&binSize, sizeof(int));\n\n    int nValues;\n    fin.read((char*)&nValues, sizeof(int));\n    for (int j=0; j<nValues; j++) {\n      double v;\n      fin.read((char*)&v, sizeof(double));\n    }\n\n    int nNormalizationFactors;\n    fin.read((char*)&nNormalizationFactors, sizeof(int));\n    for (int j=0; j<nNormalizationFactors; j++) {\n      int chrIdx;\n      fin.read((char*)&chrIdx, sizeof(int));\n      double v;\n      fin.read((char*)&v, sizeof(double));\n    }\n  }\n  fin.read((char*)&nExpectedValues, sizeof(int));\n  for (int i=0; i<nExpectedValues; i++) {\n    string str;\n    getline(fin, str, '\\0'); //typeString\n    getline(fin, str, '\\0'); //unit\n    int binSize;\n    fin.read((char*)&binSize, sizeof(int));\n\n    int nValues;\n    fin.read((char*)&nValues, sizeof(int));\n    for (int j=0; j<nValues; j++) {\n      double v;\n      fin.read((char*)&v, sizeof(double));\n    }\n    int nNormalizationFactors;\n    fin.read((char*)&nNormalizationFactors, sizeof(int));\n    for (int j=0; j<nNormalizationFactors; j++) {\n      int chrIdx;\n      fin.read((char*)&chrIdx, sizeof(int));\n      double v;\n      fin.read((char*)&v, sizeof(double));\n    }\n  }\n  // Index of normalization vectors\n  fin.read((char*)&nEntries, sizeof(int));\n  bool found1 = false;\n  bool found2 = false;\n  for (int i = 0; i < nEntries; i++) {\n    string normtype;\n    getline(fin, normtype, '\\0'); //normalization type\n    int chrIdx;\n    fin.read((char*)&chrIdx, sizeof(int));\n    string unit1;\n    getline(fin, unit1, '\\0'); //unit\n    int resolution1;\n    fin.read((char*)&resolution1, sizeof(int));\n    long filePosition;\n    fin.read((char*)&filePosition, sizeof(long));\n    int sizeInBytes;\n    fin.read((char*)&sizeInBytes, sizeof(int));\n    if (chrIdx == c1 && normtype == norm && unit1 == unit && resolution1 == resolution) {\n      c1NormEntry.position=filePosition;\n      c1NormEntry.size=sizeInBytes;\n      found1 = true;\n    }\n    if (chrIdx == c2 && normtype == norm && unit1 == unit && resolution1 == resolution) {\n      c2NormEntry.position=filePosition;\n      c2NormEntry.size=sizeInBytes;\n      found2 = true;\n    }\n  }\n  if (!found1 || !found2) {\n    cerr << \"File did not contain \" << norm << \" normalization vectors for one or both chromosomes at \" << resolution << \" \" << unit << endl;\n    exit(1);\n  }\n}\n\n// reads the raw binned contact matrix at specified resolution, setting the block bin count and block column count \nbool readMatrixZoomData(istream& fin, string myunit, int mybinsize, int &myBlockBinCount, int &myBlockColumnCount) {\n  string unit;\n  getline(fin, unit, '\\0' ); // unit\n  int tmp;\n  fin.read((char*)&tmp, sizeof(int)); // Old \"zoom\" index -- not used\n  float tmp2;\n  fin.read((char*)&tmp2, sizeof(float)); // sumCounts\n  fin.read((char*)&tmp2, sizeof(float)); // occupiedCellCount\n  fin.read((char*)&tmp2, sizeof(float)); // stdDev\n  fin.read((char*)&tmp2, sizeof(float)); // percent95\n  int binSize;\n  fin.read((char*)&binSize, sizeof(int));\n  int blockBinCount;\n  fin.read((char*)&blockBinCount, sizeof(int));\n  int blockColumnCount;\n  fin.read((char*)&blockColumnCount, sizeof(int));\n  \n  bool storeBlockData = false;\n  if (myunit==unit && mybinsize==binSize) {\n    myBlockBinCount = blockBinCount;\n    myBlockColumnCount = blockColumnCount;\n    storeBlockData = true;\n  }\n  \n  int nBlocks;\n  fin.read((char*)&nBlocks, sizeof(int));\n\n  for (int b = 0; b < nBlocks; b++) {\n    int blockNumber;\n    fin.read((char*)&blockNumber, sizeof(int));\n    long filePosition;\n    fin.read((char*)&filePosition, sizeof(long));\n    int blockSizeInBytes;\n    fin.read((char*)&blockSizeInBytes, sizeof(int));\n    indexEntry entry;\n    entry.size = blockSizeInBytes;\n    entry.position = filePosition;\n    if (storeBlockData) blockMap[blockNumber] = entry;\n  }\n  return storeBlockData;\n}\n\n// reads the raw binned contact matrix at specified resolution, setting the block bin count and block column count \nbool readMatrixZoomDataHttp(CURL* curl, long &myFilePosition, string myunit, int mybinsize, int &myBlockBinCount, int &myBlockColumnCount) {\n  char* buffer;\n  int header_size = 5*sizeof(int)+4*sizeof(float);\n  char* first;\n  first = getData(curl, myFilePosition, 1);\n  if (first[0]=='B') {\n    header_size+=3;\n  }\n  else if (first[0]=='F') {\n    header_size+=5;\n  }\n  else {\n    cerr << \"Unit not understood\" << endl;\n    exit(1);\n  }\n  buffer = getData(curl, myFilePosition, header_size);\n  membuf sbuf(buffer, buffer + header_size);\n  istream fin(&sbuf);\n\n  string unit;\n  getline(fin, unit, '\\0' ); // unit\n  int tmp;\n  fin.read((char*)&tmp, sizeof(int)); // Old \"zoom\" index -- not used\n  float tmp2;\n  fin.read((char*)&tmp2, sizeof(float)); // sumCounts\n  fin.read((char*)&tmp2, sizeof(float)); // occupiedCellCount\n  fin.read((char*)&tmp2, sizeof(float)); // stdDev\n  fin.read((char*)&tmp2, sizeof(float)); // percent95\n  int binSize;\n  fin.read((char*)&binSize, sizeof(int));\n  int blockBinCount;\n  fin.read((char*)&blockBinCount, sizeof(int));\n  int blockColumnCount;\n  fin.read((char*)&blockColumnCount, sizeof(int));\n\n  bool storeBlockData = false;\n  if (myunit==unit && mybinsize==binSize) {\n    myBlockBinCount = blockBinCount;\n    myBlockColumnCount = blockColumnCount;\n    storeBlockData = true;\n  }\n  \n  int nBlocks;\n  fin.read((char*)&nBlocks, sizeof(int));\n\n  if (storeBlockData) {\n    buffer = getData(curl, myFilePosition+header_size, nBlocks*(sizeof(int)+sizeof(long)+sizeof(int)));\n    membuf sbuf2(buffer, buffer + nBlocks*(sizeof(int)+sizeof(long)+sizeof(int)));\n    istream fin2(&sbuf2);\n    for (int b = 0; b < nBlocks; b++) {\n      int blockNumber;\n      fin2.read((char*)&blockNumber, sizeof(int));\n      long filePosition;\n      fin2.read((char*)&filePosition, sizeof(long));\n      int blockSizeInBytes;\n      fin2.read((char*)&blockSizeInBytes, sizeof(int));\n      indexEntry entry;\n      entry.size = blockSizeInBytes;\n      entry.position = filePosition;\n      blockMap[blockNumber] = entry;\n    }\n  }\n  else {\n    myFilePosition = myFilePosition+header_size+(nBlocks*(sizeof(int)+sizeof(long)+sizeof(int)));\n  }\n  delete buffer;\n  return storeBlockData;\n}\n\n// goes to the specified file pointer in http and finds the raw contact matrix at specified resolution, calling readMatrixZoomData.\n// sets blockbincount and blockcolumncount\nvoid readMatrixHttp(CURL *curl, long myFilePosition, string unit, int resolution, int &myBlockBinCount, int &myBlockColumnCount) {\n  char * buffer;\n  int size = sizeof(int)*3;\n  buffer = getData(curl, myFilePosition, size);\n  membuf sbuf(buffer, buffer + size);\n  istream bufin(&sbuf);\n\n  int c1,c2;\n  bufin.read((char*)&c1, sizeof(int)); //chr1\n  bufin.read((char*)&c2, sizeof(int)); //chr2\n  int nRes;\n  bufin.read((char*)&nRes, sizeof(int));\n  int i=0;\n  bool found=false;\n  myFilePosition=myFilePosition+size;\n  delete buffer;\n\n  while (i<nRes && !found) {\n    // myFilePosition gets updated within call\n    found = readMatrixZoomDataHttp(curl, myFilePosition, unit, resolution, myBlockBinCount, myBlockColumnCount);\n    i++;\n  }\n  if (!found) {\n    cerr << \"Error finding block data\" << endl;\n    exit(1);\n  }\n}\n\n// goes to the specified file pointer and finds the raw contact matrix at specified resolution, calling readMatrixZoomData.\n// sets blockbincount and blockcolumncount\nvoid readMatrix(istream& fin, long myFilePosition, string unit, int resolution, int &myBlockBinCount, int &myBlockColumnCount) {\n  fin.seekg(myFilePosition, ios::beg);\n  int c1,c2;\n  fin.read((char*)&c1, sizeof(int)); //chr1\n  fin.read((char*)&c2, sizeof(int)); //chr2\n  int nRes;\n  fin.read((char*)&nRes, sizeof(int));\n  int i=0;\n  bool found=false;\n  while (i<nRes && !found) {\n    found = readMatrixZoomData(fin, unit, resolution, myBlockBinCount, myBlockColumnCount);\n    i++;\n  }\n  if (!found) {\n    cerr << \"Error finding block data\" << endl;\n    exit(1);\n  }\n}\n// gets the blocks that need to be read for this slice of the data.  needs blockbincount, blockcolumncount, and whether\n// or not this is intrachromosomal.\nset<int> getBlockNumbersForRegionFromBinPosition(int* regionIndices, int blockBinCount, int blockColumnCount, bool intra) {\n   int col1 = regionIndices[0] / blockBinCount;\n   int col2 = (regionIndices[1] + 1) / blockBinCount;\n   int row1 = regionIndices[2] / blockBinCount;\n   int row2 = (regionIndices[3] + 1) / blockBinCount;\n   \n   set<int> blocksSet;\n   // first check the upper triangular matrix\n   for (int r = row1; r <= row2; r++) {\n     for (int c = col1; c <= col2; c++) {\n       int blockNumber = r * blockColumnCount + c;\n       blocksSet.insert(blockNumber);\n     }\n   }\n   // check region part that overlaps with lower left triangle\n   // but only if intrachromosomal\n   if (intra) {\n     for (int r = col1; r <= col2; r++) {\n       for (int c = row1; c <= row2; c++) {\n\t int blockNumber = r * blockColumnCount + c;\n\t blocksSet.insert(blockNumber);\n       }\n     }\n   }\n\n   return blocksSet;\n}\n\n// this is the meat of reading the data.  takes in the block number and returns the set of contact records corresponding to\n// that block.  the block data is compressed and must be decompressed using the zlib library functions\nvector<contactRecord> readBlock(istream& fin, CURL* curl, bool isHttp, int blockNumber) {\n  indexEntry idx = blockMap[blockNumber];\n  if (idx.size == 0) {\n    vector<contactRecord> v;\n    return v;\n  }\n  char* compressedBytes = new char[idx.size];\n  char* uncompressedBytes = new char[idx.size*10]; //biggest seen so far is 3\n\n  if (isHttp) {\n    compressedBytes = getData(curl, idx.position, idx.size);    \n  }\n  else {\n    fin.seekg(idx.position, ios::beg);\n    fin.read(compressedBytes, idx.size);\n  }\n  // Decompress the block\n  // zlib struct\n  z_stream infstream;\n  infstream.zalloc = Z_NULL;\n  infstream.zfree = Z_NULL;\n  infstream.opaque = Z_NULL;\n  infstream.avail_in = (uInt)(idx.size); // size of input\n  infstream.next_in = (Bytef *)compressedBytes; // input char array\n  infstream.avail_out = (uInt)idx.size*10; // size of output\n  infstream.next_out = (Bytef *)uncompressedBytes; // output char array\n  // the actual decompression work.\n  inflateInit(&infstream);\n  inflate(&infstream, Z_NO_FLUSH);\n  inflateEnd(&infstream);\n  int uncompressedSize=infstream.total_out;\n\n  // create stream from buffer for ease of use\n  membuf sbuf(uncompressedBytes, uncompressedBytes + uncompressedSize);\n  istream bufferin(&sbuf);\n  int nRecords;\n  bufferin.read((char*)&nRecords, sizeof(int));\n  vector<contactRecord> v(nRecords);\n  // different versions have different specific formats\n  if (version < 7) {\n    for (int i = 0; i < nRecords; i++) {\n      int binX, binY;\n      bufferin.read((char*)&binX, sizeof(int));\n      bufferin.read((char*)&binY, sizeof(int));\n      float counts;\n      bufferin.read((char*)&counts, sizeof(float));\n      contactRecord record;\n      record.binX = binX;\n      record.binY = binY;\n      record.counts = counts;\n      v[i] = record;\n    }\n  } \n  else {\n    int binXOffset, binYOffset;\n    bufferin.read((char*)&binXOffset, sizeof(int));\n    bufferin.read((char*)&binYOffset, sizeof(int));\n    char useShort;\n    bufferin.read((char*)&useShort, sizeof(char));\n    char type;\n    bufferin.read((char*)&type, sizeof(char));\n    int index=0;\n    if (type == 1) {\n      // List-of-rows representation\n      short rowCount;\n      bufferin.read((char*)&rowCount, sizeof(short));\n      for (int i = 0; i < rowCount; i++) {\n\tshort y;\n\tbufferin.read((char*)&y, sizeof(short));\n\tint binY = y + binYOffset;\n\tshort colCount;\n\tbufferin.read((char*)&colCount, sizeof(short));\n\tfor (int j = 0; j < colCount; j++) {\n\t  short x;\n\t  bufferin.read((char*)&x, sizeof(short));\n\t  int binX = binXOffset + x;\n\t  float counts;\n\t  if (useShort == 0) { // yes this is opposite of usual\n\t    short c;\n\t    bufferin.read((char*)&c, sizeof(short));\n\t    counts = c;\n\t  } \n\t  else {\n\t    bufferin.read((char*)&counts, sizeof(float));\n\t  }\n\t  contactRecord record;\n\t  record.binX = binX;\n\t  record.binY = binY;\n\t  record.counts = counts;\n\t  v[index]=record;\n\t  index++;\n\t}\n      }\n    }\n    else if (type == 2) { // have yet to find test file where this is true, possibly entirely deprecated\n      int nPts;\n      bufferin.read((char*)&nPts, sizeof(int));\n      short w;\n      bufferin.read((char*)&w, sizeof(short));\n\n      for (int i = 0; i < nPts; i++) {\n\t//int idx = (p.y - binOffset2) * w + (p.x - binOffset1);\n\tint row = i / w;\n\tint col = i - row * w;\n\tint bin1 = binXOffset + col;\n\tint bin2 = binYOffset + row;\n\n\tfloat counts;\n\tif (useShort == 0) { // yes this is opposite of the usual\n\t  short c;\n\t  bufferin.read((char*)&c, sizeof(short));\n\t  if (c != -32768) {\n\t    contactRecord record;\n\t    record.binX = bin1;\n\t    record.binY = bin2;\n\t    record.counts = c;\n\t    v[index]=record;\n\t    index++;\n\t  }\n\t} \n\telse {\n\t  bufferin.read((char*)&counts, sizeof(float));\n\t  if (counts != 0x7fc00000) { // not sure this works\n\t    //\t  if (!Float.isNaN(counts)) {\n\t    contactRecord record;\n\t    record.binX = bin1;\n\t    record.binY = bin2;\n\t    record.counts = counts;\n\t    v[index]=record;\n\t    index++;\n\t  }\n\t}\n      }\n    }\n  }\n  delete compressedBytes;\n  delete uncompressedBytes; // don't forget to delete your heap arrays in C++!\n  return v;\n}\n\n// reads the normalization vector from the file at the specified location\nvector<double> readNormalizationVector(istream& bufferin) {\n  int nValues;\n  bufferin.read((char*)&nValues, sizeof(int));\n  vector<double> values(nValues);\n  //  bool allNaN = true;\n\n  for (int i = 0; i < nValues; i++) {\n    double d;\n    bufferin.read((char*)&d, sizeof(double));\n    values[i] = d;\n    /* if (!Double.isNaN(values[i])) {\n      allNaN = false;\n      }*/\n  }\n  //  if (allNaN) return null;\n  return values;\n}\n\nvoid straw(string norm, string fname, int binsize, string chr1loc, string chr2loc, string unit, vector<int> &xActual, vector<int> &yActual, vector<float> &counts)\n{\n  int earlyexit=1;\n  if (!(norm==\"NONE\"||norm==\"VC\"||norm==\"VC_SQRT\"||norm==\"KR\")) {\n    cerr << \"Norm specified incorrectly, must be one of <NONE/VC/VC_SQRT/KR>\" << endl; \n    cerr << \"Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>\" << endl;\n    return;\n  }\n  if (!(unit==\"BP\"||unit==\"FRAG\")) {\n    cerr << \"Norm specified incorrectly, must be one of <BP/FRAG>\" << endl; \n    cerr << \"Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>\" << endl;\n    return;\n  }\n\n  // parse chromosome positions\n  stringstream ss(chr1loc);\n  string chr1, chr2, x, y;\n  int c1pos1=-100, c1pos2=-100, c2pos1=-100, c2pos2=-100;\n  getline(ss, chr1, ':');\n  if (getline(ss, x, ':') && getline(ss, y, ':')) {\n    c1pos1 = stoi(x);\n    c1pos2 = stoi(y);\n  }\n  stringstream ss1(chr2loc);\n  getline(ss1, chr2, ':');\n  if (getline(ss1, x, ':') && getline(ss1, y, ':')) {\n    c2pos1 = stoi(x);\n    c2pos2 = stoi(y);\n  }  \n  int chr1ind, chr2ind;\n\n  // HTTP code\n  string prefix=\"http\";\n  bool isHttp = false;\n  ifstream fin;\n\n  // read header into buffer; 100K should be sufficient\n  CURL *curl;\n\n  long master;\n  if (std::strncmp(fname.c_str(), prefix.c_str(), prefix.size()) == 0) {\n    isHttp = true;\n    char * buffer;\n    curl = initCURL(fname.c_str());\n    if (curl) {\n      buffer = getData(curl, 0, 100000);    \n    }\n    else {\n      cerr << \"URL \" << fname << \" cannot be opened for reading\" << endl;\n      return;\n    }\n    membuf sbuf(buffer, buffer + 100000); \n    istream bufin(&sbuf);  \n    master = readHeader(bufin, chr1, chr2, c1pos1, c1pos2, c2pos1, c2pos2, chr1ind, chr2ind);\n    delete buffer;\n  }\n  else {\n    fin.open(fname, fstream::in);\n    if (!fin) {\n      cerr << \"File \" << fname << \" cannot be opened for reading\" << endl;\n      return;\n    }\n    master = readHeader(fin, chr1, chr2, c1pos1, c1pos2, c2pos1, c2pos2, chr1ind, chr2ind);\n  }\n\n  // from header have size of chromosomes, set region to read\n  int c1=min(chr1ind,chr2ind);\n  int c2=max(chr1ind,chr2ind);\n  int origRegionIndices[4]; // as given by user\n  int regionIndices[4]; // used to find the blocks we need to access\n  // reverse order if necessary\n  if (chr1ind > chr2ind) {\n    origRegionIndices[0] = c2pos1;\n    origRegionIndices[1] = c2pos2;\n    origRegionIndices[2] = c1pos1;\n    origRegionIndices[3] = c1pos2;\n    regionIndices[0] = c2pos1 / binsize;\n    regionIndices[1] = c2pos2 / binsize;\n    regionIndices[2] = c1pos1 / binsize;\n    regionIndices[3] = c1pos2 / binsize;\n  }\n  else {\n    origRegionIndices[0] = c1pos1;\n    origRegionIndices[1] = c1pos2;\n    origRegionIndices[2] = c2pos1;\n    origRegionIndices[3] = c2pos2;\n    regionIndices[0] = c1pos1 / binsize;\n    regionIndices[1] = c1pos2 / binsize;\n    regionIndices[2] = c2pos1 / binsize;\n    regionIndices[3] = c2pos2 / binsize;\n  }\n\n  indexEntry c1NormEntry, c2NormEntry;\n  long myFilePos;\n\n  long bytes_to_read = total_bytes - master;\n\n  if (isHttp) {\n    char* buffer2;\n    buffer2 = getData(curl, master, bytes_to_read);    \n    membuf sbuf2(buffer2, buffer2 + bytes_to_read);\n    istream bufin2(&sbuf2);\n    readFooter(bufin2, master, c1, c2, norm, unit, binsize, myFilePos, c1NormEntry, c2NormEntry); \n    delete buffer2;\n  }\n  else { \n    fin.seekg(master, ios::beg);\n    readFooter(fin, master, c1, c2, norm, unit, binsize, myFilePos, c1NormEntry, c2NormEntry); \n  }\n  // readFooter will assign the above variables\n\n\n  vector<double> c1Norm;\n  vector<double> c2Norm;\n\n  if (norm != \"NONE\") {\n    char* buffer3;\n    if (isHttp) {\n      buffer3 = getData(curl, c1NormEntry.position, c1NormEntry.size);\n    }\n    else {\n      buffer3 = new char[c1NormEntry.size];\n      fin.seekg(c1NormEntry.position, ios::beg);\n      fin.read(buffer3, c1NormEntry.size);\n    }\n    membuf sbuf3(buffer3, buffer3 + c1NormEntry.size);\n    istream bufferin(&sbuf3);\n    c1Norm = readNormalizationVector(bufferin);\n\n    char* buffer4;\n    if (isHttp) {\n      buffer4 = getData(curl, c2NormEntry.position, c2NormEntry.size);\n    }\n    else {\n      buffer4 = new char[c2NormEntry.size];\n      fin.seekg(c2NormEntry.position, ios::beg);\n      fin.read(buffer4, c2NormEntry.size);\n    }\n    membuf sbuf4(buffer4, buffer4 + c2NormEntry.size);\n    istream bufferin2(&sbuf4);\n    c2Norm = readNormalizationVector(bufferin2);\n    delete buffer3;\n    delete buffer4;\n  }\n\n  int blockBinCount, blockColumnCount;\n  if (isHttp) {\n    // readMatrix will assign blockBinCount and blockColumnCount\n    readMatrixHttp(curl, myFilePos, unit, binsize, blockBinCount, blockColumnCount); \n  }\n  else {\n    // readMatrix will assign blockBinCount and blockColumnCount\n    readMatrix(fin, myFilePos, unit, binsize, blockBinCount, blockColumnCount); \n  }\n  set<int> blockNumbers = getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount, c1==c2); \n\n  // getBlockIndices\n  vector<contactRecord> records;\n  for (set<int>::iterator it=blockNumbers.begin(); it!=blockNumbers.end(); ++it) {\n    // get contacts in this block\n    records = readBlock(fin, curl, isHttp, *it);\n    for (vector<contactRecord>::iterator it2=records.begin(); it2!=records.end(); ++it2) {\n      contactRecord rec = *it2;\n      \n      int x = rec.binX * binsize;\n      int y = rec.binY * binsize;\n      float c = rec.counts;\n      if (norm != \"NONE\") {\n\tc = c / (c1Norm[rec.binX] * c2Norm[rec.binY]);\n      }\n\n      if ((x >= origRegionIndices[0] && x <= origRegionIndices[1] &&\n\t   y >= origRegionIndices[2] && y <= origRegionIndices[3]) ||\n\t  // or check regions that overlap with lower left\n\t  ((c1==c2) && y >= origRegionIndices[0] && y <= origRegionIndices[1] && x >= origRegionIndices[2] && x <= origRegionIndices[3])) {\n\txActual.push_back(x);\n\tyActual.push_back(y);\n\tcounts.push_back(c);\n\t//printf(\"%d\\t%d\\t%.14g\\n\", x, y, c);\n      }\n    }\n  }\n      //      free(chunk.memory);      \n      /* always cleanup */\n      // curl_easy_cleanup(curl);\n      //    curl_global_cleanup();\n\n}\n\n\n",
+			"file": "straw.cpp",
+			"file_size": 27618,
+			"file_write_time": 131424471850000000,
+			"settings":
+			{
+				"buffer_size": 27622,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "main.cpp",
+			"settings":
+			{
+				"buffer_size": 1861,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"contents": "    \n//This is just for the timestamps\n#include <time.h>\n\n    clock_t t1, t2; //<<<<<<<<<<<<<\n  t1 = clock();   //<<<<<<<<<<<<<\n\n\n\tt2 = clock();\n  float diff = ((float)t2-(float)t1);//<<<<<<<<<<<<\n  float sec = diff/CLOCKS_PER_SEC;//<<<<<<<<<<<<\n  cout << \"this function took \" << sec << \"seconds to run\" << endl; //<<<<<<<<<<\n\n\n\n//to compile\n   g++ -std=c++0x -o straw main.cpp straw.cpp -lcurl -lz\n\n// to find the error\ntime ./straw KR https://hicfiles.s3.amazonaws.com/hiseq/gm12878/in-situ/HIC001.hic 7:26733030:27694134 7:26733030:27694134 BP 25000 > stout\ntime ./straw KR ~/tools/tmp/IMR90_30.hic 7:26733030:27694134 7:26733030:27694134 BP 25000 > stout2",
+			"settings":
+			{
+				"buffer_size": 660,
+				"line_ending": "Unix"
+			}
+		}
+	],
+	"build_system": "",
+	"build_system_choices":
+	[
+		[
+			[
+				[
+					"Packages/C++/C++ Single File.sublime-build",
+					""
+				],
+				[
+					"Packages/C++/C++ Single File.sublime-build",
+					"Run"
+				]
+			],
+			[
+				"Packages/C++/C++ Single File.sublime-build",
+				"Run"
+			]
+		],
+		[
+			[
+				[
+					"Packages/Python/Python.sublime-build",
+					""
+				],
+				[
+					"Packages/Python/Python.sublime-build",
+					"Syntax Check"
+				]
+			],
+			[
+				"Packages/Python/Python.sublime-build",
+				"Syntax Check"
+			]
+		]
+	],
+	"build_varint": "",
+	"command_palette":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"console":
+	{
+		"height": 0.0,
+		"history":
+		[
+		]
+	},
+	"distraction_free":
+	{
+		"menu_visible": true,
+		"show_minimap": false,
+		"show_open_files": false,
+		"show_tabs": false,
+		"side_bar_visible": false,
+		"status_bar_visible": false
+	},
+	"expanded_folders":
+	[
+		"/Users/kiararey/Documents/GitHub/straw/C++"
+	],
+	"file_history":
+	[
+		"/Users/kiararey/Documents/GitHub/straw/C++/GSE63525_IMR90_combined_30.hic.gz",
+		"/Users/kiararey/Documents/GitHub/straw/C++/main.cpp",
+		"/Users/kiararey/Documents/GitHub/straw/C++/straw.h",
+		"/Users/kiararey/Documents/GitHub/straw/C++/straw.cpp",
+		"/Users/kiararey/Google Drive/Rice/Suh_Lab/Structure_Function Dynamics of AAV/Frustration/Modeling/20170613_AAV2_Kiara/find_and_reorder.py",
+		"/Users/kiararey/Desktop/Frustration/find_and_reorder.py",
+		"/Users/kiararey/Desktop/Frustration/find_and_reorder.txt",
+		"/Users/kiararey/Desktop/Frustration/loopy.py"
+	],
+	"find":
+	{
+		"height": 35.0
+	},
+	"find_in_files":
+	{
+		"height": 0.0,
+		"where_history":
+		[
+		]
+	},
+	"find_state":
+	{
+		"case_sensitive": false,
+		"find_history":
+		[
+			"timestamps",
+			"main"
+		],
+		"highlight": true,
+		"in_selection": false,
+		"preserve_case": false,
+		"regex": false,
+		"replace_history":
+		[
+		],
+		"reverse": false,
+		"show_context": true,
+		"use_buffer2": true,
+		"whole_word": false,
+		"wrap": true
+	},
+	"groups":
+	[
+		{
+			"selected": 1,
+			"sheets":
+			[
+				{
+					"buffer": 0,
+					"file": "straw.h",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 2574,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								0,
+								0
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/C++/C++.sublime-syntax"
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 1,
+					"type": "text"
+				},
+				{
+					"buffer": 1,
+					"file": "straw.cpp",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 27622,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								2779,
+								2712
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/C++/C++.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 1381.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 0,
+					"type": "text"
+				},
+				{
+					"buffer": 2,
+					"file": "main.cpp",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 1861,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								1587,
+								1587
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/C++/C++.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 3,
+					"type": "text"
+				},
+				{
+					"buffer": 3,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 660,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								602,
+								580
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/C++/C++.sublime-syntax"
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 2,
+					"type": "text"
+				}
+			]
+		}
+	],
+	"incremental_find":
+	{
+		"height": 23.0
+	},
+	"input":
+	{
+		"height": 0.0
+	},
+	"layout":
+	{
+		"cells":
+		[
+			[
+				0,
+				0,
+				1,
+				1
+			]
+		],
+		"cols":
+		[
+			0.0,
+			1.0
+		],
+		"rows":
+		[
+			0.0,
+			1.0
+		]
+	},
+	"menu_visible": true,
+	"output.exec":
+	{
+		"height": 100.0
+	},
+	"output.find_results":
+	{
+		"height": 0.0
+	},
+	"pinned_build_system": "Packages/C++/C++ Single File.sublime-build",
+	"project": "straw.sublime-project",
+	"replace":
+	{
+		"height": 42.0
+	},
+	"save_all_on_build": true,
+	"select_file":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_project":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_symbol":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"selected_group": 0,
+	"settings":
+	{
+	},
+	"show_minimap": true,
+	"show_open_files": false,
+	"show_tabs": true,
+	"side_bar_visible": true,
+	"side_bar_width": 150.0,
+	"status_bar_visible": true,
+	"template_settings":
+	{
+	}
+}

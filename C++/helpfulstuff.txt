@@ -1,0 +1,18 @@
+clock_t t1, t2; //<<<<<<<<<<<<<
+t1 = clock();   //<<<<<<<<<<<<<
+
+
+t2 = clock();
+float diff = ((float)t2-(float)t1);//<<<<<<<<<<<<
+float sec = diff/CLOCKS_PER_SEC;//<<<<<<<<<<<<
+cout << "getData function took " << sec << "seconds to run" << endl; //<<<<<<<<<<
+
+
+
+  time ./straw KR https://hicfiles.s3.amazonaws.com/hiseq/gm12878/in-situ/HIC001.hic 7:26733030:27694134 7:26733030:27694134 BP 25000 > stout
+  time ./straw KR /Users/kiararey/Documents/GitHub/straw/C++/GSE63525_IMR90_combined_30.hic.gz  7:26733030:27694134 7:26733030:27694134 BP 25000 > stout2
+
+
+//to compile
+
+   g++ -std=c++0x -o straw main.cpp straw.cpp -lcurl -lz

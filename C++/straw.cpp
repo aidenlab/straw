@@ -33,6 +33,14 @@
 #include <curl/curl.h>
 #include "zlib.h"
 #include "straw.h"
+
+//for timestamps only!
+#include <time.h>
+#include <string>
+
+//to replace fopen
+#include "url_fopen.c"
+
 using namespace std;
 
 /*
@@ -100,7 +108,6 @@ WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
   std::memcpy(&(mem->memory[mem->size]), contents, realsize);
   mem->size += realsize;
   mem->memory[mem->size] = 0;
- 
   return realsize;
 }
 
@@ -108,6 +115,9 @@ WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
 char* getData(CURL *curl, long position, int chunksize) {
   std::ostringstream oss;
   struct MemoryStruct chunk; 
+
+  clock_t t1, t2; //<<<<<<<<<<<<<
+  t1 = clock();   //<<<<<<<<<<<<<
 
   chunk.memory = static_cast<char*>(malloc(1)); 
   chunk.size = 0;    /* no data at this point */ 
@@ -120,6 +130,11 @@ char* getData(CURL *curl, long position, int chunksize) {
 	    curl_easy_strerror(res));    
   }
   //  printf("%lu bytes retrieved\n", (long)chunk.size);
+
+  t2 = clock();
+  float diff = ((float)t2-(float)t1);//<<<<<<<<<<<<
+  float sec = diff/CLOCKS_PER_SEC;//<<<<<<<<<<<<
+  cerr << "getData function took " << sec << "seconds to run" << endl; //<<<<<<<<<<
 
   return chunk.memory;
 }
@@ -147,6 +162,7 @@ bool readMagicString(istream& fin) {
 
 // reads the header, storing the positions of the normalization vectors and returning the master pointer
 long readHeader(istream& fin, string chr1, string chr2, int &c1pos1, int &c1pos2, int &c2pos1, int &c2pos2, int &chr1ind, int &chr2ind) {
+
   if (!readMagicString(fin)) {
     cerr << "Hi-C magic string is missing, does not appear to be a hic file" << endl;
     exit(1);
@@ -201,6 +217,7 @@ long readHeader(istream& fin, string chr1, string chr2, int &c1pos1, int &c1pos2
     cerr << "One of the chromosomes wasn't found in the file. Check that the chromosome name matches the genome." << endl;
     exit(1);
   }
+
   return master;
 }
 
@@ -209,6 +226,7 @@ long readHeader(istream& fin, string chr1, string chr2, int &c1pos1, int &c1pos2
 // position of the matrix and the normalization vectors for those chromosomes 
 // at the given normalization and resolution
 void readFooter(istream& fin, long master, int c1, int c2, string norm, string unit, int resolution, long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry) {
+
   int nBytes;
   fin.read((char*)&nBytes, sizeof(int));
   stringstream ss;
@@ -318,10 +336,12 @@ void readFooter(istream& fin, long master, int c1, int c2, string norm, string u
     cerr << "File did not contain " << norm << " normalization vectors for one or both chromosomes at " << resolution << " " << unit << endl;
     exit(1);
   }
+  return;
 }
 
 // reads the raw binned contact matrix at specified resolution, setting the block bin count and block column count 
 bool readMatrixZoomData(istream& fin, string myunit, int mybinsize, int &myBlockBinCount, int &myBlockColumnCount) {
+
   string unit;
   getline(fin, unit, '\0' ); // unit
   int tmp;
@@ -365,6 +385,7 @@ bool readMatrixZoomData(istream& fin, string myunit, int mybinsize, int &myBlock
 
 // reads the raw binned contact matrix at specified resolution, setting the block bin count and block column count 
 bool readMatrixZoomDataHttp(CURL* curl, long &myFilePosition, string myunit, int mybinsize, int &myBlockBinCount, int &myBlockColumnCount) {
+
   char* buffer;
   int header_size = 5*sizeof(int)+4*sizeof(float);
   char* first;
@@ -430,12 +451,14 @@ bool readMatrixZoomDataHttp(CURL* curl, long &myFilePosition, string myunit, int
     myFilePosition = myFilePosition+header_size+(nBlocks*(sizeof(int)+sizeof(long)+sizeof(int)));
   }
   delete buffer;
+
   return storeBlockData;
 }
 
 // goes to the specified file pointer in http and finds the raw contact matrix at specified resolution, calling readMatrixZoomData.
 // sets blockbincount and blockcolumncount
 void readMatrixHttp(CURL *curl, long myFilePosition, string unit, int resolution, int &myBlockBinCount, int &myBlockColumnCount) {
+
   char * buffer;
   int size = sizeof(int)*3;
   buffer = getData(curl, myFilePosition, size);
@@ -457,15 +480,19 @@ void readMatrixHttp(CURL *curl, long myFilePosition, string unit, int resolution
     found = readMatrixZoomDataHttp(curl, myFilePosition, unit, resolution, myBlockBinCount, myBlockColumnCount);
     i++;
   }
+
   if (!found) {
     cerr << "Error finding block data" << endl;
     exit(1);
   }
+
+  return;
 }
 
 // goes to the specified file pointer and finds the raw contact matrix at specified resolution, calling readMatrixZoomData.
 // sets blockbincount and blockcolumncount
 void readMatrix(istream& fin, long myFilePosition, string unit, int resolution, int &myBlockBinCount, int &myBlockColumnCount) {
+
   fin.seekg(myFilePosition, ios::beg);
   int c1,c2;
   fin.read((char*)&c1, sizeof(int)); //chr1
@@ -482,10 +509,13 @@ void readMatrix(istream& fin, long myFilePosition, string unit, int resolution, 
     cerr << "Error finding block data" << endl;
     exit(1);
   }
+
+  return;
 }
 // gets the blocks that need to be read for this slice of the data.  needs blockbincount, blockcolumncount, and whether
 // or not this is intrachromosomal.
 set<int> getBlockNumbersForRegionFromBinPosition(int* regionIndices, int blockBinCount, int blockColumnCount, bool intra) {
+
    int col1 = regionIndices[0] / blockBinCount;
    int col2 = (regionIndices[1] + 1) / blockBinCount;
    int row1 = regionIndices[2] / blockBinCount;
@@ -516,6 +546,7 @@ set<int> getBlockNumbersForRegionFromBinPosition(int* regionIndices, int blockBi
 // this is the meat of reading the data.  takes in the block number and returns the set of contact records corresponding to
 // that block.  the block data is compressed and must be decompressed using the zlib library functions
 vector<contactRecord> readBlock(istream& fin, CURL* curl, bool isHttp, int blockNumber) {
+
   indexEntry idx = blockMap[blockNumber];
   if (idx.size == 0) {
     vector<contactRecord> v;
@@ -652,11 +683,13 @@ vector<contactRecord> readBlock(istream& fin, CURL* curl, bool isHttp, int block
   }
   delete compressedBytes;
   delete uncompressedBytes; // don't forget to delete your heap arrays in C++!
+
   return v;
 }
 
 // reads the normalization vector from the file at the specified location
 vector<double> readNormalizationVector(istream& bufferin) {
+
   int nValues;
   bufferin.read((char*)&nValues, sizeof(int));
   vector<double> values(nValues);
@@ -676,6 +709,7 @@ vector<double> readNormalizationVector(istream& bufferin) {
 
 void straw(string norm, string fname, int binsize, string chr1loc, string chr2loc, string unit, vector<int> &xActual, vector<int> &yActual, vector<float> &counts)
 {
+
   int earlyexit=1;
   if (!(norm=="NONE"||norm=="VC"||norm=="VC_SQRT"||norm=="KR")) {
     cerr << "Norm specified incorrectly, must be one of <NONE/VC/VC_SQRT/KR>" << endl; 
@@ -731,12 +765,20 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
     delete buffer;
   }
   else {
+
+    //URL_FILE *myfin2; //<<<<<<<<<<<
+    //const char* name = fname.c_str();
+    //myfin2 = url_fopen(name, 'r'); // <<<<<<<<<
+    //cerr << "this is fin2 " << &myfin2 << " " << myfin2 << endl;  //<<<<<<<<<<<
+
     fin.open(fname, fstream::in);
+    cerr << "this is fin" << &fin << endl;
     if (!fin) {
       cerr << "File " << fname << " cannot be opened for reading" << endl;
       return;
     }
     master = readHeader(fin, chr1, chr2, c1pos1, c1pos2, c2pos1, c2pos2, chr1ind, chr2ind);
+  
   }
 
   // from header have size of chromosomes, set region to read
@@ -793,7 +835,7 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
     char* buffer3;
     if (isHttp) {
       buffer3 = getData(curl, c1NormEntry.position, c1NormEntry.size);
-    }
+     }
     else {
       buffer3 = new char[c1NormEntry.size];
       fin.seekg(c1NormEntry.position, ios::beg);
@@ -852,6 +894,8 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
 	xActual.push_back(x);
 	yActual.push_back(y);
 	counts.push_back(c);
+
+  return;
 	//printf("%d\t%d\t%.14g\n", x, y, c);
       }
     }
