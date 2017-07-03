@@ -106,7 +106,7 @@ static size_t write_callback(char *buffer,
 
   if(size > rembuff) {
     /* not enough space in buffer */
-    newbuff=realloc(url->buffer, url->buffer_len + (size - rembuff));
+    newbuff=(char * )realloc(url->buffer, url->buffer_len + (size - rembuff));
     if(newbuff==NULL) {
       fprintf(stderr, "callback buffer grow failed\n");
       size=rembuff;
@@ -237,7 +237,7 @@ URL_FILE *url_fopen(const char *url, const char *operation)
   URL_FILE *file;
   (void)operation;
 
-  file = malloc(sizeof(fcurl_data));
+  file = (URL_FILE *) malloc(sizeof(fcurl_data));
   if(!file)
     return NULL;
 
