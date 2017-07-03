@@ -38,9 +38,6 @@
 #include <time.h>
 #include <string>
 
-//to replace fopen
-#include "url_fopen.c"
-
 using namespace std;
 
 /*

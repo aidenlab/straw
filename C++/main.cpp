@@ -23,7 +23,9 @@
 */
 #include <cstring>
 #include <iostream>
+#include "url_fopen.cpp"
 #include "straw.h"
+
 using namespace std;
 
 int main(int argc, char *argv[])
