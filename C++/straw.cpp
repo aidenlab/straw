@@ -33,6 +33,7 @@
 #include <curl/curl.h>
 #include "zlib.h"
 #include "straw.h"
+#include "url_fopen.cpp"
 
 //for timestamps only!
 #include <time.h>
@@ -113,9 +114,6 @@ char* getData(CURL *curl, long position, int chunksize) {
   std::ostringstream oss;
   struct MemoryStruct chunk; 
 
-  clock_t t1, t2; //<<<<<<<<<<<<<
-  t1 = clock();   //<<<<<<<<<<<<<
-
   chunk.memory = static_cast<char*>(malloc(1)); 
   chunk.size = 0;    /* no data at this point */ 
   oss << position << "-" << position + chunksize;
@@ -127,11 +125,6 @@ char* getData(CURL *curl, long position, int chunksize) {
 	    curl_easy_strerror(res));    
   }
   //  printf("%lu bytes retrieved\n", (long)chunk.size);
-
-  t2 = clock();
-  float diff = ((float)t2-(float)t1);//<<<<<<<<<<<<
-  float sec = diff/CLOCKS_PER_SEC;//<<<<<<<<<<<<
-  cerr << "getData function took " << sec << "seconds to run" << endl; //<<<<<<<<<<
 
   return chunk.memory;
 }
@@ -763,10 +756,10 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
   }
   else {
 
-    //URL_FILE *myfin2; //<<<<<<<<<<<
-    //const char* name = fname.c_str();
-    //myfin2 = url_fopen(name, 'r'); // <<<<<<<<<
-    //cerr << "this is fin2 " << &myfin2 << " " << myfin2 << endl;  //<<<<<<<<<<<
+    URL_FILE *myfin2; //<<<<<<<<<<<
+    const char* name = fname.c_str();
+    myfin2 = url_fopen(name, 'r'); // <<<<<<<<<
+    cerr << "this is fin2 " << &myfin2 << " " << myfin2 << endl;  //<<<<<<<<<<<
 
     fin.open(fname, fstream::in);
     cerr << "this is fin" << &fin << endl;
