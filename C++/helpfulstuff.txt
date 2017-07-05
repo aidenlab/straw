@@ -12,10 +12,11 @@ cout << "getData function took " << sec << "seconds to run" << endl; //<<<<<<<<<
   time ./straw KR https://hicfiles.s3.amazonaws.com/hiseq/gm12878/in-situ/HIC001.hic 7:26733030:27694134 7:26733030:27694134 BP 25000 > stout
   time ./straw KR /Users/kiararey/Documents/GitHub/straw/C++/GSE63525_IMR90_combined_30.hic.gz  7:26733030:27694134 7:26733030:27694134 BP 25000 > stout2
 
+straw.printme("KR", "https://hicfiles.s3.amazonaws.com/hiseq/gm12878/in-situ/HIC001.hic", "7:26733030:27694134", "7:26733030:27694134", "BP", 25000, 'out.txt')
 
 //to compile
 
-   g++ -std=c++0x -o straw main.cpp straw.cpp -lcurl -lz
+   g++ -std=c++0x -o straw main.cpp straw.cpp url_fopen.c -lcurl -lz
 
 
 

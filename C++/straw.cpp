@@ -33,7 +33,6 @@
 #include <curl/curl.h>
 #include "zlib.h"
 #include "straw.h"
-#include "url_fopen.cpp"
 
 //for timestamps only!
 #include <time.h>
@@ -114,7 +113,8 @@ char* getData(CURL *curl, long position, int chunksize) {
   std::ostringstream oss;
   struct MemoryStruct chunk; 
 
-  chunk.memory = static_cast<char*>(malloc(1)); 
+  //chunk.memory = static_cast<char*>(malloc(1)); 
+  chunk.memory = new char;
   chunk.size = 0;    /* no data at this point */ 
   oss << position << "-" << position + chunksize;
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
@@ -441,7 +441,7 @@ bool readMatrixZoomDataHttp(CURL* curl, long &myFilePosition, string myunit, int
     myFilePosition = myFilePosition+header_size+(nBlocks*(sizeof(int)+sizeof(long)+sizeof(int)));
   }
   delete buffer;
-
+  delete first;
   return storeBlockData;
 }
 
@@ -671,8 +671,8 @@ vector<contactRecord> readBlock(istream& fin, CURL* curl, bool isHttp, int block
       }
     }
   }
-  delete compressedBytes;
-  delete uncompressedBytes; // don't forget to delete your heap arrays in C++!
+  delete[] compressedBytes;
+  delete[] uncompressedBytes; // don't forget to delete your heap arrays in C++!
 
   return v;
 }
@@ -755,14 +755,8 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
     delete buffer;
   }
   else {
-
-    URL_FILE *myfin2; //<<<<<<<<<<<
     const char* name = fname.c_str();
-    myfin2 = url_fopen(name, 'r'); // <<<<<<<<<
-    cerr << "this is fin2 " << &myfin2 << " " << myfin2 << endl;  //<<<<<<<<<<<
-
     fin.open(fname, fstream::in);
-    cerr << "this is fin" << &fin << endl;
     if (!fin) {
       cerr << "File " << fname << " cannot be opened for reading" << endl;
       return;
@@ -890,7 +884,7 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
       }
     }
   }
-      //      free(chunk.memory);      
+  //delete chunk.memory;      
       /* always cleanup */
       // curl_easy_cleanup(curl);
       //    curl_global_cleanup();
