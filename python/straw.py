@@ -27,10 +27,13 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 __author__ = "Yue Wu and Neva Durand"
 __license__ = "MIT"
 
+from time import time
 import sys
 import struct
 import zlib
 import requests
+from multiprocessing.pool import ThreadPool
+import threading
 try:
     from StringIO import StringIO
 except ImportError:
@@ -426,31 +429,41 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
        binsize(int): Resolution, i.e. 25000 for 25K
     """
     # clear the global variable blockMap so that it won't keep the data from previous calls
-    for blockNum in blockMap.keys():
-        blockMap.pop(blockNum)
+    global blockMap
+    blockMap = dict()
 
     magic_string = ""
+    
+    checkpoint1 = time()
+    print("checkpoint1", checkpoint1)
+
     if (infile.startswith("http")):
         # try URL first. 100K should be sufficient for header
         headers={'range' : 'bytes=0-100000', 'x-amz-meta-requester' : 'straw'}
         s = requests.Session()
+        
         r=s.get(infile, headers=headers)
         if (r.status_code >=400):
             print("Error accessing " + infile) 
             print("HTTP status code " + str(r.status_code))
             return -1
-        req=StringIO.StringIO(r.content)        
+        req=StringIO(r.content)
+                
         myrange=r.headers['content-range'].split('/')
         totalbytes=myrange[1]
     else:
         req=open(infile, 'rb')
     
+    checkpoint2 = time()
+    print("checkpoint2", checkpoint2-checkpoint1)
+
     if (not (norm=="NONE" or norm=="VC" or norm=="VC_SQRT" or norm=="KR")):
         print("Norm specified incorrectly, must be one of <NONE/VC/VC_SQRT/KR>\nUsage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>\n")
         return -1
     if (not (unit=="BP" or unit=="FRAG")):
         print("Unit specified incorrectly, must be one of <BP/FRAG>\nUsage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>\n")
         return -1
+
     c1pos1=-100
     c1pos2=-100
     c2pos1=-100
@@ -465,8 +478,14 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
     if(len(chr2_arra)==3):
         c2pos1=chr2_arra[1]
         c2pos2=chr2_arra[2]
+    
+    checkpoint3 = time()
+    print("checkpoint3", checkpoint3-checkpoint2)
 
     list1 = readHeader(req, chr1, chr2, [c1pos1, c1pos2, c2pos1, c2pos2])
+    
+    checkpoint4 = time()
+    print("checkpoint4", checkpoint4-checkpoint3)
 
     master=list1[0]
     chr1ind=list1[1]
@@ -479,58 +498,99 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
     c2=max(chr1ind,chr2ind)
     origRegionIndices=[]
     regionIndices=[]
+
     if (chr1ind > chr2ind):
-        origRegionIndices.append(c2pos1)
-        origRegionIndices.append(c2pos2)
-        origRegionIndices.append(c1pos1)
-        origRegionIndices.append(c1pos2)
-        regionIndices.append(int(c2pos1/binsize))
-        regionIndices.append(int(c2pos2/binsize))
-        regionIndices.append(int(c1pos1/binsize))
-        regionIndices.append(int(c1pos2/binsize))
+        origRegionIndices.extend([c2pos1, c2pos2, c1pos1, c1pos2])
+        # origRegionIndices.append(c2pos1)
+        # origRegionIndices.append(c2pos2)
+        # origRegionIndices.append(c1pos1)
+        # origRegionIndices.append(c1pos2)
+        regionIndices.extend([int(c2pos1/binsize), int(c2pos2/binsize), int(c1pos1/binsize), int(c1pos2/binsize)])
+        # regionIndices.append(int(c2pos1/binsize))
+        # regionIndices.append(int(c2pos2/binsize))
+        # regionIndices.append(int(c1pos1/binsize))
+        # regionIndices.append(int(c1pos2/binsize))
     else:
-        origRegionIndices.append(c1pos1)
-        origRegionIndices.append(c1pos2)
-        origRegionIndices.append(c2pos1)
-        origRegionIndices.append(c2pos2)
-        regionIndices.append(int(c1pos1/binsize))
-        regionIndices.append(int(c1pos2/binsize))
-        regionIndices.append(int(c2pos1/binsize))
-        regionIndices.append(int(c2pos2/binsize))
+        origRegionIndices.extend([c1pos1, c1pos2, c2pos1, c2pos2])
+        # origRegionIndices.append(c1pos1)
+        # origRegionIndices.append(c1pos2)
+        # origRegionIndices.append(c2pos1)
+        # origRegionIndices.append(c2pos2)
+        regionIndices.extend([int(c1pos1/binsize), int(c1pos2/binsize), int(c2pos1/binsize), int(c2pos2/binsize)])
+        # regionIndices.append(int(c1pos1/binsize))
+        # regionIndices.append(int(c1pos2/binsize))
+        # regionIndices.append(int(c2pos1/binsize))
+        # regionIndices.append(int(c2pos2/binsize))
 
     # Get footer: from master to end of file
     if (infile.startswith("http")):
         headers={'range' : 'bytes={0}-{1}'.format(master, totalbytes) , 'x-amz-meta-requester' : 'straw'}
-        #print("Requesting {} bytes".format(int(totalbytes)-master))
-        r=s.get(infile, headers=headers);
+        print("Requesting {} bytes".format(int(totalbytes)-master))
+
+        r = s.get(infile, headers=headers, stream=True)
+        # api_request = lambda infile: s.get(infile, headers=headers, stream=True)
+        # r=s.get(infile, headers=headers);
+        # pool = ThreadPool(processes=num_process)
+        # thread_result = pool.apply_async(api_request, (infile,))
+        # r = thread_result.get()
+        # # threading.Thread(target=api_request, args=(infile,))
+        # pool.close()
+        # r.start()
+        # r.start()
+        # pool = Pool(processes=4)
+        # r = pool.map(s.get,infile)   
+        # r = multiprocessing.Process(target=api_request, args=(infile,))
+        # r = p.map(api_request, infile)
+        # r.start()
+        # r.join()
+
+
+        check_getfile = time()
+        print("getting the file", check_getfile-checkpoint4)
+
         #print("Received {} bytes".format(r.headers['Content-Length']))
-        req=StringIO.StringIO(r.content);
+        req=StringIO(r.content);
+
+        check_buffer = time()
+        print("buffer", check_buffer-check_getfile)
     else:
         req.seek(master)
+
+    checkpoint5 = time()
+    print("checkpoint5",checkpoint5)
 
     list1 = readFooter(req, c1, c2, norm, unit, binsize)
     myFilePos=list1[0]
     c1NormEntry=list1[1]
     c2NormEntry=list1[2]
 
+    checkpoint6 = time()
+    print("checkpoint6", checkpoint6-checkpoint5)
+
     if (norm != "NONE"):
         if (infile.startswith("http")):
             endrange='bytes={0}-{1}'.format(c1NormEntry['position'],c1NormEntry['position']+c1NormEntry['size'])
             headers={'range' : endrange, 'x-amz-meta-requester' : 'straw'}
             r=s.get(infile, headers=headers);
-            req=StringIO.StringIO(r.content);
+            req=StringIO(r.content);
+
             c1Norm = readNormalizationVector(req)
 
             endrange='bytes={0}-{1}'.format(c2NormEntry['position'],c2NormEntry['position']+c2NormEntry['size'])
             headers={'range' : endrange, 'x-amz-meta-requester' : 'straw'}
             r=s.get(infile, headers=headers)
-            req=StringIO.StringIO(r.content)
+            req=StringIO(r.content)
             c2Norm = readNormalizationVector(req)
+
+
         else:
             req.seek(c1NormEntry['position'])
             c1Norm = readNormalizationVector(req)
             req.seek(c2NormEntry['position'])
             c2Norm = readNormalizationVector(req)
+
+    checkpoint7 = time()
+    print("checkpoint7", checkpoint7-checkpoint6)
 
     if (infile.startswith("http")):
         headers={'range' : 'bytes={0}-'.format(myFilePos), 'x-amz-meta-requester' : 'straw'}
@@ -540,12 +600,18 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
         req.seek(myFilePos)
         list1 = readMatrix(req, unit, binsize)
 
+    checkpoint8 = time()
+    print("checkpoint8", checkpoint8-checkpoint7)
+
     blockBinCount=list1[0]
     blockColumnCount=list1[1]
     blockNumbers = getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount, c1==c2)
     yActual=[]
     xActual=[]
     counts=[]
+
+    checkpoint9 = time() 
+    print("checkpoint9", checkpoint9-checkpoint8)
 
     for i_set in (blockNumbers):
         idx=dict()
@@ -561,7 +627,7 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
                 endrange='bytes={0}-{1}'.format(idx['position'], idx['position']+idx['size'])
                 headers={'range' : endrange, 'x-amz-meta-requester' : 'straw'}
                 r=s.get(infile, headers=headers);
-                req=StringIO.StringIO(r.content);
+                req=StringIO(r.content);
             else:
                 req.seek(idx['position'])
             records=readBlock(req, idx['size'])
@@ -581,6 +647,10 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
 	            xActual.append(x)
 	            yActual.append(y)
 	            counts.append(c)
+
+    checkpoint10 = time()
+    print("checkpoint10", checkpoint10-checkpoint9)
+    
     return [xActual, yActual, counts]
 
 def printme(norm, infile, chr1loc, chr2loc, unit, binsize,outfile):
@@ -602,3 +672,7 @@ def printme(norm, infile, chr1loc, chr2loc, unit, binsize,outfile):
         f.write("{0}\t{1}\t{2}\n".format(result[0][i], result[1][i], result[2][i]))
         #print("{0}\t{1}\t{2}".format(result[0][i], result[1][i], result[2][i]))
     f.close()
+
+# if __name__ == '__main__':
+#     r = threading.Thread(target=straw, args=(norm, infile, chr1loc, chr2loc, unit, binsize))
+#     r.start()
