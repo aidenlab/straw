@@ -1,11 +1,11 @@
 """Straw module
 
-Straw enables programmatic access to .hic files. 
-.hic files store the contact matrices from Hi-C experiments and the 
+Straw enables programmatic access to .hic files.
+.hic files store the contact matrices from Hi-C experiments and the
 normalization and expected vectors, along with meta-data in the header.
 
-The main function, straw, takes in the normalization, the filename or URL, 
-chromosome1 (and optional range), chromosome2 (and optional range), 
+The main function, straw, takes in the normalization, the filename or URL,
+chromosome1 (and optional range), chromosome2 (and optional range),
 whether the bins desired are fragment or base pair delimited, and bin size.
 
 It then reads the header, follows the various pointers to the desired matrix
@@ -14,7 +14,7 @@ and normalization vector, and stores as [x, y, count]
 Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <\
 BP/FRAG> <binsize>
 
-Example: 
+Example:
 >>>import straw
 >>>result = straw.straw('NONE', 'HIC001.hic', 'X', 'X', 'BP', 1000000)
 >>>for i in range(len(result[0])):
@@ -118,7 +118,7 @@ def readFooter(req, c1, c2, norm, unit, resolution):
     """Reads the footer, which contains all the expected and normalization
     vectors. Presumes file pointer is in correct position
     Args:
-       req (file): File to read from; presumes file pointer is in correct 
+       req (file): File to read from; presumes file pointer is in correct
        position
        chr1 (str): Chromosome 1
        chr2 (str): Chromosome 2
@@ -199,13 +199,13 @@ def readMatrixZoomData(req, myunit, mybinsize):
     the data. Presumes file pointer is in correct position
 
     Args:
-       req (file): File to read from; presumes file pointer is in correct 
+       req (file): File to read from; presumes file pointer is in correct
        position
        myunit (str): Unit (BP or FRAG) we're searching for
        mybinsize (int): Resolution we're searching for
 
     Returns:
-       list containing boolean indicating if we found appropriate matrix, 
+       list containing boolean indicating if we found appropriate matrix,
        and if so, the counts for the bins and columns
     """
     unit = __readcstr(req)
@@ -243,7 +243,7 @@ def readMatrix(req, unit, binsize):
     appropriate matrix. Presumes file pointer is in correct position.
 
     Args:
-       req (file): File to read from; presumes file pointer is in correct 
+       req (file): File to read from; presumes file pointer is in correct
        position
        unit (str): Unit to search for (BP or FRAG)
        binsize (int): Resolution to search for
@@ -306,7 +306,7 @@ def readBlock(req, size):
     results in array. Presumes file pointer is in correct position.
 
     Args:
-       req (file): File to read from. Presumes file pointer is in correct 
+       req (file): File to read from. Presumes file pointer is in correct
        position
        size (int): How many bytes to read
 
@@ -320,9 +320,9 @@ def readBlock(req, size):
     global version
     if (version < 7):
         for i in range(nRecords):
-            binX = struct.unpack('<i',uncompressedBytes[(12*i):(12*i+4)])[0]
-            binY = struct.unpack('<i',uncompressedBytes[(12*i+4):(12*i+8)])[0]
-            counts = struct.unpack('<f',uncompressedBytes[(12*i+8):(12*i+12)])[0]
+            binX = struct.unpack('<i',uncompressedBytes[(12*i+4):(12*i+8)])[0]
+            binY = struct.unpack('<i',uncompressedBytes[(12*i+8):(12*i+12)])[0]
+            counts = struct.unpack('<f',uncompressedBytes[(12*i+12):(12*i+16)])[0]
             record = dict()
             record['binX'] = binX
             record['binY'] = binY
@@ -398,12 +398,12 @@ def readNormalizationVector(req):
     in correct position
 
     Args:
-       req (file): File to read from; presumes file pointer is in correct 
+       req (file): File to read from; presumes file pointer is in correct
        position
-       
+
     Returns:
       Array of normalization values
-    
+
     """
     value = []
     nValues = struct.unpack('<i',req.read(4))[0]
@@ -436,15 +436,15 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
         s = requests.Session()
         r=s.get(infile, headers=headers)
         if (r.status_code >=400):
-            print("Error accessing " + infile) 
+            print("Error accessing " + infile)
             print("HTTP status code " + str(r.status_code))
             return -1
-        req=StringIO.StringIO(r.content)        
+        req=StringIO.StringIO(r.content)
         myrange=r.headers['content-range'].split('/')
         totalbytes=myrange[1]
     else:
         req=open(infile, 'rb')
-    
+
     if (not (norm=="NONE" or norm=="VC" or norm=="VC_SQRT" or norm=="KR")):
         print("Norm specified incorrectly, must be one of <NONE/VC/VC_SQRT/KR>\nUsage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>\n")
         return -1
