@@ -511,6 +511,7 @@ vector<double> readNormalizationVector(ifstream& fin, indexEntry entry) {
 
 RcppExport SEXP straw(string norm, string fname, int binsize, string chr1loc, string chr2loc, string unit)
 {
+  blockMap.clear();
   if (!(norm=="NONE"||norm=="VC"||norm=="VC_SQRT"||norm=="KR")) {
     cerr << "Norm specified incorrectly, must be one of <NONE/VC/VC_SQRT/KR>" << endl;
     cerr << "Usage: juicebox-quick-dump <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
