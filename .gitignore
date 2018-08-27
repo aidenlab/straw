@@ -45,3 +45,7 @@ Thumbs.db
 # R files #
 ###########
 .R*
+
+# Python files #
+################
+__pycache__
