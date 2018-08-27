@@ -53,6 +53,31 @@ coverage.xml
 
 # Django stuff:
 *.log
+*.sql
+*.sqlite
+
+# OS generated files #
+######################
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Emacs files #
+###############
+*~
+
+# R files #
+###########
+.R*
+
+# Python files #
+################
+__pycache__
+
 local_settings.py
 db.sqlite3
 
