@@ -426,7 +426,7 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
        binsize(int): Resolution, i.e. 25000 for 25K
     """
     # clear the global variable blockMap so that it won't keep the data from previous calls
-    for blockNum in blockMap.keys():
+    for blockNum in list(blockMap.keys()):
         blockMap.pop(blockNum)
 
     magic_string = ""
