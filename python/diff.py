@@ -8,7 +8,9 @@ Only checks intra-chromosomal matrices
 This is very slow particularly for FRAG since it looks at 
 every single matrix entry
 """
-import straw
+from __future__ import print_function
+from __future__ import absolute_import
+from . import straw
 import math
 import argparse
 

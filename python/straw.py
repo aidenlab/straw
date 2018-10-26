@@ -31,10 +31,7 @@ import sys
 import struct
 import zlib
 import requests
-try:
-    from StringIO import StringIO
-except ImportError:
-    from io import StringIO
+import io
 
 blockMap = dict()
 # global version
@@ -439,7 +436,7 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
             print("Error accessing " + infile)
             print("HTTP status code " + str(r.status_code))
             return -1
-        req=StringIO.StringIO(r.content)
+        req=io.BytesIO(r.content)
         myrange=r.headers['content-range'].split('/')
         totalbytes=myrange[1]
     else:
@@ -504,7 +501,7 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
         #print("Requesting {} bytes".format(int(totalbytes)-master))
         r=s.get(infile, headers=headers);
         #print("Received {} bytes".format(r.headers['Content-Length']))
-        req=StringIO.StringIO(r.content);
+        req=io.BytesIO(r.content)
     else:
         req.seek(master)
 
@@ -518,13 +515,13 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
             endrange='bytes={0}-{1}'.format(c1NormEntry['position'],c1NormEntry['position']+c1NormEntry['size'])
             headers={'range' : endrange, 'x-amz-meta-requester' : 'straw'}
             r=s.get(infile, headers=headers);
-            req=StringIO.StringIO(r.content);
+            req=io.BytesIO(r.content);
             c1Norm = readNormalizationVector(req)
 
             endrange='bytes={0}-{1}'.format(c2NormEntry['position'],c2NormEntry['position']+c2NormEntry['size'])
             headers={'range' : endrange, 'x-amz-meta-requester' : 'straw'}
             r=s.get(infile, headers=headers)
-            req=StringIO.StringIO(r.content)
+            req=io.BytesIO(r.content)
             c2Norm = readNormalizationVector(req)
         else:
             req.seek(c1NormEntry['position'])
@@ -561,7 +558,7 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
                 endrange='bytes={0}-{1}'.format(idx['position'], idx['position']+idx['size'])
                 headers={'range' : endrange, 'x-amz-meta-requester' : 'straw'}
                 r=s.get(infile, headers=headers);
-                req=StringIO.StringIO(r.content);
+                req=io.BytesIO(r.content);
             else:
                 req.seek(idx['position'])
             records=readBlock(req, idx['size'])
