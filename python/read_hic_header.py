@@ -17,9 +17,12 @@ def readcstr(f):
             buf = buf + b
 #            buf.append(b.decode('utf'))
 
-if (len(sys.argv) != 2):
-  sys.stderr.write('Usage: '+ sys.argv[0]+' <hic file or URL>\n')
+if (len(sys.argv) != 2 and len(sys.argv) != 3):
+  sys.stderr.write('Usage: '+ sys.argv[0]+' <hic file or URL> [verbose]\n')
   sys.exit(1)
+verbose=0
+if (len(sys.argv) == 3):
+  verbose=1
 
 infile = sys.argv[1]
 magic_string = ""
@@ -58,13 +61,15 @@ while (c != '\0'):
 print('Genome ID:')
 print('  {0}'.format(str(genome))) 
 # read and throw away attribute dictionary (stats+graphs)
-print('Attribute dictionary:')
+if (verbose == 1):
+    print('Attribute dictionary:')
 nattributes = struct.unpack('<i',req.read(4))[0]
 for x in range(0, nattributes):
   key = readcstr(req)
   value = readcstr(req)
-#  print('   Key:{0}'.format(key))
-#  print('   Value:{0}'.format(value))
+  if (verbose == 1):
+    print('   Key:{0}'.format(key))
+    print('   Value:{0}'.format(value))
 nChrs = struct.unpack('<i',req.read(4))[0]
 print("Chromosomes: ")
 for x in range(0, nChrs):
