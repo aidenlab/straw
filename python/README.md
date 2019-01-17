@@ -10,8 +10,7 @@ whether the bins desired are fragment or base pair delimited, and bin size.
 It then reads the header, follows the various pointers to the desired matrix
 and normalization vector, and stores as [x, y, count]
 
-`Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <\
-BP/FRAG> <binsize>`
+`Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>`
 
 See https://github.com/theaidenlab/straw/wiki/Python for more documentation
 
