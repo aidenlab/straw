@@ -44,12 +44,6 @@ Straw uses the [requests library](http://docs.python-requests.org/en/master/user
    from straw import straw
    straw.printme("KR", "HIC001.hic", "1:1000000:7500000", "1:1000000:7500000", "BP", 25000, 'out.txt')
    ```
-   
-To get in an array:
-   ```python
-   from straw import straw
-   result = straw.straw("KR", "HIC001.hic", "1:1000000:7500000", "1:1000000:7500000", "BP", 25000)
-   ```
 
 * Extract all interchromosomal reads between chromosome 5 and chromosome 12 at 500 fragment resolution with VC (vanilla coverage) normalization:
    ```python
