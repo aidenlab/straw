@@ -1,5 +1,6 @@
 # straw: Extract data quickly from Juicebox via straw
-Straw is a fast C++ implementation of reading/dump for .hic files.
+Straw is a fast implementation of reading/dump for .hic files. Available in C++, R, and Python.
+
 ## compile on Linux
 
          g++ -std=c++0x -o straw main.cpp straw.cpp -lcurl -lz
