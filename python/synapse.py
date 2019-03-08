@@ -28,7 +28,7 @@ batch_file_request = {
 result = syn.restPOST(uri='/fileHandle/batch', body=json.dumps(batch_file_request), endpoint=syn.fileHandleEndpoint)
 url=result["requestedFiles"][0]["preSignedURL"]
 
-result2 = straw.straw('NONE', url, '1', '1', 'BP', 1000000)
+result2 = straw.straw('NONE', url, '1', '1', 'BP', 1000000, is_synapse=True)
 for i in range(len(result2[0])):
    print("{0}\t{1}\t{2}".format(result2[0][i], result2[1][i], result2[2][i]))
 

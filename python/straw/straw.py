@@ -409,7 +409,7 @@ def readNormalizationVector(req):
         value.append(d)
     return value
 
-def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
+def straw(norm, infile, chr1loc, chr2loc, unit, binsize, is_synapse=False):
     """ This is the main workhorse method of the module. Reads a .hic file and
     extracts the given contact matrix. Stores in an array in sparse upper
     triangular format: row, column, (normalized) count
@@ -430,6 +430,8 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
     if (infile.startswith("http")):
         # try URL first. 100K should be sufficient for header
         headers={'range' : 'bytes=0-100000', 'x-amz-meta-requester' : 'straw'}
+        if is_synapse:
+            headers={'range' : 'bytes=0-100000'}
         s = requests.Session()
         r=s.get(infile, headers=headers)
         if (r.status_code >=400):
@@ -498,9 +500,9 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
     # Get footer: from master to end of file
     if (infile.startswith("http")):
         headers={'range' : 'bytes={0}-{1}'.format(master, totalbytes) , 'x-amz-meta-requester' : 'straw'}
-        #print("Requesting {} bytes".format(int(totalbytes)-master))
+        if is_synapse:
+            headers={'range' : 'bytes={0}-{1}'.format(master, totalbytes)}
         r=s.get(infile, headers=headers);
-        #print("Received {} bytes".format(r.headers['Content-Length']))
         req=io.BytesIO(r.content)
     else:
         req.seek(master)
@@ -514,12 +516,16 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
         if (infile.startswith("http")):
             endrange='bytes={0}-{1}'.format(c1NormEntry['position'],c1NormEntry['position']+c1NormEntry['size'])
             headers={'range' : endrange, 'x-amz-meta-requester' : 'straw'}
+            if is_synapse:
+                headers={'range' : endrange}
             r=s.get(infile, headers=headers);
             req=io.BytesIO(r.content);
             c1Norm = readNormalizationVector(req)
 
             endrange='bytes={0}-{1}'.format(c2NormEntry['position'],c2NormEntry['position']+c2NormEntry['size'])
             headers={'range' : endrange, 'x-amz-meta-requester' : 'straw'}
+            if is_synapse:
+                headers={'range' : endrange}
             r=s.get(infile, headers=headers)
             req=io.BytesIO(r.content)
             c2Norm = readNormalizationVector(req)
@@ -531,6 +537,8 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
 
     if (infile.startswith("http")):
         headers={'range' : 'bytes={0}-'.format(myFilePos), 'x-amz-meta-requester' : 'straw'}
+        if is_synapse:
+            headers={'range' : 'bytes={0}-'.format(myFilePos)}
         r=s.get(infile, headers=headers, stream=True)
         list1 = readMatrix(r.raw, unit, binsize)
     else:
@@ -557,6 +565,8 @@ def straw(norm, infile, chr1loc, chr2loc, unit, binsize):
             if (infile.startswith("http")):
                 endrange='bytes={0}-{1}'.format(idx['position'], idx['position']+idx['size'])
                 headers={'range' : endrange, 'x-amz-meta-requester' : 'straw'}
+                if is_synapse:
+                    headers={'range' : endrange}
                 r=s.get(infile, headers=headers);
                 req=io.BytesIO(r.content);
             else:
