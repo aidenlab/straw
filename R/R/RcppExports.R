@@ -8,12 +8,21 @@
 #' of data, and outputs as data.frame in sparse upper triangular format.
 #' Currently only supporting matrices.
 #' 
-#' Usage: straw_R <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>
+#' Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>
 #' 
-#' @param argv string of arguments separated by spaces
+#' @param norm Normalization to apply. Must be one of NONE/VC/VC_SQRT/KR.
+#'     VC is vanilla coverage, VC_SQRT is square root of vanilla coverage, and KR is Knight-Ruiz or
+#'     Balanced normalization.
+#' @param fname path to .hic file
+#' @param chr1loc first chromosome location
+#' @param chr2loc second chromosome location
+#' @param unit BP (BasePair) or FRAG (FRAGment)
+#' @param binsize The bin size. By default, for BP, this is one of <2500000, 1000000, 500000,
+#'     250000, 100000, 50000, 25000, 10000, 5000> and for FRAG this is one of <500, 200,
+#'     100, 50, 20, 5, 2, 1>.
 #' @return Data.frame of a sparse matrix of data from hic file. x,y,counts
 #' @export
-straw_R <- function(argv) {
-    .Call('_strawr_straw_R', PACKAGE = 'strawr', argv)
+straw <- function(norm, fname, chr1loc, chr2loc, unit, binsize) {
+    .Call('_strawr_straw', PACKAGE = 'strawr', norm, fname, chr1loc, chr2loc, unit, binsize)
 }
 

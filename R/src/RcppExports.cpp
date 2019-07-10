@@ -5,20 +5,25 @@
 
 using namespace Rcpp;
 
-// straw_R
-RcppExport SEXP straw_R(String argv);
-RcppExport SEXP _strawr_straw_R(SEXP argvSEXP) {
+// straw
+Rcpp::DataFrame straw(std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, std::string unit, int binsize);
+RcppExport SEXP _strawr_straw(SEXP normSEXP, SEXP fnameSEXP, SEXP chr1locSEXP, SEXP chr2locSEXP, SEXP unitSEXP, SEXP binsizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< String >::type argv(argvSEXP);
-    rcpp_result_gen = Rcpp::wrap(straw_R(argv));
+    Rcpp::traits::input_parameter< std::string >::type norm(normSEXP);
+    Rcpp::traits::input_parameter< std::string >::type fname(fnameSEXP);
+    Rcpp::traits::input_parameter< std::string >::type chr1loc(chr1locSEXP);
+    Rcpp::traits::input_parameter< std::string >::type chr2loc(chr2locSEXP);
+    Rcpp::traits::input_parameter< std::string >::type unit(unitSEXP);
+    Rcpp::traits::input_parameter< int >::type binsize(binsizeSEXP);
+    rcpp_result_gen = Rcpp::wrap(straw(norm, fname, chr1loc, chr2loc, unit, binsize));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_strawr_straw_R", (DL_FUNC) &_strawr_straw_R, 1},
+    {"_strawr_straw", (DL_FUNC) &_strawr_straw, 6},
     {NULL, NULL, 0}
 };
 
