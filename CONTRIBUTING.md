@@ -46,5 +46,5 @@ Straw is a volunteer effort. We encourage you to pitch in and join the team!
 
 Thanks! :heart: :heart: :heart:
 
-The Center for Genome Architecture
+The Center for Genome Architecture,
 Baylor College of Medicine & Rice University
