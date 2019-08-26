@@ -1,0 +1,18 @@
+# History files
+.Rhistory
+.Rapp.history
+
+# Session Data files
+.RData
+
+# Output files from R CMD check
+/*.Rcheck/
+
+# Rstudio files
+*.Rproj
+.Rproj.user
+
+# compiled
+src/*.o
+src/*.so
+src/*.dll
