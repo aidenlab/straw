@@ -247,6 +247,9 @@ def readMatrix(req, unit, binsize):
 
     Returns:
        list containing block bin count and block column count of matrix
+    
+    Raises:
+       ValueError if the .hic file can't be parsed with the specified resolution (binsize)
     """
     c1 = struct.unpack('<i',req.read(4))[0]
     c2 = struct.unpack('<i',req.read(4))[0]
@@ -263,8 +266,8 @@ def readMatrix(req, unit, binsize):
             blockColumnCount = list1[2]
         i=i+1
     if (not found):
-        print("Error finding block data\n")
-        return -1
+	raise ValueError(f"Error: could not parse .hic file using specified resolution/bin-size ({binsize})" )
+                
     return [blockBinCount, blockColumnCount]
 
 def getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount, intra):
