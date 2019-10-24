@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="hic-straw",
-    version="0.0.7",
+    version="0.0.8",
     author="Neva C. Durand",
     email="theaidenlab@gmail.com",
     description="Extract data quickly from Juicebox hic files via straw",
