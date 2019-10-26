@@ -1,6 +1,7 @@
 from __future__ import print_function
 #Reads the genome name from the hic header
 #Can take in a .hic file or URL that points to .hic file
+from typing import List
 import sys
 import struct
 import requests
@@ -27,13 +28,19 @@ def readcstr(f):
         buf = buf + b
 #            buf.append(b.decode('utf'))
 
-def main(infile:str, verbose:bool=False):
+def main(
+  infile:str, 
+  verbose:bool=False,
+  noprint_attributes:List[str]=None):
   """
   Main function used to read and print the header of a .hic file.
   ----------
   Parameters:
     infile: string path to .hic file (can also be an URL).
     verbose: boolean indicator of verbosity, default is False.
+    noprint_attributes: list of strings representing keys in the .hic archive's attribute dictionary
+                        which should not be printed.
+                        None is the "sentinel default value", gets overwritten to ['graphs']
   ----------
   Returns:
     True if the function ran to completion.
@@ -42,6 +49,10 @@ def main(infile:str, verbose:bool=False):
     requests.HTTPError: if infile is a URL, but requests.Session.get() returns an invalid (>=400) status code.
     ValueError: if the header of the .hic file does not contain the 'HIC' keyword.
   """
+  # sentinel value replacement
+  if noprint_attributes is None:
+    noprint_attributes = ['graphs']
+
   magic_string = ""
   if (infile.startswith("http")):
       # try URL first. 100K should be sufficient for header
@@ -81,6 +92,7 @@ def main(infile:str, verbose:bool=False):
   if verbose:
     print('Genome ID:')
     print('  {0}'.format(str(genome))) 
+  
   # read and throw away attribute dictionary (stats+graphs)
   if verbose:
     print('Attribute dictionary:')
@@ -90,6 +102,11 @@ def main(infile:str, verbose:bool=False):
     value = readcstr(req)
     if verbose:
       print('   Key:{0}'.format(key))
+
+      if key in noprint_attributes:
+        print('   (not displaying this attribute field as specified)')
+        continue 
+      
       print('   Value:{0}'.format(value))
   nChrs = struct.unpack('<i',req.read(4))[0]
   if verbose:
