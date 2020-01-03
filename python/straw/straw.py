@@ -1,4 +1,5 @@
-"""Straw module
+"""
+Straw module
 
 Straw enables programmatic access to .hic files.
 .hic files store the contact matrices from Hi-C experiments and the
@@ -15,16 +16,16 @@ Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <\
 BP/FRAG> <binsize>
 
 Example:
->>>import straw
->>>result = straw.straw('NONE', 'HIC001.hic', 'X', 'X', 'BP', 1000000)
->>>for i in range(len(result[0])):
+   import straw
+   result = straw.straw('NONE', 'HIC001.hic', 'X', 'X', 'BP', 1000000)
+   for i in range(len(result[0])):
 ...   print("{0}\t{1}\t{2}".format(result[0][i], result[1][i], result[2][i]))
 
 See https://github.com/theaidenlab/straw/wiki/Python for more documentation
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-__author__ = "Yue Wu and Neva Durand"
+__author__ = "Yue Wu, Neva Durand, Yossi Eliaz, Muhammad Shamim, Erez Aiden"
 __license__ = "MIT"
 
 import sys
@@ -32,10 +33,10 @@ import struct
 import zlib
 import requests
 import io
-
-blockMap = dict()
-# global version
-version=0
+import multiprocessing
+import concurrent.futures
+from concurrent.futures import ProcessPoolExecutor
+import time
 
 def __readcstr(f):
     """ Helper function for reading in C-style string from file
@@ -50,33 +51,83 @@ def __readcstr(f):
         else:
             buf += b
 
-def readHeader(req, chr1, chr2, posilist):
+"""
+functions for chrom.sizes
+internal representation is a dictionary with 
+chromosome name as the key
+value maps to a tuple containing the index and chromosome length
+"""
+class ChromDotSizes:
+    def __init__(self, data):
+        self.data = data
+
+    def getLength(self, chrom):
+        try:
+            return int(self.data[chrom][1])
+        except:
+            print(str(chrom) + " not in chrom.sizes. Check that the chromosome name matches the genome.\n")
+            return None
+
+    def getIndex(self, chrom):
+        try:
+            return int(self.data[chrom][0])
+        except:
+            print(str(chrom) + " not in chrom.sizes. Check that the chromosome name matches the genome.\n")
+            return None
+
+    def figureOutEndpoints(self, chrAndPositions):
+        chrAndPositionsArray = chrAndPositions.split(":")
+        chrom = chrAndPositionsArray[0]
+
+        indx1 = 0
+        indx2 = self.getLength(chrom)
+
+        if (len(chrAndPositionsArray) == 3):
+            indx1 = int(chrAndPositionsArray[1])
+            indx2 = int(chrAndPositionsArray[2])
+
+        return chrom, indx1, indx2
+
+
+def readHeader(infile, is_synapse):
     """ Reads the header
 
     Args:
        req (file): File to read from
-       chr1 (str): Chromosome 1
-       chr2 (str): Chromosome 2
-       c1pos1 (int, optional): Starting range of chromosome1 output
-       c1pos2 (int, optional): Stopping range of chromosome1 output
-       c2pos1 (int, optional): Starting range of chromosome2 output
-       c2pos2 (int, optional): Stopping range of chromosome2 output
 
     Returns:
        list: master index, chromosome1 index, chromosome2 index
     """
+
+    magic_string = ""
+    if infile.startswith("http"):
+        # try URL first. 100K should be sufficient for header
+        headers = getHttpHeader('bytes=0-100000', is_synapse)
+        s = requests.Session()
+        r = s.get(infile, headers=headers)
+        if (r.status_code >= 400):
+            print("Error accessing " + infile)
+            print("HTTP status code " + str(r.status_code))
+            return -1
+        req = io.BytesIO(r.content)
+        myrange = r.headers['content-range'].split('/')
+        totalbytes = myrange[1]
+    else:
+        req = open(infile, 'rb')
+        totalbytes = None
+
     magic_string = struct.unpack('<3s', req.read(3))[0]
     req.read(1)
     if (magic_string != b"HIC"):
         print('This does not appear to be a HiC file magic string is incorrect')
         return -1
-    global version
     version = struct.unpack('<i',req.read(4))[0]
     if (version < 6):
         print("Version {0} no longer supported".format(str(version)))
         return -1
     print('HiC version:' + '  {0}'.format(str(version)))
     master = struct.unpack('<q',req.read(8))[0]
+
     genome = b""
     c=req.read(1)
     while (c != b'\0'):
@@ -89,29 +140,14 @@ def readHeader(req, chr1, chr2, posilist):
         key = __readcstr(req)
         value = __readcstr(req)
     nChrs = struct.unpack('<i',req.read(4))[0]
-    found1 = False
-    found2 = False
+    chromDotSizes = {}
     for i in range(0, nChrs):
-      name = __readcstr(req)
-      length = struct.unpack('<i',req.read(4))[0]
-      if (name==chr1):
-          found1=True
-          chr1ind=i
-          if (posilist[0]==-100):
-              posilist[0]=0
-              posilist[1]=length
-      if (name==chr2):
-          found2=True
-          chr2ind=i
-          if (posilist[2]==-100):
-              posilist[2]=0
-              posilist[3]=length
-    if ((not found1) or (not found2)):
-      print("One of the chromosomes wasn't found in the file. Check that the chromosome name matches the genome.\n")
-      return -1
-    return [master, chr1ind, chr2ind, posilist[0], posilist[1], posilist[2], posilist[3]]
+        name = __readcstr(req)
+        length = struct.unpack('<i',req.read(4))[0]
+        chromDotSizes[name] = (i, length)
+    return master, version, totalbytes, ChromDotSizes(chromDotSizes)
 
-def readFooter(req, c1, c2, norm, unit, resolution):
+def readFooter(infile, is_synapse, master, totalbytes):
     """Reads the footer, which contains all the expected and normalization
     vectors. Presumes file pointer is in correct position
     Args:
@@ -127,32 +163,38 @@ def readFooter(req, c1, c2, norm, unit, resolution):
        list: File position of matrix, position+size chr1 normalization vector,
              position+size chr2 normalization vector
     """
-    c1NormEntry=dict()
-    c2NormEntry=dict()
+    if infile.startswith("http"):
+        headers = getHttpHeader('bytes={0}-{1}'.format(master, totalbytes), is_synapse)
+        s = requests.Session()
+        r = s.get(infile, headers=headers);
+        req = io.BytesIO(r.content)
+    else:
+        req = open(infile, 'rb')
+        req.seek(master)
+
+    filePositions = dict()
     nBytes = struct.unpack('<i', req.read(4))[0]
-    key = str(c1) + "_" + str(c2)
     nEntries = struct.unpack('<i', req.read(4))[0]
-    found = False
+
     for i in range(nEntries):
-        stri = __readcstr(req)
+        key = __readcstr(req)
         fpos = struct.unpack('<q', req.read(8))[0]
         sizeinbytes = struct.unpack('<i', req.read(4))[0]
-        if (stri==key):
-            myFilePos = fpos
-            found=True
-    if (not found):
-        print("File doesn't have the given chr_chr map\n")
-    if (norm=="NONE"):
-        return [myFilePos, 0, 0]
+        filePositions[key] = (fpos, sizeinbytes)
+
+
+    # later save these
     nExpectedValues = struct.unpack('<i',req.read(4))[0]
     for i in range(nExpectedValues):
-        str_ = __readcstr(req)
+        key = __readcstr(req)
         binSize = struct.unpack('<i',req.read(4))[0]
         nValues = struct.unpack('<i',req.read(4))[0]
         for j in range(nValues):
+            # replace with vector.append
             v = struct.unpack('<d',req.read(8))[0]
         nNormalizationFactors = struct.unpack('<i',req.read(4))[0]
         for j in range(nNormalizationFactors):
+            # replace with vector.append
             chrIdx = struct.unpack('<i',req.read(4))[0]
             v = struct.unpack('<d',req.read(8))[0]
     nExpectedValues = struct.unpack('<i',req.read(4))[0]
@@ -167,31 +209,45 @@ def readFooter(req, c1, c2, norm, unit, resolution):
         for j in range(nNormalizationFactors):
             chrIdx = struct.unpack('<i',req.read(4))[0]
             v = struct.unpack('<d',req.read(8))[0]
+
+        normMap = dict()
     nEntries = struct.unpack('<i',req.read(4))[0]
-    found1=False
-    found2=False
     for i in range(nEntries):
         normtype = __readcstr(req)
+        if normtype not in normMap:
+            normMap[normtype] = {}
         chrIdx = struct.unpack('<i',req.read(4))[0]
-        unit1 = __readcstr(req)
-        resolution1 = struct.unpack('<i',req.read(4))[0]
+        if chrIdx not in normMap[normtype]:
+            normMap[normtype][chrIdx] = {}
+        unit = __readcstr(req)
+        if unit not in normMap[normtype][chrIdx]:
+            normMap[normtype][chrIdx][unit] = {}
+        resolution = struct.unpack('<i',req.read(4))[0]
+        if resolution not in normMap[normtype][chrIdx][unit]:
+            normMap[normtype][chrIdx][unit][resolution] = {}
         filePosition = struct.unpack('<q',req.read(8))[0]
         sizeInBytes = struct.unpack('<i',req.read(4))[0]
-        if (chrIdx==c1 and normtype==norm and unit1==unit and resolution1==resolution):
-            c1NormEntry['position']=filePosition
-            c1NormEntry['size']=sizeInBytes
-            found1=True
-        if (chrIdx==c2 and normtype==norm and unit1==unit and resolution1==resolution):
-            c2NormEntry['position']=filePosition
-            c2NormEntry['size']=sizeInBytes
-            found2=True
+
+        normMap[normtype][chrIdx][unit][resolution]['position'] = filePosition
+        normMap[normtype][chrIdx][unit][resolution]['size'] = sizeInBytes
+
+    return filePositions, normMap
+
+"""
+
+    if (not found):
+        print("File doesn't have the given chr_chr map\n")
+
+    if (norm == "NONE"):
+        return [myFilePos, 0, 0]
     if ((not found1) or (not found2)):
         print("File did not contain {0} normalization vectors for one or both chromosomes at {1} {2}\n".format(norm, resolution, unit))
         return -1
-    return [myFilePos, c1NormEntry, c2NormEntry]
+
+"""
 
 
-def readMatrixZoomData(req, myunit, mybinsize):
+def readMatrixZoomData(req, myunit, mybinsize, blockMap):
     """ Reads the Matrix Zoom Data, which gives pointer list for blocks for
     the data. Presumes file pointer is in correct position
 
@@ -232,9 +288,9 @@ def readMatrixZoomData(req, myunit, mybinsize):
         entry['position'] = filePosition
         if (storeBlockData):
             blockMap[blockNumber] = entry
-    return [storeBlockData, myBlockBinCount, myBlockColumnCount]
+    return storeBlockData, myBlockBinCount, myBlockColumnCount
 
-def readMatrix(req, unit, binsize):
+def readMatrix(req, unit, binsize, blockMap):
     """ Reads the matrix - that is, finds the appropriate pointers to block
     data and stores them. Needs to read through headers of zoom data to find
     appropriate matrix. Presumes file pointer is in correct position.
@@ -259,16 +315,12 @@ def readMatrix(req, unit, binsize):
     blockBinCount = -1
     blockColumnCount = -1
     while (i<nRes and (not found)):
-        list1 = readMatrixZoomData(req, unit, binsize)
-        found = list1[0]
-        if(list1[1]!=-1 and list1[2]!=-1):
-            blockBinCount = list1[1]
-            blockColumnCount = list1[2]
+        found, blockBinCount, blockColumnCount = readMatrixZoomData(req, unit, binsize, blockMap)
         i=i+1
     if (not found):
-	raise ValueError(f"Error: could not parse .hic file using specified resolution/bin-size ({binsize})" )
-                
-    return [blockBinCount, blockColumnCount]
+        raise ValueError(f"Error: could not parse .hic file using specified resolution/bin-size ({binsize})" )
+
+    return blockBinCount, blockColumnCount
 
 def getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount, intra):
     """ Gets the block numbers we will need for a specific region; used when
@@ -301,7 +353,7 @@ def getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockC
     # print(str(blocksSet))
     return blocksSet
 
-def readBlock(req, size):
+def readBlock(req, size, version):
     """ Reads the block - reads the compressed bytes, decompresses, and stores
     results in array. Presumes file pointer is in correct position.
 
@@ -317,7 +369,6 @@ def readBlock(req, size):
     uncompressedBytes = zlib.decompress(compressedBytes)
     nRecords = struct.unpack('<i',uncompressedBytes[0:4])[0]
     v=[]
-    global version
     if (version < 7):
         for i in range(nRecords):
             binX = struct.unpack('<i',uncompressedBytes[(12*i+4):(12*i+8)])[0]
@@ -393,6 +444,47 @@ def readBlock(req, size):
                         index = index + 1
     return v
 
+
+def readBlockWorker(infile, is_synapse, blockNum, binsize, blockMap, norm, c1Norm, c2Norm, genomePositionsBox, isIntra, lock, xActual, yActual, counts, version):
+    idx = dict()
+    if (blockNum in blockMap):
+        idx = blockMap[blockNum]
+    else:
+        idx['size'] = 0
+        idx['position'] = 0
+
+    if (idx['size'] == 0):
+        records = []
+    else:
+        if infile.startswith("http"):
+            headers = getHttpHeader('bytes={0}-{1}'.format(idx['position'], idx['position'] + idx['size']), is_synapse)
+            s = requests.Session()
+            r = s.get(infile, headers=headers);
+            req = io.BytesIO(r.content);
+        else:
+            req = open(infile, 'rb')
+            req.seek(idx['position'])
+        records = readBlock(req, idx['size'], version)
+
+    for j in range(len(records)):
+        rec = records[j]
+        x = rec['binX'] * binsize
+        y = rec['binY'] * binsize
+        c = rec['counts']
+        if (norm != "NONE"):
+            a = c1Norm[rec['binX']] * c2Norm[rec['binY']]
+            if (a != 0.0):
+                c = (c / (c1Norm[rec['binX']] * c2Norm[rec['binY']]))
+            else:
+                c = "inf"
+        if ((genomePositionsBox[0] <= x <= genomePositionsBox[1] and genomePositionsBox[2] <= y <= genomePositionsBox[3]) or \
+                (isIntra and genomePositionsBox[0] <= y <= genomePositionsBox[1] and genomePositionsBox[2] <= x <= genomePositionsBox[3])):
+            with lock:
+                xActual.append(x)
+                yActual.append(y)
+                counts.append(c)
+
+
 def readNormalizationVector(req):
     """ Reads the normalization vector from the file; presumes file pointer is
     in correct position
@@ -412,184 +504,218 @@ def readNormalizationVector(req):
         value.append(d)
     return value
 
-def straw(norm, infile, chr1loc, chr2loc, unit, binsize, is_synapse=False):
-    """ This is the main workhorse method of the module. Reads a .hic file and
-    extracts the given contact matrix. Stores in an array in sparse upper
-    triangular format: row, column, (normalized) count
+# binsize
+# chr1loc, chr2loc,
+def getHttpHeader(endrange, is_synapse):
+    if is_synapse:
+        return {'range': endrange}
+    return {'range': endrange, 'x-amz-meta-requester': 'straw'}
 
-    Args:
-       norm(str): Normalization type, one of VC, KR, VC_SQRT, or NONE
-       infile(str): File name or URL of .hic file
-       chr1loc(str): Chromosome name and (optionally) range, i.e. "1" or "1:10000:25000"
-       chr2loc(str): Chromosome name and (optionally) range, i.e. "1" or "1:10000:25000"
-       unit(str): One of BP or FRAG
-       binsize(int): Resolution, i.e. 25000 for 25K
-    """
-    # clear the global variable blockMap so that it won't keep the data from previous calls
-    for blockNum in list(blockMap.keys()):
-        blockMap.pop(blockNum)
+def readLocalNorm(infile, position):
+    req = open(infile, 'rb')
+    req.seek(position)
+    return readNormalizationVector(req)
 
-    magic_string = ""
-    if (infile.startswith("http")):
-        # try URL first. 100K should be sufficient for header
-        headers={'range' : 'bytes=0-100000', 'x-amz-meta-requester' : 'straw'}
-        if is_synapse:
-            headers={'range' : 'bytes=0-100000'}
-        s = requests.Session()
-        r=s.get(infile, headers=headers)
-        if (r.status_code >=400):
-            print("Error accessing " + infile)
-            print("HTTP status code " + str(r.status_code))
+def readHttpNorm(infile, normEntry, is_synapse):
+    endrange = 'bytes={0}-{1}'.format(normEntry['position'], normEntry['position'] + normEntry['size'])
+    headers = getHttpHeader(endrange, is_synapse)
+    s = requests.Session()
+    r = s.get(infile, headers=headers);
+    req = io.BytesIO(r.content);
+    return readNormalizationVector(req)
+
+
+class straw:
+    def __init__(self, infile, is_synapse=False):
+        """ This is the main workhorse method of the module. Reads a .hic file and
+        extracts the given contact matrix. Stores in an array in sparse upper
+        triangular format: row, column, (normalized) count
+
+        Args:
+           norm(str): Normalization type, one of VC, KR, VC_SQRT, or NONE
+           infile(str): File name or URL of .hic file
+           chr1loc(str): Chromosome name and (optionally) range, i.e. "1" or "1:10000:25000"
+           chr2loc(str): Chromosome name and (optionally) range, i.e. "1" or "1:10000:25000"
+           unit(str): One of BP or FRAG
+           binsize(int): Resolution, i.e. 25000 for 25K
+        """
+
+        self.isHttpFile = infile.startswith("http")
+        self.infile = infile
+        self.is_synapse = is_synapse
+        self.master, self.version, totalbytes, self.chromDotSizes  = readHeader(infile, is_synapse)
+        self.myFilePositions, self.normMap = readFooter(infile, is_synapse, self.master, totalbytes)
+
+    def getNormalizedMatrix(self, chr1, chr2, norm, unit, binsize):
+
+        if (not (unit=="BP" or unit=="FRAG")):
+            print("Unit specified incorrectly, must be one of <BP/FRAG>\nUsage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>\n")
             return -1
-        req=io.BytesIO(r.content)
-        myrange=r.headers['content-range'].split('/')
-        totalbytes=myrange[1]
-    else:
-        req=open(infile, 'rb')
-    if (not (unit=="BP" or unit=="FRAG")):
-        print("Unit specified incorrectly, must be one of <BP/FRAG>\nUsage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>\n")
-        return -1
-    c1pos1=-100
-    c1pos2=-100
-    c2pos1=-100
-    c2pos2=-100
-    chr1_arra = chr1loc.split(":")
-    chr2_arra = chr2loc.split(":")
-    chr1=chr1_arra[0]
-    chr2=chr2_arra[0]
-    if(len(chr1_arra)==3):
-        c1pos1=chr1_arra[1]
-        c1pos2=chr1_arra[2]
-    if(len(chr2_arra)==3):
-        c2pos1=chr2_arra[1]
-        c2pos2=chr2_arra[2]
 
-    list1 = readHeader(req, chr1, chr2, [c1pos1, c1pos2, c2pos1, c2pos2])
+        for chrom in [chr1, chr2]:
+            if chrom not in self.chromDotSizes.data:
+                print(str(chrom) + " wasn't found in the file. Check that the chromosome name matches the genome.\n")
+                return None
 
-    master=list1[0]
-    chr1ind=list1[1]
-    chr2ind=list1[2]
-    c1pos1=int(list1[3])
-    c1pos2=int(list1[4])
-    c2pos1=int(list1[5])
-    c2pos2=int(list1[6])
-    c1=min(chr1ind,chr2ind)
-    c2=max(chr1ind,chr2ind)
-    origRegionIndices=[]
-    regionIndices=[]
-    if (chr1ind > chr2ind):
-        origRegionIndices.append(c2pos1)
-        origRegionIndices.append(c2pos2)
-        origRegionIndices.append(c1pos1)
-        origRegionIndices.append(c1pos2)
-        regionIndices.append(int(c2pos1/binsize))
-        regionIndices.append(int(c2pos2/binsize))
-        regionIndices.append(int(c1pos1/binsize))
-        regionIndices.append(int(c1pos2/binsize))
-    else:
-        origRegionIndices.append(c1pos1)
-        origRegionIndices.append(c1pos2)
-        origRegionIndices.append(c2pos1)
-        origRegionIndices.append(c2pos2)
-        regionIndices.append(int(c1pos1/binsize))
-        regionIndices.append(int(c1pos2/binsize))
-        regionIndices.append(int(c2pos1/binsize))
-        regionIndices.append(int(c2pos2/binsize))
+        chrIndex1 = self.chromDotSizes.getIndex(chr1)
+        chrIndex2 = self.chromDotSizes.getIndex(chr2)
+        isIntra = chrIndex1 == chrIndex2
 
-    # Get footer: from master to end of file
-    if (infile.startswith("http")):
-        headers={'range' : 'bytes={0}-{1}'.format(master, totalbytes) , 'x-amz-meta-requester' : 'straw'}
-        if is_synapse:
-            headers={'range' : 'bytes={0}-{1}'.format(master, totalbytes)}
-        r=s.get(infile, headers=headers);
-        req=io.BytesIO(r.content)
-    else:
-        req.seek(master)
+        neededToFlipIndices = False
+        if (chrIndex1 > chrIndex2):
+            neededToFlipIndices = True
+            chrIndex1, chrIndex2 = chrIndex2, chrIndex1
 
-    list1 = readFooter(req, c1, c2, norm, unit, binsize)
-    myFilePos=list1[0]
-    c1NormEntry=list1[1]
-    c2NormEntry=list1[2]
-
-    if (norm != "NONE"):
-        if (infile.startswith("http")):
-            endrange='bytes={0}-{1}'.format(c1NormEntry['position'],c1NormEntry['position']+c1NormEntry['size'])
-            headers={'range' : endrange, 'x-amz-meta-requester' : 'straw'}
-            if is_synapse:
-                headers={'range' : endrange}
-            r=s.get(infile, headers=headers);
-            req=io.BytesIO(r.content);
-            c1Norm = readNormalizationVector(req)
-
-            endrange='bytes={0}-{1}'.format(c2NormEntry['position'],c2NormEntry['position']+c2NormEntry['size'])
-            headers={'range' : endrange, 'x-amz-meta-requester' : 'straw'}
-            if is_synapse:
-                headers={'range' : endrange}
-            r=s.get(infile, headers=headers)
-            req=io.BytesIO(r.content)
-            c2Norm = readNormalizationVector(req)
-        else:
-            req.seek(c1NormEntry['position'])
-            c1Norm = readNormalizationVector(req)
-            req.seek(c2NormEntry['position'])
-            c2Norm = readNormalizationVector(req)
-
-    if (infile.startswith("http")):
-        headers={'range' : 'bytes={0}-'.format(myFilePos), 'x-amz-meta-requester' : 'straw'}
-        if is_synapse:
-            headers={'range' : 'bytes={0}-'.format(myFilePos)}
-        r=s.get(infile, headers=headers, stream=True)
-        list1 = readMatrix(r.raw, unit, binsize)
-    else:
-        req.seek(myFilePos)
-        list1 = readMatrix(req, unit, binsize)
-
-    blockBinCount=list1[0]
-    blockColumnCount=list1[1]
-    blockNumbers = getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount, c1==c2)
-    yActual=[]
-    xActual=[]
-    counts=[]
-
-    for i_set in (blockNumbers):
-        idx=dict()
-        if(i_set in blockMap):
-            idx=blockMap[i_set]
-        else:
-            idx['size']=0
-            idx['position']=0
-        if (idx['size']==0):
-            records=[]
-        else:
-            if (infile.startswith("http")):
-                endrange='bytes={0}-{1}'.format(idx['position'], idx['position']+idx['size'])
-                headers={'range' : endrange, 'x-amz-meta-requester' : 'straw'}
-                if is_synapse:
-                    headers={'range' : endrange}
-                r=s.get(infile, headers=headers);
-                req=io.BytesIO(r.content);
+        executor = concurrent.futures.ThreadPoolExecutor(2)
+        if (norm != "NONE"):
+            c1NormEntry = self.normMap[norm][chrIndex1][unit][binsize]
+            if not isIntra:
+                c2NormEntry = self.normMap[norm][chrIndex2][unit][binsize]
+            if self.isHttpFile:
+                futureNorm1 = executor.submit(readHttpNorm, self.infile, c1NormEntry, self.is_synapse)
+                if not isIntra:
+                    futureNorm2 = executor.submit(readHttpNorm, self.infile, c2NormEntry, self.is_synapse)
             else:
-                req.seek(idx['position'])
-            records=readBlock(req, idx['size'])
+                futureNorm1 = executor.submit(readLocalNorm, self.infile, c1NormEntry['position'])
+                if not isIntra:
+                    futureNorm2 = executor.submit(readLocalNorm, self.infile, c2NormEntry['position'])
 
-        for j in range(len(records)):
-            rec=records[j]
-            x=rec['binX']*binsize
-            y=rec['binY']*binsize
-            c=rec['counts']
-            if (norm != "NONE"):
-                a=c1Norm[rec['binX']]*c2Norm[rec['binY']]
-                if (a!=0.0):
-                    c=(c/(c1Norm[rec['binX']]*c2Norm[rec['binY']]))
+        blockMap = dict()
+        key = str(chrIndex1) + "_" + str(chrIndex2)
+        myFilePos = self.myFilePositions[key][0]
+        if self.isHttpFile:
+            headers = getHttpHeader('bytes={0}-'.format(myFilePos), self.is_synapse)
+            s = requests.Session()
+            r = s.get(self.infile, headers=headers, stream=True)
+            futureMatrix = executor.submit(readMatrix, r.raw, unit, binsize, blockMap)
+        else:
+            req = open(self.infile, 'rb')
+            req.seek(myFilePos)
+            futureMatrix = executor.submit(readMatrix, req, unit, binsize, blockMap)
+
+        if (norm != "NONE"):
+            c1Norm = futureNorm1.result()
+            if isIntra:
+                c2Norm = c1Norm
+            else:
+                c2Norm = futureNorm2.result()
+        blockBinCount, blockColumnCount = futureMatrix.result()
+        return normalizedmatrix(self.infile, self.is_synapse, binsize, isIntra, neededToFlipIndices, blockBinCount, blockColumnCount, blockMap, norm, c1Norm, c2Norm, self.version)
+
+class normalizedmatrix:
+    def __init__(self, infile, is_synapse, binsize, isIntra, neededToFlipIndices, blockBinCount, blockColumnCount, blockMap, norm, c1Norm, c2Norm, version):
+        self.infile = infile
+        self.is_synapse = is_synapse
+        self.isHttpFile = infile.startswith("http")
+        self.binsize = binsize
+        self.isIntra = isIntra
+        self.neededToFlipIndices = neededToFlipIndices
+        self.blockBinCount = blockBinCount
+        self.blockColumnCount = blockColumnCount
+        self.norm = norm
+        self.c1Norm = c1Norm
+        self.c2Norm = c2Norm
+        self.blockMap = blockMap
+        self.version = version
+
+    def getDataFromBinRegion(self, executor, lock, X1, X2, Y1, Y2):
+        binsize = self.binsize
+        return self.getDataFromGenomeRegion(executor, lock, binsize*X1, binsize*X2, binsize*Y1, binsize*Y2)
+
+    def getDataFromGenomeRegion(self, executor, lock, X1, X2, Y1, Y2):
+        genomePositionsBox=[]
+        binPositionsBox=[]
+        binsize = self.binsize
+        if self.neededToFlipIndices:
+            X1, X2, Y1, Y2 = Y1, Y2, X1, X2
+
+        genomePositionsBox.append(X1)
+        genomePositionsBox.append(X2)
+        genomePositionsBox.append(Y1)
+        genomePositionsBox.append(Y2)
+        binPositionsBox.append(int(X1/binsize))
+        binPositionsBox.append(int(X2/binsize))
+        binPositionsBox.append(int(Y1/binsize))
+        binPositionsBox.append(int(Y2/binsize))
+
+        t1 = time.time()
+
+        blockNumbers = getBlockNumbersForRegionFromBinPosition(binPositionsBox, self.blockBinCount, self.blockColumnCount, self.isIntra)
+        yActual=[]
+        xActual=[]
+        counts=[]
+
+        t2 = time.time()
+        #futures = [executor.submit(readBlockWorker, self.infile, self.is_synapse, bNum, binsize, self.blockMap, self.norm,\
+        #                           self.c1Norm, self.c2Norm, genomePositionsBox, self.isIntra, lock, xActual, yActual, counts, self.version\
+        #                           ) for bNum in blockNumbers]
+
+        blockMap = self.blockMap
+        infile = self.infile
+        is_synapse = self.is_synapse
+        norm = self.norm
+        isIntra = self.isIntra
+        c1Norm = self.c1Norm
+        c2Norm = self.c2Norm
+        version = self.version
+        s = requests.Session()
+        req = open(infile, 'rb')
+
+
+
+        for blockNum in blockNumbers:
+            #readBlockWorker(self.infile, self.is_synapse, bNum, binsize, self.blockMap, self.norm, \
+            #                               self.c1Norm, self.c2Norm, genomePositionsBox, self.isIntra, lock, xActual, yActual, counts, self.version)
+            idx = dict()
+            if (blockNum in blockMap):
+                idx = blockMap[blockNum]
+            else:
+                idx['size'] = 0
+                idx['position'] = 0
+
+            if (idx['size'] == 0):
+                records = []
+            else:
+                if infile.startswith("http"):
+                    headers = getHttpHeader('bytes={0}-{1}'.format(idx['position'], idx['position'] + idx['size']),
+                                            is_synapse)
+                    r = s.get(infile, headers=headers);
+                    req = io.BytesIO(r.content);
                 else:
-                    c="inf"
-            if ((x>=origRegionIndices[0] and x<=origRegionIndices[1] and y>=origRegionIndices[2] and y<=origRegionIndices[3]) or ((c1==c2) and y>=origRegionIndices[0] and y<=origRegionIndices[1] and x>= origRegionIndices[2] and x<=origRegionIndices[3])):
-	            xActual.append(x)
-	            yActual.append(y)
-	            counts.append(c)
-    return [xActual, yActual, counts]
 
-def printme(norm, infile, chr1loc, chr2loc, unit, binsize,outfile):
+                    req.seek(idx['position'])
+                records = readBlock(req, idx['size'], version)
+
+            for j in range(len(records)):
+                rec = records[j]
+                x = rec['binX'] * binsize
+                y = rec['binY'] * binsize
+                c = rec['counts']
+                if (norm != "NONE"):
+                    a = c1Norm[rec['binX']] * c2Norm[rec['binY']]
+                    if (a != 0.0):
+                        c = (c / (c1Norm[rec['binX']] * c2Norm[rec['binY']]))
+                    else:
+                        c = "inf"
+                if ((genomePositionsBox[0] <= x <= genomePositionsBox[1] and genomePositionsBox[2] <= y <=
+                     genomePositionsBox[3]) or \
+                        (isIntra and genomePositionsBox[0] <= y <= genomePositionsBox[1] and genomePositionsBox[2] <= x <=
+                         genomePositionsBox[3])):
+                    xActual.append(x)
+                    yActual.append(y)
+                    counts.append(c)
+
+
+        #for future in futures:
+        #    future.result()
+        #executor.shutdown()
+
+        t3 = time.time()
+        print("first part ",t2-t1)
+        print("second part ", t3 - t2)
+        return [xActual, yActual, counts]
+
+def printme(norm, infile, chr1loc, chr2loc, unit, binsize, outfile):
     """ Reads a .hic file and extracts and prints the given contact matrix
     to a text file
 
@@ -603,8 +729,15 @@ def printme(norm, infile, chr1loc, chr2loc, unit, binsize,outfile):
        outfile(str): Name of text file to write to
     """
     f = open(outfile, 'w')
-    result = straw(norm, infile, chr1loc, chr2loc, unit, binsize)
+    strawObj = straw(infile)
+
+    chr1, X1, X2 = strawObj.chromDotSizes.figureOutEndpoints(chr1loc)
+    chr2, Y1, Y2 = strawObj.chromDotSizes.figureOutEndpoints(chr2loc)
+
+    matrxObj = strawObj.getNormalizedMatrix(chr1, chr2, norm, unit, binsize)
+
+    result = matrxObj.getDataFromGenomeRegion(X1, X2, Y1, Y2)
+
     for i in range(len(result[0])):
         f.write("{0}\t{1}\t{2}\n".format(result[0][i], result[1][i], result[2][i]))
-        #print("{0}\t{1}\t{2}".format(result[0][i], result[1][i], result[2][i]))
     f.close()
