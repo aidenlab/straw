@@ -52,6 +52,8 @@ internal representation is a dictionary with
 chromosome name as the key
 value maps to a tuple containing the index and chromosome length
 """
+
+
 class ChromDotSizes:
     def __init__(self, data):
         self.data = data
@@ -99,7 +101,7 @@ def readHeader(infile, is_synapse):
         headers = getHttpHeader('bytes=0-100000', is_synapse)
         s = requests.Session()
         r = s.get(infile, headers=headers)
-        if (r.status_code >= 400):
+        if r.status_code >= 400:
             print("Error accessing " + infile)
             print("HTTP status code " + str(r.status_code))
             return -1
@@ -112,11 +114,11 @@ def readHeader(infile, is_synapse):
 
     magic_string = struct.unpack('<3s', req.read(3))[0]
     req.read(1)
-    if (magic_string != b"HIC"):
+    if magic_string != b"HIC":
         print('This does not appear to be a HiC file magic string is incorrect')
         return -1
     version = struct.unpack('<i', req.read(4))[0]
-    if (version < 6):
+    if version < 6:
         print("Version {0} no longer supported".format(str(version)))
         return -1
     print('HiC version:' + '  {0}'.format(str(version)))
@@ -124,7 +126,7 @@ def readHeader(infile, is_synapse):
 
     genome = b""
     c = req.read(1)
-    while (c != b'\0'):
+    while c != b'\0':
         genome += c
         c = req.read(1)
 
@@ -161,7 +163,7 @@ def readFooter(infile, is_synapse, master, totalbytes):
     if infile.startswith("http"):
         headers = getHttpHeader('bytes={0}-{1}'.format(master, totalbytes), is_synapse)
         s = requests.Session()
-        r = s.get(infile, headers=headers);
+        r = s.get(infile, headers=headers)
         req = io.BytesIO(r.content)
     else:
         req = open(infile, 'rb')
@@ -255,7 +257,7 @@ def readMatrixZoomData(req, myunit, mybinsize, blockMap):
     # for the initial
     myBlockBinCount = -1
     myBlockColumnCount = -1
-    if (myunit == unit and mybinsize == binSize):
+    if myunit == unit and mybinsize == binSize:
         myBlockBinCount = blockBinCount
         myBlockColumnCount = blockColumnCount
         storeBlockData = True
@@ -267,7 +269,7 @@ def readMatrixZoomData(req, myunit, mybinsize, blockMap):
         entry = dict()
         entry['size'] = blockSizeInBytes
         entry['position'] = filePosition
-        if (storeBlockData):
+        if storeBlockData:
             blockMap[blockNumber] = entry
     return storeBlockData, myBlockBinCount, myBlockColumnCount
 
@@ -296,10 +298,10 @@ def readMatrix(req, unit, binsize, blockMap):
     found = False
     blockBinCount = -1
     blockColumnCount = -1
-    while (i < nRes and (not found)):
+    while i < nRes and (not found):
         found, blockBinCount, blockColumnCount = readMatrixZoomData(req, unit, binsize, blockMap)
         i = i + 1
-    if (not found):
+    if not found:
         raise ValueError(f"Error: could not parse .hic file using specified resolution/bin-size ({binsize})")
 
     return blockBinCount, blockColumnCount
@@ -328,7 +330,7 @@ def getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockC
         for c in range(col1, col2 + 1):
             blockNumber = r * blockColumnCount + c
             blocksSet.add(blockNumber)
-    if (intra):
+    if intra:
         for r in range(col1, col2 + 1):
             for c in range(row1, row2 + 1):
                 blockNumber = r * blockColumnCount + c
@@ -352,7 +354,7 @@ def readBlock(req, size, version):
     uncompressedBytes = zlib.decompress(compressedBytes)
     nRecords = struct.unpack('<i', uncompressedBytes[0:4])[0]
     v = []
-    if (version < 7):
+    if version < 7:
         for i in range(nRecords):
             binX = struct.unpack('<i', uncompressedBytes[(12 * i + 4):(12 * i + 8)])[0]
             binY = struct.unpack('<i', uncompressedBytes[(12 * i + 8):(12 * i + 12)])[0]
@@ -368,7 +370,7 @@ def readBlock(req, size, version):
         useShort = struct.unpack('<b', uncompressedBytes[12:13])[0]
         type_ = struct.unpack('<b', uncompressedBytes[13:14])[0]
         index = 0
-        if (type_ == 1):
+        if type_ == 1:
             rowCount = struct.unpack('<h', uncompressedBytes[14:16])[0]
             temp = 16
             for i in range(rowCount):
@@ -381,7 +383,7 @@ def readBlock(req, size, version):
                     x = struct.unpack('<h', uncompressedBytes[temp:(temp + 2)])[0]
                     temp = temp + 2
                     binX = binXOffset + x
-                    if (useShort == 0):
+                    if useShort == 0:
                         c = struct.unpack('<h', uncompressedBytes[temp:(temp + 2)])[0]
                         temp = temp + 2
                         counts = c
@@ -394,7 +396,7 @@ def readBlock(req, size, version):
                     record['counts'] = counts
                     v.append(record)
                     index = index + 1
-        elif (type_ == 2):
+        elif type_ == 2:
             temp = 14
             nPts = struct.unpack('<i', uncompressedBytes[temp:(temp + 4)])[0]
             temp = temp + 4
@@ -405,10 +407,10 @@ def readBlock(req, size, version):
                 col = i - row * w
                 bin1 = int(binXOffset + col)
                 bin2 = int(binYOffset + row)
-                if (useShort == 0):
+                if useShort == 0:
                     c = struct.unpack('<h', uncompressedBytes[temp:(temp + 2)])[0]
                     temp = temp + 2
-                    if (c != -32768):
+                    if c != -32768:
                         record = dict()
                         record['binX'] = bin1
                         record['binY'] = bin2
@@ -418,7 +420,7 @@ def readBlock(req, size, version):
                 else:
                     counts = struct.unpack('<f', uncompressedBytes[temp:(temp + 4)])[0]
                     temp = temp + 4
-                    if (counts != 0x7fc00000):
+                    if counts != 0x7fc00000:
                         record = dict()
                         record['binX'] = bin1
                         record['binY'] = bin2
@@ -434,13 +436,13 @@ def readBlockWorker(infile, is_synapse, blockNum, binsize, blockMap, norm, c1Nor
     xActual = []
     counts = []
     idx = dict()
-    if (blockNum in blockMap):
+    if blockNum in blockMap:
         idx = blockMap[blockNum]
     else:
         idx['size'] = 0
         idx['position'] = 0
 
-    if (idx['size'] == 0):
+    if idx['size'] == 0:
         records = []
     else:
         if infile.startswith("http"):
@@ -460,10 +462,11 @@ def readBlockWorker(infile, is_synapse, blockNum, binsize, blockMap, norm, c1Nor
 
             if ((binPositionBox[0] <= binX <= binPositionBox[1] and binPositionBox[2] <= binY <=
                  binPositionBox[3]) or (
-                    isIntra and binPositionBox[0] <= binY <= binPositionBox[1] and binPositionBox[2] <= binX <= binPositionBox[3])):
+                    isIntra and binPositionBox[0] <= binY <= binPositionBox[1] and binPositionBox[2] <= binX <=
+                    binPositionBox[3])):
                 c = record['counts']
                 a = c1Norm[binX] * c2Norm[binY]
-                if (a != 0.0):
+                if a != 0.0:
                     c = (c / a)
                 else:
                     c = "inf"
@@ -503,6 +506,7 @@ def readNormalizationVector(req):
         d = struct.unpack('<d', req.read(8))[0]
         value.append(d)
     return value
+
 
 def getHttpHeader(endrange, is_synapse):
     if is_synapse:
@@ -548,7 +552,7 @@ class straw:
 
     def getNormalizedMatrix(self, chr1, chr2, norm, unit, binsize):
 
-        if (not (unit == "BP" or unit == "FRAG")):
+        if not (unit == "BP" or unit == "FRAG"):
             print(
                 "Unit specified incorrectly, must be one of <BP/FRAG>\nUsage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>\n")
             return None
@@ -563,17 +567,18 @@ class straw:
         isIntra = chrIndex1 == chrIndex2
 
         neededToFlipIndices = False
-        if (chrIndex1 > chrIndex2):
+        if chrIndex1 > chrIndex2:
             neededToFlipIndices = True
             chrIndex1, chrIndex2 = chrIndex2, chrIndex1
             chr1, chr2 = chr2, chr1
 
         executor = concurrent.futures.ThreadPoolExecutor()
-        if (norm != "NONE"):
+        if norm != "NONE":
             try:
                 c1NormEntry = self.normMap[norm][chrIndex1][unit][binsize]
             except:
-                print("File did not contain {0} norm vectors for chr {1} at {2} {3}\n".format(norm,chr1,binsize,unit))
+                print(
+                    "File did not contain {0} norm vectors for chr {1} at {2} {3}\n".format(norm, chr1, binsize, unit))
                 return None
 
             if not isIntra:
@@ -608,7 +613,7 @@ class straw:
             req.seek(myFilePos)
             futureMatrix = executor.submit(readMatrix, req, unit, binsize, blockMap)
 
-        if (norm != "NONE"):
+        if norm != "NONE":
             c1Norm = futureNorm1.result()
             if isIntra:
                 c2Norm = c1Norm
@@ -655,7 +660,8 @@ class normalizedmatrix:
         executor = concurrent.futures.ProcessPoolExecutor()
         futures = [
             executor.submit(readBlockWorker, self.infile, self.is_synapse, bNum, binsize, self.blockMap, self.norm, \
-                            self.c1Norm, self.c2Norm, binPositionsBox, self.isIntra, self.version) for bNum in blockNumbers]
+                            self.c1Norm, self.c2Norm, binPositionsBox, self.isIntra, self.version) for bNum in
+            blockNumbers]
 
         for future in futures:
             xTemp, yTemp, cTemp = future.result()
@@ -666,7 +672,7 @@ class normalizedmatrix:
 
     def getDataFromGenomeRegion(self, X1, X2, Y1, Y2):
         binsize = self.binsize
-        return self.getDataFromBinRegion(X1/binsize, math.ceil(X2/binsize), Y1/binsize, math.ceil(Y2/binsize))
+        return self.getDataFromBinRegion(X1 / binsize, math.ceil(X2 / binsize), Y1 / binsize, math.ceil(Y2 / binsize))
 
     def getBatchedDataFromGenomeRegion(self, listOfCoordinates):
         executor = concurrent.futures.ThreadPoolExecutor()
