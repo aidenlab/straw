@@ -5,19 +5,15 @@ Straw enables programmatic access to .hic files.
 .hic files store the contact matrices from Hi-C experiments and the
 normalization and expected vectors, along with meta-data in the header.
 
-The main function, straw, takes in the normalization, the filename or URL,
-chromosome1 (and optional range), chromosome2 (and optional range),
-whether the bins desired are fragment or base pair delimited, and bin size.
-
-It then reads the header, follows the various pointers to the desired matrix
-and normalization vector, and stores as [x, y, count]
-
-Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <\
-BP/FRAG> <binsize>
+Usage: strawObj = straw <hicFile(s)>
+       matrixObj = strawObj.getNormalizedMatrix <chr1> <chr2> <NONE/VC/VC_SQRT/KR> <BP/FRAG> <binsize>
+       data = matrixObj.getDataFromBinRegion <x1,x2,y1,y2>
 
 Example:
    import straw
-   result = straw.straw('NONE', 'HIC001.hic', 'X', 'X', 'BP', 1000000)
+   strawObj = straw(filename)
+   matrixObj = strawObj.getNormalizedMatrix('5', '5', 'KR', 'BP', 5000)
+   result = matrixObj.getDataFromBinRegion(0,500,0,500)
    for i in range(len(result[0])):
 ...   print("{0}\t{1}\t{2}".format(result[0][i], result[1][i], result[2][i]))
 
