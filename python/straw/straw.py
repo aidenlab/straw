@@ -33,7 +33,7 @@ import zlib
 import requests
 import io
 import concurrent.futures
-import time
+import math
 
 
 def __readcstr(f):
@@ -92,10 +92,10 @@ def readHeader(infile, is_synapse):
     """ Reads the header
 
     Args:
-       req (file): File to read from
+       input file, is_synapse
 
     Returns:
-       list: master index, chromosome1 index, chromosome2 index
+       list: master index, version number, size of totalbytes, chromDotSizes
     """
 
     if infile.startswith("http"):
@@ -327,7 +327,7 @@ def getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockC
     row1 = int(regionIndices[2] / blockBinCount)
     row2 = int((regionIndices[3] + 1) / blockBinCount)
     blocksSet = set()
-    # print(str(col1)+"\t"+str(col2)+"\t"+str(row1)+"\t"+str(row2))
+
     for r in range(row1, row2 + 1):
         for c in range(col1, col2 + 1):
             blockNumber = r * blockColumnCount + c
@@ -337,7 +337,6 @@ def getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockC
             for c in range(row1, row2 + 1):
                 blockNumber = r * blockColumnCount + c
                 blocksSet.add(blockNumber)
-    # print(str(blocksSet))
     return blocksSet
 
 
@@ -432,12 +431,9 @@ def readBlock(req, size, version):
                         index = index + 1
     return v
 
-counter1 = 0
-counter2 = 0
 
-def readBlockWorker(infile, is_synapse, blockNum, binsize, blockMap, norm, c1Norm, c2Norm, genomePositionsBox, isIntra,
+def readBlockWorker(infile, is_synapse, blockNum, binsize, blockMap, norm, c1Norm, c2Norm, binPositionBox, isIntra,
                     version):
-    time1 = time.time()
     yActual = []
     xActual = []
     counts = []
@@ -450,7 +446,6 @@ def readBlockWorker(infile, is_synapse, blockNum, binsize, blockMap, norm, c1Nor
 
     if (idx['size'] == 0):
         records = []
-        time15 = time.time()
     else:
         if infile.startswith("http"):
             headers = getHttpHeader('bytes={0}-{1}'.format(idx['position'], idx['position'] + idx['size']), is_synapse)
@@ -460,47 +455,38 @@ def readBlockWorker(infile, is_synapse, blockNum, binsize, blockMap, norm, c1Nor
         else:
             req = open(infile, 'rb')
             req.seek(idx['position'])
-        time15 = time.time()
         records = readBlock(req, idx['size'], version)
-    time2 = time.time()
 
     if norm != "NONE":
         for record in records:
-            bx = record['binX']
-            by = record['binY']
-            c = record['counts']
-            x = bx * binsize
-            y = by * binsize
-            a = c1Norm[bx] * c2Norm[by]
-            if (a != 0.0):
-                c = (c / a)
-            else:
-                c = "inf"
-            if ((genomePositionsBox[0] <= x <= genomePositionsBox[1] and genomePositionsBox[2] <= y <=
-                 genomePositionsBox[
-                     3]) or (
-                    isIntra and genomePositionsBox[0] <= y <= genomePositionsBox[1] and genomePositionsBox[2] <= x <=
-                    genomePositionsBox[3])):
-                xActual.append(x)
-                yActual.append(y)
+            binX = record['binX']
+            binY = record['binY']
+
+            if ((binPositionBox[0] <= binX <= binPositionBox[1] and binPositionBox[2] <= binY <=
+                 binPositionBox[3]) or (
+                    isIntra and binPositionBox[0] <= binY <= binPositionBox[1] and binPositionBox[2] <= binX <= binPositionBox[3])):
+                c = record['counts']
+                a = c1Norm[binX] * c2Norm[binY]
+                if (a != 0.0):
+                    c = (c / a)
+                else:
+                    c = "inf"
+                xActual.append(binX)
+                yActual.append(binY)
                 counts.append(c)
     else:
         for record in records:
-            bx = record['binX']
-            by = record['binY']
-            c = record['counts']
-            x = bx * binsize
-            y = by * binsize
-            if ((genomePositionsBox[0] <= x <= genomePositionsBox[1] and genomePositionsBox[2] <= y <=
-                 genomePositionsBox[
-                     3]) or (
-                    isIntra and genomePositionsBox[0] <= y <= genomePositionsBox[1] and genomePositionsBox[2] <= x <=
-                    genomePositionsBox[3])):
-                xActual.append(x)
-                yActual.append(y)
+            binX = record['binX']
+            binY = record['binY']
+            if ((binPositionBox[0] <= binX <= binPositionBox[1] and binPositionBox[2] <= binY <=
+                 binPositionBox[3]) or (
+                    isIntra and binPositionBox[0] <= binY <= binPositionBox[1] and binPositionBox[2] <= binX <=
+                    binPositionBox[3])):
+                c = record['counts']
+                xActual.append(binX)
+                yActual.append(binY)
                 counts.append(c)
-    time3 = time.time()
-    return xActual, yActual, counts, time2 - time1, time2 - time15, time3 - time2
+    return xActual, yActual, counts
 
 
 def readNormalizationVector(req):
@@ -522,9 +508,6 @@ def readNormalizationVector(req):
         value.append(d)
     return value
 
-
-# binsize
-# chr1loc, chr2loc,
 def getHttpHeader(endrange, is_synapse):
     if is_synapse:
         return {'range': endrange}
@@ -659,26 +642,13 @@ class normalizedmatrix:
 
     def getDataFromBinRegion(self, X1, X2, Y1, Y2):
         binsize = self.binsize
-        return self.getDataFromGenomeRegion(binsize * X1, binsize * X2, binsize * Y1, binsize * Y2)
-
-    def getDataFromGenomeRegion(self, X1, X2, Y1, Y2):
-
-        t1 = time.time()
-
-        genomePositionsBox = []
-        binPositionsBox = []
-        binsize = self.binsize
         if self.neededToFlipIndices:
             X1, X2, Y1, Y2 = Y1, Y2, X1, X2
-
-        genomePositionsBox.append(X1)
-        genomePositionsBox.append(X2)
-        genomePositionsBox.append(Y1)
-        genomePositionsBox.append(Y2)
-        binPositionsBox.append(int(X1 / binsize))
-        binPositionsBox.append(int(X2 / binsize))
-        binPositionsBox.append(int(Y1 / binsize))
-        binPositionsBox.append(int(Y2 / binsize))
+        binPositionsBox = []
+        binPositionsBox.append(int(X1))
+        binPositionsBox.append(int(X2))
+        binPositionsBox.append(int(Y1))
+        binPositionsBox.append(int(Y2))
 
         blockNumbers = getBlockNumbersForRegionFromBinPosition(binPositionsBox, self.blockBinCount,
                                                                self.blockColumnCount, self.isIntra)
@@ -686,33 +656,29 @@ class normalizedmatrix:
         xActual = []
         counts = []
 
-        t2 = time.time()
-
         executor = concurrent.futures.ProcessPoolExecutor()
         futures = [
             executor.submit(readBlockWorker, self.infile, self.is_synapse, bNum, binsize, self.blockMap, self.norm, \
-                            self.c1Norm, self.c2Norm, genomePositionsBox, self.isIntra, self.version) for bNum in
-            blockNumbers]
-
-        t3 = time.time()
-
-        cc1 = 0
-        cc2 = 0
-        cc3 = 0
+                            self.c1Norm, self.c2Norm, binPositionsBox, self.isIntra, self.version) for bNum in blockNumbers]
 
         for future in futures:
-            xTemp, yTemp, cTemp, a, b, c = future.result()
+            xTemp, yTemp, cTemp = future.result()
             xActual.extend(xTemp)
             yActual.extend(yTemp)
             counts.extend(cTemp)
-            cc1 = cc1 + a
-            cc2 = cc2 + b
-            cc3 = cc3 + c
-        t4 = time.time()
-
-        print("part 1", t2-t1,"part 2", t3-t2, "part 3", t4-t3)
-        print("count1  ",cc1,"  count2  ",cc2,"  count 3 ", cc3)
         return [xActual, yActual, counts]
+
+    def getDataFromGenomeRegion(self, X1, X2, Y1, Y2):
+        binsize = self.binsize
+        return self.getDataFromBinRegion(X1/binsize, math.ceil(X2/binsize), Y1/binsize, math.ceil(Y2/binsize))
+
+    def getBatchedDataFromGenomeRegion(self, listOfCoordinates):
+        executor = concurrent.futures.ThreadPoolExecutor()
+        futures = [executor.submit(self.getDataFromGenomeRegion, a, b, c, d) for (a, b, c, d) in listOfCoordinates]
+        finalResults = list()
+        for future in futures:
+            finalResults.append(future.result())
+        return finalResults
 
 
 def printme(norm, infile, chr1loc, chr2loc, unit, binsize, outfile):
