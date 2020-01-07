@@ -117,29 +117,29 @@ def readHeader(infile, is_synapse):
     if magic_string != b"HIC":
         print('This does not appear to be a HiC file magic string is incorrect')
         return -1
-    version = struct.unpack('<i', req.read(4))[0]
+    version = struct.unpack('<i',req.read(4))[0]
     if version < 6:
         print("Version {0} no longer supported".format(str(version)))
         return -1
     print('HiC version:' + '  {0}'.format(str(version)))
-    master = struct.unpack('<q', req.read(8))[0]
+    master = struct.unpack('<q',req.read(8))[0]
 
     genome = b""
-    c = req.read(1)
+    c =req.read(1)
     while c != b'\0':
         genome += c
-        c = req.read(1)
+        c =req.read(1)
 
     # read and throw away attribute dictionary (stats+graphs)
-    nattributes = struct.unpack('<i', req.read(4))[0]
+    nattributes = struct.unpack('<i',req.read(4))[0]
     for x in range(nattributes):
         key = __readcstr(req)
         value = __readcstr(req)
-    nChrs = struct.unpack('<i', req.read(4))[0]
+    nChrs = struct.unpack('<i',req.read(4))[0]
     chromDotSizes = {}
     for i in range(0, nChrs):
         name = __readcstr(req)
-        length = struct.unpack('<i', req.read(4))[0]
+        length = struct.unpack('<i',req.read(4))[0]
         chromDotSizes[name] = (i, length)
     return master, version, totalbytes, ChromDotSizes(chromDotSizes)
 
@@ -170,59 +170,59 @@ def readFooter(infile, is_synapse, master, totalbytes):
         req.seek(master)
 
     filePositions = dict()
-    nBytes = struct.unpack('<i', req.read(4))[0]
-    nEntries = struct.unpack('<i', req.read(4))[0]
+    nBytes = struct.unpack('<i',req.read(4))[0]
+    nEntries = struct.unpack('<i',req.read(4))[0]
 
     for i in range(nEntries):
         key = __readcstr(req)
-        fpos = struct.unpack('<q', req.read(8))[0]
-        sizeinbytes = struct.unpack('<i', req.read(4))[0]
+        fpos = struct.unpack('<q',req.read(8))[0]
+        sizeinbytes = struct.unpack('<i',req.read(4))[0]
         filePositions[key] = (fpos, sizeinbytes)
 
     # later save these
-    nExpectedValues = struct.unpack('<i', req.read(4))[0]
+    nExpectedValues = struct.unpack('<i',req.read(4))[0]
     for i in range(nExpectedValues):
         key = __readcstr(req)
-        binSize = struct.unpack('<i', req.read(4))[0]
-        nValues = struct.unpack('<i', req.read(4))[0]
+        binSize = struct.unpack('<i',req.read(4))[0]
+        nValues = struct.unpack('<i',req.read(4))[0]
         for j in range(nValues):
             # replace with vector.append
-            v = struct.unpack('<d', req.read(8))[0]
-        nNormalizationFactors = struct.unpack('<i', req.read(4))[0]
+            v = struct.unpack('<d',req.read(8))[0]
+        nNormalizationFactors = struct.unpack('<i',req.read(4))[0]
         for j in range(nNormalizationFactors):
             # replace with vector.append
-            chrIdx = struct.unpack('<i', req.read(4))[0]
-            v = struct.unpack('<d', req.read(8))[0]
-    nExpectedValues = struct.unpack('<i', req.read(4))[0]
+            chrIdx = struct.unpack('<i',req.read(4))[0]
+            v = struct.unpack('<d',req.read(8))[0]
+    nExpectedValues = struct.unpack('<i',req.read(4))[0]
     for i in range(nExpectedValues):
         str_ = __readcstr(req)
         str_ = __readcstr(req)
-        binSize = struct.unpack('<i', req.read(4))[0]
-        nValues = struct.unpack('<i', req.read(4))[0]
+        binSize = struct.unpack('<i',req.read(4))[0]
+        nValues = struct.unpack('<i',req.read(4))[0]
         for j in range(nValues):
-            v = struct.unpack('<d', req.read(8))[0]
-        nNormalizationFactors = struct.unpack('<i', req.read(4))[0]
+            v = struct.unpack('<d',req.read(8))[0]
+        nNormalizationFactors = struct.unpack('<i',req.read(4))[0]
         for j in range(nNormalizationFactors):
-            chrIdx = struct.unpack('<i', req.read(4))[0]
-            v = struct.unpack('<d', req.read(8))[0]
+            chrIdx = struct.unpack('<i',req.read(4))[0]
+            v = struct.unpack('<d',req.read(8))[0]
 
     normMap = dict()
-    nEntries = struct.unpack('<i', req.read(4))[0]
+    nEntries = struct.unpack('<i',req.read(4))[0]
     for i in range(nEntries):
         normtype = __readcstr(req)
         if normtype not in normMap:
             normMap[normtype] = {}
-        chrIdx = struct.unpack('<i', req.read(4))[0]
+        chrIdx = struct.unpack('<i',req.read(4))[0]
         if chrIdx not in normMap[normtype]:
             normMap[normtype][chrIdx] = {}
         unit = __readcstr(req)
         if unit not in normMap[normtype][chrIdx]:
             normMap[normtype][chrIdx][unit] = {}
-        resolution = struct.unpack('<i', req.read(4))[0]
+        resolution = struct.unpack('<i',req.read(4))[0]
         if resolution not in normMap[normtype][chrIdx][unit]:
             normMap[normtype][chrIdx][unit][resolution] = {}
-        filePosition = struct.unpack('<q', req.read(8))[0]
-        sizeInBytes = struct.unpack('<i', req.read(4))[0]
+        filePosition = struct.unpack('<q',req.read(8))[0]
+        sizeInBytes = struct.unpack('<i',req.read(4))[0]
 
         normMap[normtype][chrIdx][unit][resolution]['position'] = filePosition
         normMap[normtype][chrIdx][unit][resolution]['size'] = sizeInBytes
@@ -245,28 +245,28 @@ def readMatrixZoomData(req, myunit, mybinsize, blockMap):
        and if so, the counts for the bins and columns
     """
     unit = __readcstr(req)
-    temp = struct.unpack('<i', req.read(4))[0]
-    temp = struct.unpack('<f', req.read(4))[0]
-    temp = struct.unpack('<f', req.read(4))[0]
-    temp = struct.unpack('<f', req.read(4))[0]
-    temp = struct.unpack('<f', req.read(4))[0]
-    binSize = struct.unpack('<i', req.read(4))[0]
-    blockBinCount = struct.unpack('<i', req.read(4))[0]
-    blockColumnCount = struct.unpack('<i', req.read(4))[0]
+    temp = struct.unpack('<i',req.read(4))[0]
+    temp = struct.unpack('<f',req.read(4))[0]
+    temp = struct.unpack('<f',req.read(4))[0]
+    temp = struct.unpack('<f',req.read(4))[0]
+    temp = struct.unpack('<f',req.read(4))[0]
+    binSize = struct.unpack('<i',req.read(4))[0]
+    blockBinCount = struct.unpack('<i',req.read(4))[0]
+    blockColumnCount = struct.unpack('<i',req.read(4))[0]
     storeBlockData = False
-    # for the initial
+    #for the initial
     myBlockBinCount = -1
     myBlockColumnCount = -1
-    if myunit == unit and mybinsize == binSize:
-        myBlockBinCount = blockBinCount
-        myBlockColumnCount = blockColumnCount
-        storeBlockData = True
-    nBlocks = struct.unpack('<i', req.read(4))[0]
+    if myunit==unit and mybinsize==binSize:
+        myBlockBinCount=blockBinCount
+        myBlockColumnCount=blockColumnCount
+        storeBlockData=True
+    nBlocks = struct.unpack('<i',req.read(4))[0]
     for b in range(nBlocks):
-        blockNumber = struct.unpack('<i', req.read(4))[0]
-        filePosition = struct.unpack('<q', req.read(8))[0]
-        blockSizeInBytes = struct.unpack('<i', req.read(4))[0]
-        entry = dict()
+        blockNumber = struct.unpack('<i',req.read(4))[0]
+        filePosition = struct.unpack('<q',req.read(8))[0]
+        blockSizeInBytes = struct.unpack('<i',req.read(4))[0]
+        entry=dict()
         entry['size'] = blockSizeInBytes
         entry['position'] = filePosition
         if storeBlockData:
@@ -291,9 +291,9 @@ def readMatrix(req, unit, binsize, blockMap):
     Raises:
        ValueError if the .hic file can't be parsed with the specified resolution (binsize)
     """
-    c1 = struct.unpack('<i', req.read(4))[0]
-    c2 = struct.unpack('<i', req.read(4))[0]
-    nRes = struct.unpack('<i', req.read(4))[0]
+    c1 = struct.unpack('<i',req.read(4))[0]
+    c2 = struct.unpack('<i',req.read(4))[0]
+    nRes = struct.unpack('<i',req.read(4))[0]
     i = 0
     found = False
     blockBinCount = -1
@@ -320,20 +320,20 @@ def getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockC
     Returns:
        blockSet (set): A set of blocks to print
     """
-    col1 = int(regionIndices[0] / blockBinCount)
-    col2 = int((regionIndices[1] + 1) / blockBinCount)
-    row1 = int(regionIndices[2] / blockBinCount)
-    row2 = int((regionIndices[3] + 1) / blockBinCount)
-    blocksSet = set()
+    col1=int(regionIndices[0]/blockBinCount)
+    col2=int((regionIndices[1]+1)/blockBinCount)
+    row1=int(regionIndices[2]/blockBinCount)
+    row2=int((regionIndices[3]+1)/blockBinCount)
+    blocksSet=set()
 
-    for r in range(row1, row2 + 1):
-        for c in range(col1, col2 + 1):
-            blockNumber = r * blockColumnCount + c
+    for r in range(row1, row2+1):
+        for c in range(col1, col2+1):
+            blockNumber=r*blockColumnCount+c
             blocksSet.add(blockNumber)
     if intra:
-        for r in range(col1, col2 + 1):
-            for c in range(row1, row2 + 1):
-                blockNumber = r * blockColumnCount + c
+        for r in range(row1, row2+1):
+            for c in range(col1, col2+1):
+                blockNumber = r*blockColumnCount+c
                 blocksSet.add(blockNumber)
     return blocksSet
 
@@ -501,9 +501,9 @@ def readNormalizationVector(req):
 
     """
     value = []
-    nValues = struct.unpack('<i', req.read(4))[0]
+    nValues = struct.unpack('<i',req.read(4))[0]
     for i in range(nValues):
-        d = struct.unpack('<d', req.read(8))[0]
+        d = struct.unpack('<d',req.read(8))[0]
         value.append(d)
     return value
 
