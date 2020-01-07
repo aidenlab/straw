@@ -123,9 +123,8 @@ def readHeader(infile, is_synapse):
         return -1
     print('HiC version:' + '  {0}'.format(str(version)))
     master = struct.unpack('<q',req.read(8))[0]
-
     genome = b""
-    c =req.read(1)
+    c=req.read(1)
     while c != b'\0':
         genome += c
         c =req.read(1)
@@ -333,7 +332,7 @@ def getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockC
     if intra:
         for r in range(row1, row2+1):
             for c in range(col1, col2+1):
-                blockNumber = r*blockColumnCount+c
+                blockNumber=r*blockColumnCount+c
                 blocksSet.add(blockNumber)
     return blocksSet
 
@@ -356,40 +355,40 @@ def readBlock(req, size, version):
     v = []
     if version < 7:
         for i in range(nRecords):
-            binX = struct.unpack('<i', uncompressedBytes[(12 * i + 4):(12 * i + 8)])[0]
-            binY = struct.unpack('<i', uncompressedBytes[(12 * i + 8):(12 * i + 12)])[0]
-            counts = struct.unpack('<f', uncompressedBytes[(12 * i + 12):(12 * i + 16)])[0]
+            binX = struct.unpack('<i',uncompressedBytes[(12*i+4):(12*i+8)])[0]
+            binY = struct.unpack('<i',uncompressedBytes[(12*i+8):(12*i+12)])[0]
+            counts = struct.unpack('<f',uncompressedBytes[(12*i+12):(12*i+16)])[0]
             record = dict()
             record['binX'] = binX
             record['binY'] = binY
             record['counts'] = counts
             v.append(record)
     else:
-        binXOffset = struct.unpack('<i', uncompressedBytes[4:8])[0]
-        binYOffset = struct.unpack('<i', uncompressedBytes[8:12])[0]
-        useShort = struct.unpack('<b', uncompressedBytes[12:13])[0]
-        type_ = struct.unpack('<b', uncompressedBytes[13:14])[0]
-        index = 0
-        if type_ == 1:
-            rowCount = struct.unpack('<h', uncompressedBytes[14:16])[0]
+        binXOffset = struct.unpack('<i',uncompressedBytes[4:8])[0]
+        binYOffset = struct.unpack('<i',uncompressedBytes[8:12])[0]
+        useShort = struct.unpack('<b',uncompressedBytes[12:13])[0]
+        type_ = struct.unpack('<b',uncompressedBytes[13:14])[0]
+        index=0
+        if type_==1:
+            rowCount = struct.unpack('<h',uncompressedBytes[14:16])[0]
             temp = 16
             for i in range(rowCount):
-                y = struct.unpack('<h', uncompressedBytes[temp:(temp + 2)])[0]
-                temp = temp + 2
+                y = struct.unpack('<h',uncompressedBytes[temp:(temp+2)])[0]
+                temp=temp+2
                 binY = y + binYOffset
-                colCount = struct.unpack('<h', uncompressedBytes[temp:(temp + 2)])[0]
-                temp = temp + 2
+                colCount = struct.unpack('<h',uncompressedBytes[temp:(temp+2)])[0]
+                temp=temp+2
                 for j in range(colCount):
-                    x = struct.unpack('<h', uncompressedBytes[temp:(temp + 2)])[0]
-                    temp = temp + 2
+                    x = struct.unpack('<h',uncompressedBytes[temp:(temp+2)])[0]
+                    temp=temp+2
                     binX = binXOffset + x
-                    if useShort == 0:
-                        c = struct.unpack('<h', uncompressedBytes[temp:(temp + 2)])[0]
-                        temp = temp + 2
+                    if useShort==0:
+                        c = struct.unpack('<h',uncompressedBytes[temp:(temp+2)])[0]
+                        temp=temp+2
                         counts = c
                     else:
-                        counts = struct.unpack('<f', uncompressedBytes[temp:(temp + 4)])[0]
-                        temp = temp + 4
+                        counts = struct.unpack('<f',uncompressedBytes[temp:(temp+4)])[0]
+                        temp=temp+4
                     record = dict()
                     record['binX'] = binX
                     record['binY'] = binY
@@ -397,19 +396,19 @@ def readBlock(req, size, version):
                     v.append(record)
                     index = index + 1
         elif type_ == 2:
-            temp = 14
-            nPts = struct.unpack('<i', uncompressedBytes[temp:(temp + 4)])[0]
-            temp = temp + 4
-            w = struct.unpack('<h', uncompressedBytes[temp:(temp + 2)])[0]
-            temp = temp + 2
+            temp=14
+            nPts = struct.unpack('<i', uncompressedBytes[temp:(temp+4)])[0]
+            temp=temp+4
+            w = struct.unpack('<h', uncompressedBytes[temp:(temp+2)])[0]
+            temp=temp+2
             for i in range(nPts):
-                row = int(i / w)
-                col = i - row * w
-                bin1 = int(binXOffset + col)
-                bin2 = int(binYOffset + row)
-                if useShort == 0:
-                    c = struct.unpack('<h', uncompressedBytes[temp:(temp + 2)])[0]
-                    temp = temp + 2
+                row=int(i/w)
+                col=i-row*w
+                bin1=int(binXOffset+col)
+                bin2=int(binYOffset+row)
+                if useShort==0:
+                    c = struct.unpack('<h',uncompressedBytes[temp:(temp+2)])[0]
+                    temp=temp+2
                     if c != -32768:
                         record = dict()
                         record['binX'] = bin1
@@ -418,8 +417,8 @@ def readBlock(req, size, version):
                         v.append(record)
                         index = index + 1
                 else:
-                    counts = struct.unpack('<f', uncompressedBytes[temp:(temp + 4)])[0]
-                    temp = temp + 4
+                    counts = struct.unpack('<f',uncompressedBytes[temp:(temp+4)])[0]
+                    temp=temp+4
                     if counts != 0x7fc00000:
                         record = dict()
                         record['binX'] = bin1
