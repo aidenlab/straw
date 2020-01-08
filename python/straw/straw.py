@@ -31,7 +31,6 @@ import io
 import concurrent.futures
 import math
 
-
 def __readcstr(f):
     """ Helper function for reading in C-style string from file
     """
@@ -329,9 +328,10 @@ def getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockC
         for c in range(col1, col2+1):
             blockNumber=r*blockColumnCount+c
             blocksSet.add(blockNumber)
-    if intra:
-        for r in range(row1, row2+1):
-            for c in range(col1, col2+1):
+    # in Java code, this is "if getBelowDiagonal" 
+    if intra and col2 > row1:
+        for r in range(col1, col2+1):
+            for c in range(row1, row2+1):
                 blockNumber=r*blockColumnCount+c
                 blocksSet.add(blockNumber)
     return blocksSet
@@ -454,6 +454,7 @@ def readBlockWorker(infile, is_synapse, blockNum, binsize, blockMap, norm, c1Nor
             req.seek(idx['position'])
         records = readBlock(req, idx['size'], version)
 
+    # No caching currently; in Java code we keep all records and check positions later
     if norm != "NONE":
         for record in records:
             binX = record['binX']
