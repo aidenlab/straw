@@ -19,13 +19,18 @@ Straw uses the [requests library](http://docs.python-requests.org/en/master/user
 
 # Examples
 
-* Extract all reads on chromosome X at 1MB resolution with no normalization in local file "HIC001.hic" 
+Usage: strawObj = straw <hicFile(s)>
+       matrixObj = strawObj.getNormalizedMatrix <chr1> <chr2> <NONE/VC/VC_SQRT/KR> <BP/FRAG> <binsize>
+       data = matrixObj.getDataFromBinRegion <x1,x2,y1,y2>
+
+* Extract reads on chromosome 5 at 5Kb resolution with KR normalization 
    ```python
-   from straw import straw
-   result = straw.straw('NONE', 'HIC001.hic', 'X', 'X', 'BP', 1000000)
-   # the values returned are in x / y / counts
+   import straw
+   strawObj = straw(filename)
+   matrixObj = strawObj.getNormalizedMatrix('5', '5', 'KR', 'BP', 5000)
+   result = matrixObj.getDataFromBinRegion(0,500,0,500)
    for i in range(len(result[0])):
-      print("{0}\t{1}\t{2}".format(result[0][i], result[1][i], result[2][i]))
+     print("{0}\t{1}\t{2}".format(result[0][i], result[1][i], result[2][i]))
    ```
 
 * Extract all reads from chromosome 4 at 500KB resolution with VC (coverage) normalization from the combined MAPQ 30 map from Rao and Huntley et al. 2014
