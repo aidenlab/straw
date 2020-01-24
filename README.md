@@ -11,7 +11,15 @@ Clone the library and cd into the `straw/` directory.
 ```
 pip install ./pybind11_python
 ```
-Then run via `import strawC` and `strawC.straw` 
+Then run via `import strawC` and `strawC.strawC` 
+
+```
+    Example:
+    >>>import strawC
+    >>>result = strawC.strawC('NONE', 'HIC001.hic', 'X', 'X', 'BP', 1000000)
+    >>>for i in range(len(result)):
+    ...   print("{0}\t{1}\t{2}".format(result[i].binX, result[i].binY, result[i].counts))
+```
 
 For the pure Python version:
 ```
