@@ -49,5 +49,5 @@ void readMatrix(std::istream& fin, int myFilePosition, std::string unit, int res
 std::set<int> getBlockNumbersForRegionFromBinPosition(int* regionIndices, int blockBinCount, int blockColumnCount, bool intra);
 std::vector<contactRecord> readBlock(std::istream& fin, int blockNumber);
 std::vector<double> readNormalizationVector(std::istream& fin, indexEntry entry);
-void straw(std::string norm, std::string fname, int binsize, std::string chr1loc, std::string chr2loc, std::string unit, std::vector<int>& xActual, std::vector<int>& yActual, std::vector<float>& counts);
+std::vector<contactRecord> straw(std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, std::string unit, int binsize);
 #endif

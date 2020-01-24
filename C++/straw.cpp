@@ -650,8 +650,8 @@ vector<contactRecord> readBlock(istream& fin, CURL* curl, bool isHttp, int block
       }
     }
   }
-  delete compressedBytes;
-  delete uncompressedBytes; // don't forget to delete your heap arrays in C++!
+  delete[] compressedBytes;
+  delete[] uncompressedBytes; // don't forget to delete your heap arrays in C++!
   return v;
 }
 
@@ -674,14 +674,15 @@ vector<double> readNormalizationVector(istream& bufferin) {
   return values;
 }
 
-void straw(string norm, string fname, int binsize, string chr1loc, string chr2loc, string unit, vector<int> &xActual, vector<int> &yActual, vector<float> &counts)
+vector<contactRecord> straw(string norm, string fname, string chr1loc, string chr2loc, string unit, int binsize)
 {
   int earlyexit=1;
 
   if (!(unit=="BP"||unit=="FRAG")) {
     cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl; 
     cerr << "Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
-    return;
+    vector<contactRecord> v;
+    return v;
   }
 
   // parse chromosome positions
@@ -719,7 +720,8 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
     }
     else {
       cerr << "URL " << fname << " cannot be opened for reading" << endl;
-      return;
+      vector<contactRecord> v;
+      return v;
     }
     membuf sbuf(buffer, buffer + 100000); 
     istream bufin(&sbuf);  
@@ -730,7 +732,8 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
     fin.open(fname, fstream::in);
     if (!fin) {
       cerr << "File " << fname << " cannot be opened for reading" << endl;
-      return;
+      vector<contactRecord> v;
+      return v;
     }
     master = readHeader(fin, chr1, chr2, c1pos1, c1pos2, c2pos1, c2pos2, chr1ind, chr2ind);
   }
@@ -828,10 +831,11 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
 
   // getBlockIndices
   vector<contactRecord> records;
+  vector<contactRecord> tmp_records;
   for (set<int>::iterator it=blockNumbers.begin(); it!=blockNumbers.end(); ++it) {
     // get contacts in this block
-    records = readBlock(fin, curl, isHttp, *it);
-    for (vector<contactRecord>::iterator it2=records.begin(); it2!=records.end(); ++it2) {
+    tmp_records = readBlock(fin, curl, isHttp, *it);
+    for (vector<contactRecord>::iterator it2=tmp_records.begin(); it2!=tmp_records.end(); ++it2) {
       contactRecord rec = *it2;
       
       int x = rec.binX * binsize;
@@ -845,9 +849,11 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
 	   y >= origRegionIndices[2] && y <= origRegionIndices[3]) ||
 	  // or check regions that overlap with lower left
 	  ((c1==c2) && y >= origRegionIndices[0] && y <= origRegionIndices[1] && x >= origRegionIndices[2] && x <= origRegionIndices[3])) {
-	xActual.push_back(x);
-	yActual.push_back(y);
-	counts.push_back(c);
+	contactRecord record;
+	record.binX = x;
+	record.binY = y;
+	record.counts = c;
+	records.push_back(record);
 	//printf("%d\t%d\t%.14g\n", x, y, c);
       }
     }
@@ -856,7 +862,7 @@ void straw(string norm, string fname, int binsize, string chr1loc, string chr2lo
       /* always cleanup */
       // curl_easy_cleanup(curl);
       //    curl_global_cleanup();
-
+  return records;
 }
 
 
