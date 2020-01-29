@@ -27,6 +27,7 @@
 #include <iostream>
 #include <sstream>
 #include <map>
+#include <cmath>
 #include <set>
 #include <vector>
 #include <streambuf>
@@ -600,7 +601,7 @@ vector<contactRecord> readBlock(istream& fin, CURL* curl, bool isHttp, indexEntr
 	}
       }
     }
-    else if (type == 2) { // have yet to find test file where this is true, possibly entirely deprecated
+    else if (type == 2) {
       int nPts;
       bufferin.read((char*)&nPts, sizeof(int));
       short w;
@@ -628,8 +629,7 @@ vector<contactRecord> readBlock(istream& fin, CURL* curl, bool isHttp, indexEntr
 	} 
 	else {
 	  bufferin.read((char*)&counts, sizeof(float));
-	  if (counts != 0x7fc00000) { // not sure this works
-	    //	  if (!Float.isNaN(counts)) {
+	  if (!isnan(counts)) {
 	    contactRecord record;
 	    record.binX = bin1;
 	    record.binY = bin2;
