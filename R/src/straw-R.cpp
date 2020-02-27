@@ -534,11 +534,6 @@ vector<double> readNormalizationVector(ifstream& fin, indexEntry entry) {
 Rcpp::DataFrame straw(std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, std::string unit, int binsize)
 {
   blockMap.clear();
-  if (!(norm=="NONE"||norm=="VC"||norm=="VC_SQRT"||norm=="KR")) {
-    cerr << "Norm specified incorrectly, must be one of <NONE/VC/VC_SQRT/KR>" << endl;
-    cerr << "Usage: juicebox-quick-dump <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
-    stop("\n");
-  }
   if (!(unit=="BP"||unit=="FRAG")) {
     cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl;
     cerr << "Usage: juicebox-quick-dump <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
