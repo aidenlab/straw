@@ -16,4 +16,4 @@ verbose=0
 if (len(sys.argv) == 3):
     verbose=1
 
-straw_module.read_metadata(sys.argv[1],verbose=True)
+_=straw_module.read_metadata(sys.argv[1],verbose=False)
