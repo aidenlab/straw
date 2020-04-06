@@ -162,7 +162,8 @@ def read_metadata(infile,verbose=False):
         l.append(res)
     metadata["Fragment-delimited resolutions"]=l 
     for k in metadata:
-        print(k,':',metadata[k])
+        if k!='Attribute dictionary':
+            print(k,':',metadata[k])
     if verbose:
         print('Attribute dictionary',':',metadata['Attribute dictionary'])        
     return metadata    
