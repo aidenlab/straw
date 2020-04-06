@@ -84,23 +84,22 @@ class ChromDotSizes:
 
         return chrom, indx1, indx2
 
-def read_metadata(infile,verbose=True):
+def read_metadata(infile,verbose=False):
     """
     Reads the metadata of HiC file from header.
 
     Args
     infile: str, path to the HiC file 
-    verbose: bool, print the metadata if True else return the metadata
+    verbose: bool
     
     Returns
-    metadata: dict, the metadata is returned if verbose is False. 
+    metadata: dict, containing the metadata. 
                 Keys of the metadata: 
                 HiC version, 
                 Master index, 
                 Genome ID (str), 
                 Attribute dictionary (dict), 
                 Chromosomes (dict), 
-                chromosomes2length (dict), 
                 Base pair-delimited resolutions (list), 
                 Fragment-delimited resolutions (list). 
     """
@@ -150,7 +149,6 @@ def read_metadata(infile,verbose=True):
         value = struct.unpack('<i',req.read(4))[0]
         d[key]=value
     metadata["Chromosomes"]=d
-    metadata["chromosomes2length"]=metadata["Chromosomes"]
     nBpRes = struct.unpack('<i',req.read(4))[0]
     l=[]
     for x in range(0, nBpRes):
@@ -163,11 +161,11 @@ def read_metadata(infile,verbose=True):
         res = struct.unpack('<i',req.read(4))[0]
         l.append(res)
     metadata["Fragment-delimited resolutions"]=l 
+    for k in metadata:
+        print(k,':',metadata[k])
     if verbose:
-        for k in metadata:
-            print(k,':',metadata[k])
-    else:
-        return metadata    
+        print('Attribute dictionary',':',metadata['Attribute dictionary'])        
+    return metadata    
 
 def readHeader(infile, is_synapse):
     """ Reads the header
