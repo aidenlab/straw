@@ -61,5 +61,5 @@ Usage: strawObj = straw <hicFile(s)>
 
 See the script [straw.py](https://github.com/theaidenlab/straw/blob/master/python/straw.py) for an example of how to print the results to a file.  
 
-# Read header
+# Read header/metadata
 See the file [read_hic_header.py](https://github.com/theaidenlab/straw/blob/master/python/read_hic_header.py) for a Python script that reads the header of a hic file and outputs the information (including resolutions).
