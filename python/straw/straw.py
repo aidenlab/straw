@@ -703,7 +703,7 @@ class straw:
             else:
                 c2Norm = futureNorm2.result()
         else:
-            c1Norm, c1Norm = None, None
+            c1Norm, c2Norm = None, None
             
         blockBinCount, blockColumnCount = futureMatrix.result()
         return normalizedmatrix(self.infile, self.is_synapse, binsize, isIntra, neededToFlipIndices, blockBinCount,
