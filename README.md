@@ -3,6 +3,8 @@ Straw is a fast implementation of reading/dump for .hic files. Available in C++,
 
 There are two Python versions - a pure Python one and a version where the C++ code is bound with pybind11. The latter is much faster.
 
+A Jupyter notebook example can be found here: https://aidenlab.gitbook.io/juicebox/accessing-raw-data
+
 ## Quick Start Python
 
 For the fastest version, you must have pybind11 installed.
