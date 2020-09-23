@@ -1,7 +1,37 @@
 # straw: Extract data quickly from Juicebox via straw
 Straw is a fast implementation of reading/dump for .hic files. Available in C++, R, and Python.
 
-## compile on Linux
+There are two Python versions - a pure Python one and a version where the C++ code is bound with pybind11. The latter is much faster.
+
+A Jupyter notebook example can be found here: https://aidenlab.gitbook.io/juicebox/accessing-raw-data
+
+## Quick Start Python
+
+For the fastest version, you must have pybind11 installed.
+
+Clone the library and cd into the `straw/` directory.
+```
+pip install ./pybind11_python
+```
+Then run via `import strawC` and `strawC.strawC` 
+
+```
+    Example:
+    >>>import strawC
+    >>>result = strawC.strawC('NONE', 'HIC001.hic', 'X', 'X', 'BP', 1000000)
+    >>>for i in range(len(result)):
+    ...   print("{0}\t{1}\t{2}".format(result[i].binX, result[i].binY, result[i].counts))
+```
+
+For the pure Python version:
+```
+pip install ./python
+```
+Then run via `import straw` and `straw.straw`
+
+Some more information on running: https://github.com/aidenlab/straw/tree/master/python
+
+## Compile on Linux
 
          g++ -std=c++0x -o straw main.cpp straw.cpp -lcurl -lz
  

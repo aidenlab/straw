@@ -41,13 +41,11 @@ int main(int argc, char *argv[])
   string unit=argv[5];
   string size=argv[6];
   int binsize=stoi(size);
-  vector<int> x;
-  vector<int> y;
-  vector<float> counts;
+  vector<contactRecord> records;
 
-  straw(norm, fname, binsize, chr1loc, chr2loc, unit, x, y, counts);
-  int length=x.size();
+  records = straw(norm, fname, chr1loc, chr2loc, unit, binsize);
+  int length=records.size();
   for (int i=0; i<length; i++) {
-    printf("%d\t%d\t%.14g\n", x[i], y[i], counts[i]);   
+    printf("%d\t%d\t%.14g\n", records[i].binX, records[i].binY, records[i].counts);   
   }
 }
