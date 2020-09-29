@@ -31,7 +31,7 @@
 
 // pointer structure for reading blocks or matrices, holds the size and position 
 struct indexEntry {
-    int size; // long
+    long size;
     long position;
 };
 
@@ -46,7 +46,7 @@ struct contactRecord {
 struct chromosome {
     std::string name;
     int index;
-    int length; // long
+    long length;
 };
 
 bool readMagicString(std::ifstream &fin);

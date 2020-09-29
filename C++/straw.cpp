@@ -103,7 +103,7 @@ WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
 }
 
 // get a buffer that can be used as an input stream from the URL
-char* getData(CURL *curl, long position, int chunksize) {
+char *getData(CURL *curl, long position, long chunksize) {
     std::ostringstream oss;
     struct MemoryStruct chunk;
 
@@ -195,7 +195,7 @@ map <string, chromosome> readHeader(istream &fin, long &masterIndexPosition) {
         chromosome chr;
         chr.index = i;
         chr.name = name;
-        chr.length = (int) length;
+        chr.length = length;
         chromosomeMap[name] = chr;
     }
     return chromosomeMap;
@@ -360,12 +360,12 @@ bool readFooter(istream& fin, long master, int c1, int c2, string norm, string u
 
         if (chrIdx == c1 && normtype == norm && unit1 == unit && resolution1 == resolution) {
             c1NormEntry.position = filePosition;
-            c1NormEntry.size = (int) sizeInBytes;
+            c1NormEntry.size = sizeInBytes;
             found1 = true;
         }
         if (chrIdx == c2 && normtype == norm && unit1 == unit && resolution1 == resolution) {
             c2NormEntry.position = filePosition;
-            c2NormEntry.size = (int) sizeInBytes;
+            c2NormEntry.size = sizeInBytes;
             found2 = true;
         }
     }
@@ -414,7 +414,7 @@ map <int, indexEntry> readMatrixZoomData(istream& fin, string myunit, int mybins
         int blockSizeInBytes;
         fin.read((char *) &blockSizeInBytes, sizeof(int));
         indexEntry entry;
-        entry.size = (int) blockSizeInBytes;
+        entry.size = (long) blockSizeInBytes;
         entry.position = filePosition;
         if (found) blockMap[blockNumber] = entry;
     }
@@ -479,7 +479,7 @@ map <int, indexEntry> readMatrixZoomDataHttp(CURL* curl, long &myFilePosition, s
             int blockSizeInBytes;
             fin2.read((char *) &blockSizeInBytes, sizeof(int));
             indexEntry entry;
-            entry.size = (int) blockSizeInBytes;
+            entry.size = (long) blockSizeInBytes;
             entry.position = filePosition;
             blockMap[blockNumber] = entry;
         }
@@ -544,9 +544,11 @@ map <int, indexEntry> readMatrix(istream& fin, long myFilePosition, string unit,
     }
     return blockMap;
 }
+
 // gets the blocks that need to be read for this slice of the data.  needs blockbincount, blockcolumncount, and whether
 // or not this is intrachromosomal.
-set<int> getBlockNumbersForRegionFromBinPosition(int* regionIndices, int blockBinCount, int blockColumnCount, bool intra) {
+set<int>
+getBlockNumbersForRegionFromBinPosition(long *regionIndices, int blockBinCount, int blockColumnCount, bool intra) {
     int col1 = regionIndices[0] / blockBinCount;
     int col2 = (regionIndices[1] + 1) / blockBinCount;
     int row1 = regionIndices[2] / blockBinCount;
@@ -596,9 +598,9 @@ vector<contactRecord> readBlock(istream& fin, CURL* curl, bool isHttp, indexEntr
     infstream.zalloc = Z_NULL;
     infstream.zfree = Z_NULL;
     infstream.opaque = Z_NULL;
-    infstream.avail_in = (uInt)(idx.size); // size of input
+    infstream.avail_in = (uLong) (idx.size); // size of input
     infstream.next_in = (Bytef *) compressedBytes; // input char array
-    infstream.avail_out = (uInt) idx.size * 10; // size of output
+    infstream.avail_out = (uLong) idx.size * 10; // size of output
     infstream.next_out = (Bytef *) uncompressedBytes; // output char array
     // the actual decompression work.
     inflateInit(&infstream);
@@ -728,9 +730,9 @@ int readSize(istream& fin, CURL* curl, bool isHttp, indexEntry idx) {
     infstream.zalloc = Z_NULL;
     infstream.zfree = Z_NULL;
     infstream.opaque = Z_NULL;
-    infstream.avail_in = (uInt)(idx.size); // size of input
+    infstream.avail_in = (uLong) (idx.size); // size of input
     infstream.next_in = (Bytef *) compressedBytes; // input char array
-    infstream.avail_out = (uInt) idx.size * 10; // size of output
+    infstream.avail_out = (uLong) idx.size * 10; // size of output
     infstream.next_out = (Bytef *) uncompressedBytes; // output char array
     // the actual decompression work.
     inflateInit(&infstream);
@@ -828,7 +830,7 @@ vector <contactRecord> straw(string norm, string fname, string chr1loc, string c
     // parse chromosome positions
     stringstream ss(chr1loc);
     string chr1, chr2, x, y;
-    int c1pos1 = -100, c1pos2 = -100, c2pos1 = -100, c2pos2 = -100;
+    long c1pos1 = -100, c1pos2 = -100, c2pos1 = -100, c2pos2 = -100;
     getline(ss, chr1, ':');
     if (chromosomeMap.count(chr1) == 0) {
         cerr << chr1 << " not found in the file." << endl;
@@ -837,8 +839,8 @@ vector <contactRecord> straw(string norm, string fname, string chr1loc, string c
     }
 
     if (getline(ss, x, ':') && getline(ss, y, ':')) {
-        c1pos1 = stoi(x);
-        c1pos2 = stoi(y);
+        c1pos1 = stol(x);
+        c1pos2 = stol(y);
     } else {
         c1pos1 = 0;
         c1pos2 = chromosomeMap[chr1].length;
@@ -852,8 +854,8 @@ vector <contactRecord> straw(string norm, string fname, string chr1loc, string c
     }
 
     if (getline(ss1, x, ':') && getline(ss1, y, ':')) {
-        c2pos1 = stoi(x);
-        c2pos2 = stoi(y);
+        c2pos1 = stol(x);
+        c2pos2 = stol(y);
     } else {
         c2pos1 = 0;
         c2pos2 = chromosomeMap[chr2].length;
@@ -862,8 +864,8 @@ vector <contactRecord> straw(string norm, string fname, string chr1loc, string c
     // from header have size of chromosomes, set region to read
     int c1 = min(chromosomeMap[chr1].index, chromosomeMap[chr2].index);
     int c2 = max(chromosomeMap[chr1].index, chromosomeMap[chr2].index);
-    int origRegionIndices[4]; // as given by user
-    int regionIndices[4]; // used to find the blocks we need to access
+    long origRegionIndices[4]; // as given by user
+    long regionIndices[4]; // used to find the blocks we need to access
     // reverse order if necessary
     if (chromosomeMap[chr1].index > chromosomeMap[chr2].index) {
         origRegionIndices[0] = c2pos1;
@@ -962,8 +964,8 @@ vector <contactRecord> straw(string norm, string fname, string chr1loc, string c
         for (vector<contactRecord>::iterator it2 = tmp_records.begin(); it2 != tmp_records.end(); ++it2) {
             contactRecord rec = *it2;
 
-            int x = rec.binX * binsize;
-            int y = rec.binY * binsize;
+            long x = rec.binX * binsize;
+            long y = rec.binY * binsize;
             float c = rec.counts;
             if (norm != "NONE") {
                 c = c / (c1Norm[rec.binX] * c2Norm[rec.binY]);
@@ -1035,7 +1037,7 @@ int getSize(string norm, string fname, string chr1loc, string chr2loc, string un
     // parse chromosome positions
     stringstream ss(chr1loc);
     string chr1, chr2, x, y;
-    int c1pos1 = -100, c1pos2 = -100, c2pos1 = -100, c2pos2 = -100;
+    long c1pos1 = -100, c1pos2 = -100, c2pos1 = -100, c2pos2 = -100;
     getline(ss, chr1, ':');
     if (chromosomeMap.count(chr1) == 0) {
         cerr << chr1 << " not found in the file." << endl;
@@ -1043,8 +1045,8 @@ int getSize(string norm, string fname, string chr1loc, string chr2loc, string un
     }
 
     if (getline(ss, x, ':') && getline(ss, y, ':')) {
-        c1pos1 = stoi(x);
-        c1pos2 = stoi(y);
+        c1pos1 = stol(x);
+        c1pos2 = stol(y);
     } else {
         c1pos1 = 0;
         c1pos2 = chromosomeMap[chr1].length;
@@ -1056,8 +1058,8 @@ int getSize(string norm, string fname, string chr1loc, string chr2loc, string un
         return 0;
     }
     if (getline(ss1, x, ':') && getline(ss1, y, ':')) {
-        c2pos1 = stoi(x);
-        c2pos2 = stoi(y);
+        c2pos1 = stol(x);
+        c2pos2 = stol(y);
     } else {
         c2pos1 = 0;
         c2pos2 = chromosomeMap[chr2].length;
@@ -1066,23 +1068,14 @@ int getSize(string norm, string fname, string chr1loc, string chr2loc, string un
     // from header have size of chromosomes, set region to read
     int c1 = min(chromosomeMap[chr1].index, chromosomeMap[chr2].index);
     int c2 = max(chromosomeMap[chr1].index, chromosomeMap[chr2].index);
-    int origRegionIndices[4]; // as given by user
-    int regionIndices[4]; // used to find the blocks we need to access
+    long regionIndices[4]; // used to find the blocks we need to access
     // reverse order if necessary
     if (chromosomeMap[chr1].index > chromosomeMap[chr2].index) {
-        origRegionIndices[0] = c2pos1;
-        origRegionIndices[1] = c2pos2;
-        origRegionIndices[2] = c1pos1;
-        origRegionIndices[3] = c1pos2;
         regionIndices[0] = c2pos1 / binsize;
         regionIndices[1] = c2pos2 / binsize;
         regionIndices[2] = c1pos1 / binsize;
         regionIndices[3] = c1pos2 / binsize;
     } else {
-        origRegionIndices[0] = c1pos1;
-        origRegionIndices[1] = c1pos2;
-        origRegionIndices[2] = c2pos1;
-        origRegionIndices[3] = c2pos2;
         regionIndices[0] = c1pos1 / binsize;
         regionIndices[1] = c1pos2 / binsize;
         regionIndices[2] = c2pos1 / binsize;
