@@ -31,32 +31,50 @@
 
 // pointer structure for reading blocks or matrices, holds the size and position 
 struct indexEntry {
-  int size;
-  long position;
+    int size; // long
+    long position;
 };
 
 // sparse matrix entry
 struct contactRecord {
   int binX;
   int binY;
-  float counts;
+    float counts;
 };
 
 // chromosome
 struct chromosome {
-  std::string name;
-  int index;
-  int length;
+    std::string name;
+    int index;
+    int length; // long
 };
 
-bool readMagicString(std::ifstream& fin);
-std::map<std::string, chromosome> readHeader(std::istream& fin, long &master);
-bool readFooter(std::istream& fin, long master, int c1, int c2, std::string norm, std::string unit, int resolution, long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry);
-std::map<int, indexEntry> readMatrixZoomData(std::istream& fin, std::string myunit, int mybinsize, int &myBlockBinCount, int &myBlockColumnCount, bool &found);
-std::map<int, indexEntry> readMatrix(std::istream& fin, int myFilePosition, std::string unit, int resolution, int &myBlockBinCount, int &myBlockColumnCount);
-std::set<int> getBlockNumbersForRegionFromBinPosition(int* regionIndices, int blockBinCount, int blockColumnCount, bool intra);
-std::vector<contactRecord> readBlock(std::istream& fin, int blockNumber);
-std::vector<double> readNormalizationVector(std::istream& fin, indexEntry entry);
-std::vector<contactRecord> straw(std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, std::string unit, int binsize);
-int getSize(std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, std::string unit, int binsize);
+bool readMagicString(std::ifstream &fin);
+
+std::map<std::string, chromosome> readHeader(std::istream &fin, long &masterIndexPosition);
+
+bool readFooter(std::istream &fin, long master, int c1, int c2, std::string norm, std::string unit, int resolution,
+                long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry);
+
+std::map<int, indexEntry>
+readMatrixZoomData(std::istream &fin, std::string myunit, int mybinsize, int &myBlockBinCount, int &myBlockColumnCount,
+                   bool &found);
+
+std::map<int, indexEntry>
+readMatrix(std::istream &fin, int myFilePosition, std::string unit, int resolution, int &myBlockBinCount,
+           int &myBlockColumnCount);
+
+std::set<int>
+getBlockNumbersForRegionFromBinPosition(int *regionIndices, int blockBinCount, int blockColumnCount, bool intra);
+
+std::vector<contactRecord> readBlock(std::istream &fin, int blockNumber);
+
+std::vector<double> readNormalizationVector(std::istream &fin, indexEntry entry);
+
+std::vector<contactRecord>
+straw(std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, std::string unit, int binsize);
+
+int
+getSize(std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, std::string unit, int binsize);
+
 #endif
