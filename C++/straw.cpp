@@ -143,6 +143,18 @@ bool readMagicString(istream &fin) {
     return str[0] == 'H' && str[1] == 'I' && str[2] == 'C';
 }
 
+char readCharFromFile(istream &fin) {
+    char tempChar;
+    fin.read((char *) &tempChar, sizeof(char));
+    return tempChar;
+}
+
+short readShortFromFile(istream &fin) {
+    short tempShort;
+    fin.read((char *) &tempShort, sizeof(short));
+    return tempShort;
+}
+
 int readIntFromFile(istream &fin) {
     int tempInt;
     fin.read((char *) &tempInt, sizeof(int));
@@ -290,7 +302,7 @@ bool readFooter(istream& fin, long master, int c1, int c2, string norm, string u
         }
     }
 
-    fin.read((char *) &nExpectedValues, sizeof(int));
+    nExpectedValues = readIntFromFile(fin);
     for (int i = 0; i < nExpectedValues; i++) {
         string str, str2;
         getline(fin, str, '\0'); //typeString
@@ -326,27 +338,22 @@ bool readFooter(istream& fin, long master, int c1, int c2, string norm, string u
     }
 
     // Index of normalization vectors
-    fin.read((char *) &nEntries, sizeof(int));
+    nEntries = readIntFromFile(fin);
     bool found1 = false;
     bool found2 = false;
     for (int i = 0; i < nEntries; i++) {
         string normtype;
         getline(fin, normtype, '\0'); //normalization type
-        int chrIdx;
-        fin.read((char *) &chrIdx, sizeof(int));
+        int chrIdx = readIntFromFile(fin);
         string unit1;
         getline(fin, unit1, '\0'); //unit
-        int resolution1;
-        fin.read((char *) &resolution1, sizeof(int));
-        long filePosition;
-        fin.read((char *) &filePosition, sizeof(long));
+        int resolution1 = readIntFromFile(fin);
+        long filePosition = readLongFromFile(fin);
         long sizeInBytes;
         if (version > 8) {
             fin.read((char *) &sizeInBytes, sizeof(long));
         } else {
-            int sizeInBytesTemp;
-            fin.read((char *) &sizeInBytesTemp, sizeof(int));
-            sizeInBytes = (long) sizeInBytesTemp;
+            sizeInBytes = (long) readIntFromFile(fin);
         }
 
         if (chrIdx == c1 && normtype == norm && unit1 == unit && resolution1 == resolution) {
@@ -373,19 +380,14 @@ map <int, indexEntry> readMatrixZoomData(istream& fin, string myunit, int mybins
     map<int, indexEntry> blockMap;
     string unit;
     getline(fin, unit, '\0'); // unit
-    int tmp;
-    fin.read((char *) &tmp, sizeof(int)); // Old "zoom" index -- not used
-    float tmp2;
-    fin.read((char *) &tmp2, sizeof(float)); // sumCounts
-    fin.read((char *) &tmp2, sizeof(float)); // occupiedCellCount
-    fin.read((char *) &tmp2, sizeof(float)); // stdDev
-    fin.read((char *) &tmp2, sizeof(float)); // percent95
-    int binSize;
-    fin.read((char *) &binSize, sizeof(int));
-    int blockBinCount;
-    fin.read((char *) &blockBinCount, sizeof(int));
-    int blockColumnCount;
-    fin.read((char *) &blockColumnCount, sizeof(int));
+    readIntFromFile(fin); // Old "zoom" index -- not used
+    readFloatFromFile(fin); // sumCounts
+    readFloatFromFile(fin); // occupiedCellCount
+    readFloatFromFile(fin); // stdDev
+    readFloatFromFile(fin); // percent95
+    int binSize = readIntFromFile(fin);
+    int blockBinCount = readIntFromFile(fin);
+    int blockColumnCount = readIntFromFile(fin);
 
     found = false;
     if (myunit == unit && mybinsize == binSize) {
@@ -394,16 +396,12 @@ map <int, indexEntry> readMatrixZoomData(istream& fin, string myunit, int mybins
         found = true;
     }
 
-    int nBlocks;
-    fin.read((char *) &nBlocks, sizeof(int));
+    int nBlocks = readIntFromFile(fin);
 
     for (int b = 0; b < nBlocks; b++) {
-        int blockNumber;
-        fin.read((char *) &blockNumber, sizeof(int));
-        long filePosition;
-        fin.read((char *) &filePosition, sizeof(long));
-        int blockSizeInBytes;
-        fin.read((char *) &blockSizeInBytes, sizeof(int));
+        int blockNumber = readIntFromFile(fin);
+        long filePosition = readLongFromFile(fin);
+        int blockSizeInBytes = readIntFromFile(fin);
         indexEntry entry;
         entry.size = (long) blockSizeInBytes;
         entry.position = filePosition;
@@ -434,19 +432,14 @@ map <int, indexEntry> readMatrixZoomDataHttp(CURL* curl, long &myFilePosition, s
 
     string unit;
     getline(fin, unit, '\0'); // unit
-    int tmp;
-    fin.read((char *) &tmp, sizeof(int)); // Old "zoom" index -- not used
-    float tmp2;
-    fin.read((char *) &tmp2, sizeof(float)); // sumCounts
-    fin.read((char *) &tmp2, sizeof(float)); // occupiedCellCount
-    fin.read((char *) &tmp2, sizeof(float)); // stdDev
-    fin.read((char *) &tmp2, sizeof(float)); // percent95
-    int binSize;
-    fin.read((char *) &binSize, sizeof(int));
-    int blockBinCount;
-    fin.read((char *) &blockBinCount, sizeof(int));
-    int blockColumnCount;
-    fin.read((char *) &blockColumnCount, sizeof(int));
+    readIntFromFile(fin); // Old "zoom" index -- not used
+    readFloatFromFile(fin); // sumCounts
+    readFloatFromFile(fin); // occupiedCellCount
+    readFloatFromFile(fin); // stdDev
+    readFloatFromFile(fin); // percent95
+    int binSize = readIntFromFile(fin);
+    int blockBinCount = readIntFromFile(fin);
+    int blockColumnCount = readIntFromFile(fin);
 
     found = false;
     if (myunit == unit && mybinsize == binSize) {
@@ -455,20 +448,16 @@ map <int, indexEntry> readMatrixZoomDataHttp(CURL* curl, long &myFilePosition, s
         found = true;
     }
 
-    int nBlocks;
-    fin.read((char *) &nBlocks, sizeof(int));
+    int nBlocks = readIntFromFile(fin);
 
     if (found) {
         buffer = getData(curl, myFilePosition + header_size, nBlocks * (sizeof(int) + sizeof(long) + sizeof(int)));
         membuf sbuf2(buffer, buffer + nBlocks * (sizeof(int) + sizeof(long) + sizeof(int)));
         istream fin2(&sbuf2);
         for (int b = 0; b < nBlocks; b++) {
-            int blockNumber;
-            fin2.read((char *) &blockNumber, sizeof(int));
-            long filePosition;
-            fin2.read((char *) &filePosition, sizeof(long));
-            int blockSizeInBytes;
-            fin2.read((char *) &blockSizeInBytes, sizeof(int));
+            int blockNumber = readIntFromFile(fin2);
+            long filePosition = readLongFromFile(fin2);
+            int blockSizeInBytes = readIntFromFile(fin2);
             indexEntry entry;
             entry.size = (long) blockSizeInBytes;
             entry.position = filePosition;
@@ -490,11 +479,9 @@ map <int, indexEntry> readMatrixHttp(CURL *curl, long myFilePosition, string uni
     membuf sbuf(buffer, buffer + size);
     istream bufin(&sbuf);
 
-    int c1, c2;
-    bufin.read((char *) &c1, sizeof(int)); //chr1
-    bufin.read((char *) &c2, sizeof(int)); //chr2
-    int nRes;
-    bufin.read((char *) &nRes, sizeof(int));
+    int c1 = readIntFromFile(bufin);
+    int c2 = readIntFromFile(bufin);
+    int nRes = readIntFromFile(bufin);
     int i = 0;
     bool found = false;
     myFilePosition = myFilePosition + size;
@@ -519,11 +506,9 @@ map <int, indexEntry> readMatrix(istream& fin, long myFilePosition, string unit,
     map<int, indexEntry> blockMap;
 
     fin.seekg(myFilePosition, ios::beg);
-    int c1, c2;
-    fin.read((char *) &c1, sizeof(int)); //chr1
-    fin.read((char *) &c2, sizeof(int)); //chr2
-    int nRes;
-    fin.read((char *) &nRes, sizeof(int));
+    int c1 = readIntFromFile(fin);
+    int c2 = readIntFromFile(fin);
+    int nRes = readIntFromFile(fin);
     int i = 0;
     bool found = false;
     while (i < nRes && !found) {
@@ -602,64 +587,42 @@ vector<contactRecord> readBlock(istream& fin, CURL* curl, bool isHttp, indexEntr
     // create stream from buffer for ease of use
     membuf sbuf(uncompressedBytes, uncompressedBytes + uncompressedSize);
     istream bufferin(&sbuf);
-    int nRecords;
-    bufferin.read((char *) &nRecords, sizeof(int));
-    vector <contactRecord> v(nRecords);
+    int nRecords = readIntFromFile(bufferin);
+    vector<contactRecord> v(nRecords);
     // different versions have different specific formats
     if (version < 7) {
         for (int i = 0; i < nRecords; i++) {
-            int binX, binY;
-            bufferin.read((char *) &binX, sizeof(int));
-            bufferin.read((char *) &binY, sizeof(int));
-            float counts;
-            bufferin.read((char *) &counts, sizeof(float));
             contactRecord record;
-            record.binX = binX;
-            record.binY = binY;
-            record.counts = counts;
+            record.binX = readIntFromFile(bufferin);
+            record.binY = readIntFromFile(bufferin);
+            record.counts = readFloatFromFile(bufferin);
             v[i] = record;
         }
     } else {
-        int binXOffset, binYOffset;
-        bufferin.read((char *) &binXOffset, sizeof(int));
-        bufferin.read((char *) &binYOffset, sizeof(int));
-        char charShort;
-        bufferin.read((char *) &charShort, sizeof(char));
-        bool useShort = charShort == 0; // yes this is opposite of usual
+        int binXOffset = readIntFromFile(bufferin);
+        int binYOffset = readIntFromFile(bufferin);
+        bool useShort = readCharFromFile(bufferin) == 0; // yes this is opposite of usual
 
         bool useShortBinX = true;
         bool useShortBinY = true;
         if (version > 8) {
-            char charShortBinX;
-            char charShortBinY;
-            bufferin.read((char *) &charShortBinX, sizeof(char));
-            bufferin.read((char *) &charShortBinY, sizeof(char));
-            useShortBinX = charShortBinX == 0;
-            useShortBinY = charShortBinY == 0;
+            useShortBinX = readCharFromFile(bufferin) == 0;
+            useShortBinY = readCharFromFile(bufferin) == 0;
         }
 
-        char type;
-        bufferin.read((char *) &type, sizeof(char));
+        char type = readCharFromFile(bufferin);
         int index = 0;
         if (type == 1) {
             if (useShortBinX && useShortBinY) {
-                short rowCount;
-                bufferin.read((char *) &rowCount, sizeof(short));
+                short rowCount = readShortFromFile(bufferin);
                 for (int i = 0; i < rowCount; i++) {
-                    short y;
-                    bufferin.read((char *) &y, sizeof(short));
-                    int binY = y + binYOffset;
-                    short colCount;
-                    bufferin.read((char *) &colCount, sizeof(short));
+                    int binY = binYOffset + readShortFromFile(bufferin);
+                    short colCount = readShortFromFile(bufferin);
                     for (int j = 0; j < colCount; j++) {
-                        short x;
-                        bufferin.read((char *) &x, sizeof(short));
-                        int binX = binXOffset + x;
+                        int binX = binXOffset + readShortFromFile(bufferin);
                         float counts;
                         if (useShort) {
-                            short c;
-                            bufferin.read((char *) &c, sizeof(short));
-                            counts = c;
+                            counts = readShortFromFile(bufferin);
                         } else {
                             bufferin.read((char *) &counts, sizeof(float));
                         }
@@ -673,10 +636,8 @@ vector<contactRecord> readBlock(istream& fin, CURL* curl, bool isHttp, indexEntr
                 }
             }
         } else if (type == 2) {
-            int nPts;
-            bufferin.read((char *) &nPts, sizeof(int));
-            short w;
-            bufferin.read((char *) &w, sizeof(short));
+            int nPts = readIntFromFile(bufferin);
+            short w = readShortFromFile(bufferin);
 
             for (int i = 0; i < nPts; i++) {
                 //int idx = (p.y - binOffset2) * w + (p.x - binOffset1);
@@ -687,8 +648,7 @@ vector<contactRecord> readBlock(istream& fin, CURL* curl, bool isHttp, indexEntr
 
                 float counts;
                 if (useShort == 0) { // yes this is opposite of the usual
-                    short c;
-                    bufferin.read((char *) &c, sizeof(short));
+                    short c = readShortFromFile(bufferin);
                     if (c != -32768) {
                         contactRecord record;
                         record.binX = bin1;
@@ -748,8 +708,7 @@ int readSize(istream& fin, CURL* curl, bool isHttp, indexEntry idx) {
     // create stream from buffer for ease of use
     membuf sbuf(uncompressedBytes, uncompressedBytes + uncompressedSize);
     istream bufferin(&sbuf);
-    int nRecords;
-    bufferin.read((char *) &nRecords, sizeof(int));
+    int nRecords = readIntFromFile(bufferin);
     delete[] compressedBytes;
     delete[] uncompressedBytes;
     return nRecords;
@@ -762,24 +721,18 @@ vector<double> readNormalizationVector(istream& bufferin) {
     if (version > 8) {
         bufferin.read((char *) &nValues, sizeof(long));
     } else {
-        int nValuesTemp;
-        bufferin.read((char *) &nValuesTemp, sizeof(int));
-        nValues = (long) nValuesTemp;
+        nValues = (long) readIntFromFile(bufferin);
     }
 
     vector<double> values((int) nValues);
 
     if (version > 8) {
-        for (int i = 0; i < nValues; i++) {
-            float d;
-            bufferin.read((char *) &d, sizeof(float));
-            values[i] = (double) d;
+        for (long i = 0; i < nValues; i++) {
+            values[i] = (double) readFloatFromFile(bufferin);
         }
     } else {
         for (int i = 0; i < nValues; i++) {
-            double d;
-            bufferin.read((char *) &d, sizeof(double));
-            values[i] = d;
+            values[i] = readDoubleFromFile(bufferin);
         }
     }
 
