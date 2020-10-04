@@ -175,15 +175,11 @@ map<string, chromosome> readHeader(istream &fin, long &masterIndexPosition) {
     getline(fin, genomeID, '\0');
 
     if (version > 8) {
-        long nviPosition, nviLength;
-        fin.read((char *) &nviPosition, sizeof(long));
-        //long nviPosition = readLongFromFile(fin);
-        //long nviLength = readLongFromFile(fin);
-        fin.read((char *) &nviLength, sizeof(long));
+        long nviPosition = readLongFromFile(fin);
+        long nviLength = readLongFromFile(fin);
     }
 
-    int nattributes;
-    fin.read((char *) &nattributes, sizeof(int));
+    int nattributes = readIntFromFile(fin);
 
     // reading and ignoring attribute-value dictionary
     for (int i = 0; i < nattributes; i++) {
@@ -191,8 +187,7 @@ map<string, chromosome> readHeader(istream &fin, long &masterIndexPosition) {
         getline(fin, key, '\0');
         getline(fin, value, '\0');
     }
-    int nChrs;
-    fin.read((char *) &nChrs, sizeof(int));
+    int nChrs = readIntFromFile(fin);
     // chromosome map for finding matrix
     for (int i = 0; i < nChrs; i++) {
         string name;
@@ -201,9 +196,8 @@ map<string, chromosome> readHeader(istream &fin, long &masterIndexPosition) {
         if (version > 8) {
             fin.read((char *) &length, sizeof(long));
         } else {
-            int shortlength;
-            fin.read((char *) &shortlength, sizeof(int));
-            length = (long) shortlength;
+            int intlength = readIntFromFile(fin);
+            length = (long) intlength;
         }
 
         chromosome chr;
@@ -220,30 +214,23 @@ map<string, chromosome> readHeader(istream &fin, long &masterIndexPosition) {
 // position of the matrix and the normalization vectors for those chromosomes 
 // at the given normalization and resolution
 bool readFooter(istream& fin, long master, int c1, int c2, string norm, string unit, int resolution, long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry) {
-    //long nBytes;
     if (version > 8) {
-        long nBytes;
-        fin.read((char *) &nBytes, sizeof(long));
+        long nBytes = readLongFromFile(fin);
     } else {
-        int nBytes;//tempNBytes;
-        fin.read((char *) &nBytes, sizeof(int));
-        //nBytes = (long) tempNBytes;
+        int nBytes = readIntFromFile(fin);
     }
 
     stringstream ss;
     ss << c1 << "_" << c2;
     string key = ss.str();
 
-    int nEntries;
-    fin.read((char *) &nEntries, sizeof(int));
+    int nEntries = readIntFromFile(fin);
     bool found = false;
     for (int i = 0; i < nEntries; i++) {
         string str;
         getline(fin, str, '\0');
-        long fpos;
-        fin.read((char *) &fpos, sizeof(long));
-        int sizeinbytes;
-        fin.read((char *) &sizeinbytes, sizeof(int));
+        long fpos = readLongFromFile(fin);
+        int sizeinbytes = readIntFromFile(fin);
         if (str == key) {
             myFilePos = fpos;
             found = true;
