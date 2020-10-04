@@ -538,8 +538,7 @@ getBlockNumbersForRegionFromBinPosition(long *regionIndices, int blockBinCount, 
             blocksSet.insert(blockNumber);
         }
     }
-    // check region part that overlaps with lower left triangle
-    // but only if intrachromosomal
+    // check region part that overlaps with lower left triangle but only if intrachromosomal
     if (intra) {
         for (int r = col1; r <= col2; r++) {
             for (int c = row1; c <= row2; c++) {
@@ -548,15 +547,37 @@ getBlockNumbersForRegionFromBinPosition(long *regionIndices, int blockBinCount, 
             }
         }
     }
+    return blocksSet;
+}
+
+set<int>
+getBlockNumbersForRegionFromBinPositionV9(long *regionIndices, int blockBinCount, int blockColumnCount, bool intra) {
+    // regionIndices is binX1 binX2 binY1 binY2
+    set<int> blocksSet;
+    int translatedLowerPAD = (regionIndices[0] + regionIndices[2]) / 2 / blockBinCount;
+    int translatedHigherPAD = (regionIndices[1] + regionIndices[3]) / 2 / blockBinCount + 1;
+    int translatedNearerDepth = log2(1 + abs(regionIndices[0] - regionIndices[3]) / sqrt(2) / blockBinCount);
+    int translatedFurtherDepth = log2(1 + abs(regionIndices[1] - regionIndices[2]) / sqrt(2) / blockBinCount);
+
+    // because code above assume above diagonal; but we could be below diagonal
+    int nearerDepth = min(translatedNearerDepth, translatedFurtherDepth);
+    int furtherDepth = max(translatedNearerDepth, translatedFurtherDepth) + 1; // +1; integer divide rounds down
+
+    for (int depth = nearerDepth; depth <= furtherDepth; depth++) {
+        for (int pad = translatedLowerPAD; pad <= translatedHigherPAD; pad++) {
+            int blockNumber = depth * blockColumnCount + pad;
+            blocksSet.insert(blockNumber);
+        }
+    }
 
     return blocksSet;
 }
 
 // this is the meat of reading the data.  takes in the block number and returns the set of contact records corresponding to
 // that block.  the block data is compressed and must be decompressed using the zlib library functions
-vector<contactRecord> readBlock(istream& fin, CURL* curl, bool isHttp, indexEntry idx) {
+vector<contactRecord> readBlock(istream &fin, CURL *curl, bool isHttp, indexEntry idx) {
     if (idx.size == 0) {
-        vector <contactRecord> v;
+        vector<contactRecord> v;
         return v;
     }
     char *compressedBytes = new char[idx.size];
@@ -969,12 +990,18 @@ vector <contactRecord> straw(string norm, string fname, string chr1loc, string c
         blockMap = readMatrix(fin, myFilePos, unit, binsize, blockBinCount, blockColumnCount);
     }
 
-    set<int> blockNumbers = getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount,
-                                                                    c1 == c2);
+    set<int> blockNumbers;
+    if (version > 8) {
+        blockNumbers = getBlockNumbersForRegionFromBinPositionV9(regionIndices, blockBinCount, blockColumnCount,
+                                                                 c1 == c2);
+    } else {
+        blockNumbers = getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount,
+                                                               c1 == c2);
+    }
 
     // getBlockIndices
-    vector <contactRecord> records;
-    vector <contactRecord> tmp_records;
+    vector<contactRecord> records;
+    vector<contactRecord> tmp_records;
     for (set<int>::iterator it = blockNumbers.begin(); it != blockNumbers.end(); ++it) {
         // get contacts in this block
         tmp_records = readBlock(fin, curl, isHttp, blockMap[*it]);
@@ -1160,11 +1187,17 @@ int getSize(string norm, string fname, string chr1loc, string chr2loc, string un
         // readMatrix will assign blockBinCount and blockColumnCount
         blockMap = readMatrix(fin, myFilePos, unit, binsize, blockBinCount, blockColumnCount);
     }
-    set<int> blockNumbers = getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount,
-                                                                    c1 == c2);
+    set<int> blockNumbers;
+    if (version > 8) {
+        blockNumbers = getBlockNumbersForRegionFromBinPositionV9(regionIndices, blockBinCount, blockColumnCount,
+                                                                 c1 == c2);
+    } else {
+        blockNumbers = getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount,
+                                                               c1 == c2);
+    }
 
     // getBlockIndices
-    vector <contactRecord> tmp_records;
+    vector<contactRecord> tmp_records;
     int count = 0;
     for (set<int>::iterator it = blockNumbers.begin(); it != blockNumbers.end(); ++it) {
         // get contacts in this block
