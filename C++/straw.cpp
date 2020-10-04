@@ -615,11 +615,74 @@ vector<contactRecord> readBlock(istream& fin, CURL* curl, bool isHttp, indexEntr
         if (type == 1) {
             if (useShortBinX && useShortBinY) {
                 short rowCount = readShortFromFile(bufferin);
-                for (int i = 0; i < rowCount; i++) {
+                for (short i = 0; i < rowCount; i++) {
                     int binY = binYOffset + readShortFromFile(bufferin);
                     short colCount = readShortFromFile(bufferin);
-                    for (int j = 0; j < colCount; j++) {
+                    for (short j = 0; j < colCount; j++) {
                         int binX = binXOffset + readShortFromFile(bufferin);
+                        float counts;
+                        if (useShort) {
+                            counts = readShortFromFile(bufferin);
+                        } else {
+                            bufferin.read((char *) &counts, sizeof(float));
+                        }
+                        contactRecord record;
+                        record.binX = binX;
+                        record.binY = binY;
+                        record.counts = counts;
+                        v[index] = record;
+                        index++;
+                    }
+                }
+            } else if (useShortBinX && !useShortBinY) {
+                int rowCount = readIntFromFile(bufferin);
+                for (int i = 0; i < rowCount; i++) {
+                    int binY = binYOffset + readIntFromFile(bufferin);
+                    short colCount = readShortFromFile(bufferin);
+                    for (short j = 0; j < colCount; j++) {
+                        int binX = binXOffset + readShortFromFile(bufferin);
+                        float counts;
+                        if (useShort) {
+                            counts = readShortFromFile(bufferin);
+                        } else {
+                            bufferin.read((char *) &counts, sizeof(float));
+                        }
+                        contactRecord record;
+                        record.binX = binX;
+                        record.binY = binY;
+                        record.counts = counts;
+                        v[index] = record;
+                        index++;
+                    }
+                }
+            } else if (!useShortBinX && useShortBinY) {
+                short rowCount = readShortFromFile(bufferin);
+                for (short i = 0; i < rowCount; i++) {
+                    int binY = binYOffset + readShortFromFile(bufferin);
+                    int colCount = readIntFromFile(bufferin);
+                    for (int j = 0; j < colCount; j++) {
+                        int binX = binXOffset + readIntFromFile(bufferin);
+                        float counts;
+                        if (useShort) {
+                            counts = readShortFromFile(bufferin);
+                        } else {
+                            bufferin.read((char *) &counts, sizeof(float));
+                        }
+                        contactRecord record;
+                        record.binX = binX;
+                        record.binY = binY;
+                        record.counts = counts;
+                        v[index] = record;
+                        index++;
+                    }
+                }
+            } else {
+                int rowCount = readIntFromFile(bufferin);
+                for (int i = 0; i < rowCount; i++) {
+                    int binY = binYOffset + readIntFromFile(bufferin);
+                    int colCount = readIntFromFile(bufferin);
+                    for (int j = 0; j < colCount; j++) {
+                        int binX = binXOffset + readIntFromFile(bufferin);
                         float counts;
                         if (useShort) {
                             counts = readShortFromFile(bufferin);
@@ -823,27 +886,23 @@ vector <contactRecord> straw(string norm, string fname, string chr1loc, string c
     int c1 = min(chromosomeMap[chr1].index, chromosomeMap[chr2].index);
     int c2 = max(chromosomeMap[chr1].index, chromosomeMap[chr2].index);
     long origRegionIndices[4]; // as given by user
-    long regionIndices[4]; // used to find the blocks we need to access
     // reverse order if necessary
     if (chromosomeMap[chr1].index > chromosomeMap[chr2].index) {
         origRegionIndices[0] = c2pos1;
         origRegionIndices[1] = c2pos2;
         origRegionIndices[2] = c1pos1;
         origRegionIndices[3] = c1pos2;
-        regionIndices[0] = c2pos1 / binsize;
-        regionIndices[1] = c2pos2 / binsize;
-        regionIndices[2] = c1pos1 / binsize;
-        regionIndices[3] = c1pos2 / binsize;
     } else {
         origRegionIndices[0] = c1pos1;
         origRegionIndices[1] = c1pos2;
         origRegionIndices[2] = c2pos1;
         origRegionIndices[3] = c2pos2;
-        regionIndices[0] = c1pos1 / binsize;
-        regionIndices[1] = c1pos2 / binsize;
-        regionIndices[2] = c2pos1 / binsize;
-        regionIndices[3] = c2pos2 / binsize;
     }
+    long regionIndices[4]; // used to find the blocks we need to access
+    regionIndices[0] = origRegionIndices[0] / binsize;
+    regionIndices[1] = origRegionIndices[1] / binsize;
+    regionIndices[2] = origRegionIndices[2] / binsize;
+    regionIndices[3] = origRegionIndices[3] / binsize;
 
     indexEntry c1NormEntry, c2NormEntry;
     long myFilePos;

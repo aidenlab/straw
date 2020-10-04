@@ -28,25 +28,25 @@ using namespace std;
 
 int main(int argc, char *argv[])
 {
-  if (argc != 7) {
-      cerr << "Incorrect arguments" << endl;
-      cerr << "Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>"
-           << endl;
-      exit(1);
-  }
+    if (argc != 7) {
+        cerr << "Incorrect arguments" << endl;
+        cerr << "Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>"
+             << endl;
+        exit(1);
+    }
 
-  string norm=argv[1];
-  string fname=argv[2];
-  string chr1loc=argv[3];
-  string chr2loc=argv[4];
-  string unit=argv[5];
-  string size=argv[6];
-  int binsize=stoi(size);
-  vector<contactRecord> records;
+    string norm = argv[1];
+    string fname = argv[2];
+    string chr1loc = argv[3];
+    string chr2loc = argv[4];
+    string unit = argv[5];
+    string size = argv[6];
+    int binsize = stoi(size);
+    vector<contactRecord> records;
 
-  records = straw(norm, fname, chr1loc, chr2loc, unit, binsize);
-  int length=records.size();
-  for (int i=0; i<length; i++) {
-    printf("%d\t%d\t%.14g\n", records[i].binX, records[i].binY, records[i].counts);   
-  }
+    records = straw(norm, fname, chr1loc, chr2loc, unit, binsize);
+    long length = records.size();
+    for (long i = 0; i < length; i++) {
+        printf("%d\t%d\t%.14g\n", records[i].binX, records[i].binY, records[i].counts);
+    }
 }
