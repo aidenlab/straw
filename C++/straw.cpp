@@ -149,10 +149,22 @@ int readIntFromFile(istream &fin) {
     return tempInt;
 }
 
-int readLongFromFile(istream &fin) {
+long readLongFromFile(istream &fin) {
     long tempLong;
     fin.read((char *) &tempLong, sizeof(long));
     return tempLong;
+}
+
+float readFloatFromFile(istream &fin) {
+    float tempFloat;
+    fin.read((char *) &tempFloat, sizeof(float));
+    return tempFloat;
+}
+
+double readDoubleFromFile(istream &fin) {
+    double tempDouble;
+    fin.read((char *) &tempDouble, sizeof(double));
+    return tempDouble;
 }
 
 // reads the header, storing the positions of the normalization vectors and returning the masterIndexPosition pointer
@@ -196,8 +208,7 @@ map<string, chromosome> readHeader(istream &fin, long &masterIndexPosition) {
         if (version > 8) {
             fin.read((char *) &length, sizeof(long));
         } else {
-            int intlength = readIntFromFile(fin);
-            length = (long) intlength;
+            length = (long) readIntFromFile(fin);
         }
 
         chromosome chr;
@@ -245,92 +256,71 @@ bool readFooter(istream& fin, long master, int c1, int c2, string norm, string u
 
     // read in and ignore expected value maps; don't store; reading these to
     // get to norm vector index
-    int nExpectedValues;
-    fin.read((char *) &nExpectedValues, sizeof(int));
+    int nExpectedValues = readIntFromFile(fin);
     for (int i = 0; i < nExpectedValues; i++) {
         string str;
         getline(fin, str, '\0'); //unit
-        int binSize;
-        fin.read((char *) &binSize, sizeof(int));
-
-        int nValues;
-        if (version > 8) {
-            long tempNValues;
-            fin.read((char *) &tempNValues, sizeof(long));
-            nValues = (int) tempNValues;
-        } else {
-            int tempNValues;
-            fin.read((char *) &tempNValues, sizeof(int));
-            nValues = (int) tempNValues;
-        }
-
-        if (version > 8) {
-            for (int j = 0; j < nValues; j++) {
-                float v;
-                fin.read((char *) &v, sizeof(float));
-            }
-        } else {
-            for (int j = 0; j < nValues; j++) {
-                double v;
-                fin.read((char *) &v, sizeof(double));
-            }
-        }
-
-        int nNormalizationFactors;
-        fin.read((char *) &nNormalizationFactors, sizeof(int));
-        for (int j = 0; j < nNormalizationFactors; j++) {
-            int chrIdx;
-            fin.read((char *) &chrIdx, sizeof(int));
-            if (version > 8) {
-                float v;
-                fin.read((char *) &v, sizeof(float));
-            } else {
-                double v;
-                fin.read((char *) &v, sizeof(double));
-            }
-        }
-    }
-    fin.read((char *) &nExpectedValues, sizeof(int));
-    for (int i = 0; i < nExpectedValues; i++) {
-        string str, str2;
-        getline(fin, str, '\0'); //typeString
-        getline(fin, str2, '\0'); //unit
-        int binSize;
-        fin.read((char *) &binSize, sizeof(int));
+        int binSize = readIntFromFile(fin);
 
         long nValues;
         if (version > 8) {
             fin.read((char *) &nValues, sizeof(long));
         } else {
-            int nValuesTemp;
-            fin.read((char *) &nValuesTemp, sizeof(int));
-            nValues = (long) nValuesTemp;
+            nValues = (long) readIntFromFile(fin);
         }
 
-
         if (version > 8) {
-            for (int j = 0; j < nValues; j++) {
-                float v;
-                fin.read((char *) &v, sizeof(float));
+            for (long j = 0; j < nValues; j++) {
+                readFloatFromFile(fin);
             }
         } else {
             for (int j = 0; j < nValues; j++) {
-                double v;
-                fin.read((char *) &v, sizeof(double));
+                readDoubleFromFile(fin);
             }
         }
 
-        int nNormalizationFactors;
-        fin.read((char *) &nNormalizationFactors, sizeof(int));
+        int nNormalizationFactors = readIntFromFile(fin);
         for (int j = 0; j < nNormalizationFactors; j++) {
-            int chrIdx;
-            fin.read((char *) &chrIdx, sizeof(int));
+            int chrIdx = readIntFromFile(fin);
             if (version > 8) {
-                float v;
-                fin.read((char *) &v, sizeof(float));
+                readFloatFromFile(fin);
             } else {
-                double v;
-                fin.read((char *) &v, sizeof(double));
+                readDoubleFromFile(fin);
+            }
+        }
+    }
+
+    fin.read((char *) &nExpectedValues, sizeof(int));
+    for (int i = 0; i < nExpectedValues; i++) {
+        string str, str2;
+        getline(fin, str, '\0'); //typeString
+        getline(fin, str2, '\0'); //unit
+        int binSize = readIntFromFile(fin);
+
+        long nValues;
+        if (version > 8) {
+            fin.read((char *) &nValues, sizeof(long));
+        } else {
+            nValues = (long) readIntFromFile(fin);
+        }
+
+        if (version > 8) {
+            for (long j = 0; j < nValues; j++) {
+                readFloatFromFile(fin);
+            }
+        } else {
+            for (int j = 0; j < nValues; j++) {
+                readDoubleFromFile(fin);
+            }
+        }
+
+        int nNormalizationFactors = readIntFromFile(fin);
+        for (int j = 0; j < nNormalizationFactors; j++) {
+            int chrIdx = readIntFromFile(fin);
+            if (version > 8) {
+                readFloatFromFile(fin);
+            } else {
+                readDoubleFromFile(fin);
             }
         }
     }
