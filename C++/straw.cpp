@@ -137,15 +137,27 @@ CURL* initCURL(const char* url) {
 }
 
 // returns whether or not this is valid HiC file
-bool readMagicString(istream& fin) {
+bool readMagicString(istream &fin) {
     string str;
     getline(fin, str, '\0');
     return str[0] == 'H' && str[1] == 'I' && str[2] == 'C';
 }
 
+int readIntFromFile(istream &fin) {
+    int tempInt;
+    fin.read((char *) &tempInt, sizeof(int));
+    return tempInt;
+}
+
+int readLongFromFile(istream &fin) {
+    long tempLong;
+    fin.read((char *) &tempLong, sizeof(long));
+    return tempLong;
+}
+
 // reads the header, storing the positions of the normalization vectors and returning the masterIndexPosition pointer
-map <string, chromosome> readHeader(istream &fin, long &masterIndexPosition) {
-    map <string, chromosome> chromosomeMap;
+map<string, chromosome> readHeader(istream &fin, long &masterIndexPosition) {
+    map<string, chromosome> chromosomeMap;
     if (!readMagicString(fin)) {
         cerr << "Hi-C magic string is missing, does not appear to be a hic file" << endl;
         masterIndexPosition = -1;
@@ -165,6 +177,8 @@ map <string, chromosome> readHeader(istream &fin, long &masterIndexPosition) {
     if (version > 8) {
         long nviPosition, nviLength;
         fin.read((char *) &nviPosition, sizeof(long));
+        //long nviPosition = readLongFromFile(fin);
+        //long nviLength = readLongFromFile(fin);
         fin.read((char *) &nviLength, sizeof(long));
     }
 
@@ -632,39 +646,53 @@ vector<contactRecord> readBlock(istream& fin, CURL* curl, bool isHttp, indexEntr
         int binXOffset, binYOffset;
         bufferin.read((char *) &binXOffset, sizeof(int));
         bufferin.read((char *) &binYOffset, sizeof(int));
-        char useShort;
-        bufferin.read((char *) &useShort, sizeof(char));
+        char charShort;
+        bufferin.read((char *) &charShort, sizeof(char));
+        bool useShort = charShort == 0; // yes this is opposite of usual
+
+        bool useShortBinX = true;
+        bool useShortBinY = true;
+        if (version > 8) {
+            char charShortBinX;
+            char charShortBinY;
+            bufferin.read((char *) &charShortBinX, sizeof(char));
+            bufferin.read((char *) &charShortBinY, sizeof(char));
+            useShortBinX = charShortBinX == 0;
+            useShortBinY = charShortBinY == 0;
+        }
+
         char type;
         bufferin.read((char *) &type, sizeof(char));
         int index = 0;
         if (type == 1) {
-            // List-of-rows representation
-            short rowCount;
-            bufferin.read((char *) &rowCount, sizeof(short));
-            for (int i = 0; i < rowCount; i++) {
-                short y;
-                bufferin.read((char *) &y, sizeof(short));
-                int binY = y + binYOffset;
-                short colCount;
-                bufferin.read((char *) &colCount, sizeof(short));
-                for (int j = 0; j < colCount; j++) {
-                    short x;
-                    bufferin.read((char *) &x, sizeof(short));
-                    int binX = binXOffset + x;
-                    float counts;
-                    if (useShort == 0) { // yes this is opposite of usual
-                        short c;
-                        bufferin.read((char *) &c, sizeof(short));
-                        counts = c;
-                    } else {
-                        bufferin.read((char *) &counts, sizeof(float));
+            if (useShortBinX && useShortBinY) {
+                short rowCount;
+                bufferin.read((char *) &rowCount, sizeof(short));
+                for (int i = 0; i < rowCount; i++) {
+                    short y;
+                    bufferin.read((char *) &y, sizeof(short));
+                    int binY = y + binYOffset;
+                    short colCount;
+                    bufferin.read((char *) &colCount, sizeof(short));
+                    for (int j = 0; j < colCount; j++) {
+                        short x;
+                        bufferin.read((char *) &x, sizeof(short));
+                        int binX = binXOffset + x;
+                        float counts;
+                        if (useShort) {
+                            short c;
+                            bufferin.read((char *) &c, sizeof(short));
+                            counts = c;
+                        } else {
+                            bufferin.read((char *) &counts, sizeof(float));
+                        }
+                        contactRecord record;
+                        record.binX = binX;
+                        record.binY = binY;
+                        record.counts = counts;
+                        v[index] = record;
+                        index++;
                     }
-                    contactRecord record;
-                    record.binX = binX;
-                    record.binY = binY;
-                    record.counts = counts;
-                    v[index] = record;
-                    index++;
                 }
             }
         } else if (type == 2) {
