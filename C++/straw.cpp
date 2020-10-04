@@ -551,7 +551,7 @@ getBlockNumbersForRegionFromBinPosition(long *regionIndices, int blockBinCount, 
 }
 
 set<int>
-getBlockNumbersForRegionFromBinPositionV9(long *regionIndices, int blockBinCount, int blockColumnCount, bool intra) {
+getBlockNumbersForRegionFromBinPositionV9Intra(long *regionIndices, int blockBinCount, int blockColumnCount) {
     // regionIndices is binX1 binX2 binY1 binY2
     set<int> blocksSet;
     int translatedLowerPAD = (regionIndices[0] + regionIndices[2]) / 2 / blockBinCount;
@@ -991,9 +991,8 @@ vector <contactRecord> straw(string norm, string fname, string chr1loc, string c
     }
 
     set<int> blockNumbers;
-    if (version > 8) {
-        blockNumbers = getBlockNumbersForRegionFromBinPositionV9(regionIndices, blockBinCount, blockColumnCount,
-                                                                 c1 == c2);
+    if (version > 8 && c1 == c2) {
+        blockNumbers = getBlockNumbersForRegionFromBinPositionV9Intra(regionIndices, blockBinCount, blockColumnCount);
     } else {
         blockNumbers = getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount,
                                                                c1 == c2);
@@ -1188,9 +1187,8 @@ int getSize(string norm, string fname, string chr1loc, string chr2loc, string un
         blockMap = readMatrix(fin, myFilePos, unit, binsize, blockBinCount, blockColumnCount);
     }
     set<int> blockNumbers;
-    if (version > 8) {
-        blockNumbers = getBlockNumbersForRegionFromBinPositionV9(regionIndices, blockBinCount, blockColumnCount,
-                                                                 c1 == c2);
+    if (version > 8 && c1 == c2) {
+        blockNumbers = getBlockNumbersForRegionFromBinPositionV9Intra(regionIndices, blockBinCount, blockColumnCount);
     } else {
         blockNumbers = getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount,
                                                                c1 == c2);
