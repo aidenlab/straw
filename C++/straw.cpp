@@ -561,6 +561,10 @@ getBlockNumbersForRegionFromBinPositionV9Intra(long *regionIndices, int blockBin
 
     // because code above assume above diagonal; but we could be below diagonal
     int nearerDepth = min(translatedNearerDepth, translatedFurtherDepth);
+    if ((regionIndices[0] > regionIndices[3] && regionIndices[1] < regionIndices[2]) ||
+        (regionIndices[1] > regionIndices[2] && regionIndices[0] < regionIndices[3])) {
+        nearerDepth = 0;
+    }
     int furtherDepth = max(translatedNearerDepth, translatedFurtherDepth) + 1; // +1; integer divide rounds down
 
     for (int depth = nearerDepth; depth <= furtherDepth; depth++) {
