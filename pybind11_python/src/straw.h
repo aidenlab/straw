@@ -39,7 +39,7 @@ struct indexEntry {
 struct contactRecord {
   int binX;
   int binY;
-    float counts;
+  float counts;
 };
 
 // chromosome

@@ -33,6 +33,8 @@
 #include <curl/curl.h>
 #include "zlib.h"
 #include "straw.h"
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 using namespace std;
 
 /*
@@ -503,7 +505,7 @@ map <int, indexEntry> readMatrixHttp(CURL *curl, long myFilePosition, string uni
 // goes to the specified file pointer and finds the raw contact matrix at specified resolution, calling readMatrixZoomData.
 // sets blockbincount and blockcolumncount
 map <int, indexEntry> readMatrix(istream& fin, long myFilePosition, string unit, int resolution, int &myBlockBinCount, int &myBlockColumnCount) {
-    map<int, indexEntry> blockMap;
+    map <int, indexEntry> blockMap;
 
     fin.seekg(myFilePosition, ios::beg);
     int c1 = readIntFromFile(fin);
@@ -828,7 +830,7 @@ vector<double> readNormalizationVector(istream& bufferin) {
     return values;
 }
 
-vector <contactRecord> straw(string norm, string fname, string chr1loc, string chr2loc, string unit, int binsize) {
+vector<contactRecord> straw(string norm, string fname, string chr1loc, string chr2loc, string unit, int binsize) {
     if (!(unit == "BP" || unit == "FRAG")) {
         cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl;
         cerr << "Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>"
@@ -1209,3 +1211,54 @@ int getSize(string norm, string fname, string chr1loc, string chr2loc, string un
 }
 
 
+namespace py = pybind11;
+
+PYBIND11_MODULE(strawC, m) {
+  m.doc() = R"pbdoc(
+        New straw with pybind
+        -----------------------
+
+        .. currentmodule:: straw
+
+        .. autosummary::
+           :toctree: _generate
+
+           straw
+Straw enables programmatic access to .hic files.
+.hic files store the contact matrices from Hi-C experiments and the
+normalization and expected vectors, along with meta-data in the header.
+The main function, straw, takes in the normalization, the filename or URL,
+chromosome1 (and optional range), chromosome2 (and optional range),
+whether the bins desired are fragment or base pair delimited, and bin size.
+It then reads the header, follows the various pointers to the desired matrix
+and normalization vector, and stores as [x, y, count]
+Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>
+
+Example:
+>>>import strawC
+>>>result = strawC.strawC('NONE', 'HIC001.hic', 'X', 'X', 'BP', 1000000)
+>>>for i in range(len(result)):
+...   print("{0}\t{1}\t{2}".format(result[i].binX, result[i].binY, result[i].counts))
+See https://github.com/theaidenlab/straw/wiki/Python for more documentation
+    )pbdoc";
+
+  m.def("strawC", &straw, R"pbdoc(
+        Straw: fast C++ implementation of dump.
+
+        Bound with pybind
+Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>
+    )pbdoc");
+
+  py::class_<contactRecord>(m, "contactRecord")
+    .def(py::init<>())
+    .def_readwrite("binX", &contactRecord::binX)
+    .def_readwrite("binY", &contactRecord::binY)
+    .def_readwrite("counts", &contactRecord::counts)
+    ;
+
+#ifdef VERSION_INFO
+  m.attr("__version__") = VERSION_INFO;
+#else
+  m.attr("__version__") = "dev";
+#endif
+}
