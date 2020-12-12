@@ -1,18 +1,18 @@
 /*
   The MIT License (MIT)
- 
+
   Copyright (c) 2011-2016 Broad Institute, Aiden Lab
- 
+
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
  in the Software without restriction, including without limitation the rights
  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  copies of the Software, and to permit persons to whom the Software is
  furnished to do so, subject to the following conditions:
- 
+
  The above copyright notice and this permission notice shall be included in
  all copies or substantial portions of the Software.
- 
+
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -29,7 +29,7 @@
 #include <vector>
 #include <map>
 
-// pointer structure for reading blocks or matrices, holds the size and position 
+// pointer structure for reading blocks or matrices, holds the size and position
 struct indexEntry {
   int size;
   long position;
@@ -51,9 +51,9 @@ struct chromosome {
 
 bool readMagicString(std::ifstream& fin);
 std::map<std::string, chromosome> readHeader(std::istream& fin, long &master);
-bool readFooter(std::istream& fin, long master, int c1, int c2, std::string norm, std::string unit, int resolution, long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry);
-std::map<int, indexEntry> readMatrixZoomData(std::istream& fin, std::string myunit, int mybinsize, int &myBlockBinCount, int &myBlockColumnCount, bool &found);
-std::map<int, indexEntry> readMatrix(std::istream& fin, int myFilePosition, std::string unit, int resolution, int &myBlockBinCount, int &myBlockColumnCount);
+bool readFooter(std::istream& fin, long master, int c1, int c2, std::string norm, std::string unit, int resolution, long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry, std::vector<double> &expectedValues);
+std::map<int, indexEntry> readMatrixZoomData(std::istream& fin, std::string myunit, int mybinsize, float &mySumCounts, int &myBlockBinCount, int &myBlockColumnCount, bool &found);
+std::map<int, indexEntry> readMatrix(std::istream& fin, int myFilePosition, std::string unit, int resolution, float &mySumCounts, int &myBlockBinCount, int &myBlockColumnCount);
 std::set<int> getBlockNumbersForRegionFromBinPosition(int* regionIndices, int blockBinCount, int blockColumnCount, bool intra);
 std::vector<contactRecord> readBlock(std::istream& fin, int blockNumber);
 std::vector<double> readNormalizationVector(std::istream& fin, indexEntry entry);
