@@ -922,7 +922,6 @@ vector<contactRecord> straw(string matrix, string norm, string fname, string chr
     // readMatrix will assign blockBinCount and blockColumnCount
     blockMap = readMatrix(fin, myFilePos, unit, binsize, sumCounts, blockBinCount, blockColumnCount);
   }
-
   double avgCount;
   if (c1 != c2) {
     long nBins1 = chromosomeMap[chr1].length / binsize;
