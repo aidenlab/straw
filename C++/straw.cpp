@@ -194,7 +194,7 @@ map<string, chromosome> readHeader(istream& fin, long& master) {
 // norm, unit (BP or FRAG) and resolution or binsize, and sets the file
 // position of the matrix and the normalization vectors for those chromosomes
 // at the given normalization and resolution
-bool readFooter(istream& fin, long master, int c1, int c2, string norm, string unit, int resolution, long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry, vector<double> &expectedValues) {
+bool readFooter(istream& fin, long master, int c1, int c2, string matrix, string norm, string unit, int resolution, long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry, vector<double> &expectedValues) {
   int nBytes;
   fin.read((char*)&nBytes, sizeof(int));
   stringstream ss;
@@ -221,21 +221,21 @@ bool readFooter(istream& fin, long master, int c1, int c2, string norm, string u
     return false;
   }
 
-  if (norm=="NONE") return true; // no need to read norm vector index
+  if ((matrix=="observed" && norm=="NONE") || (matrix=="oe" && norm=="NONE" && c1!=c2)) return true; // no need to read norm vector index
 
   // read in and ignore expected value maps; don't store; reading these to
   // get to norm vector index
   int nExpectedValues;
   fin.read((char*)&nExpectedValues, sizeof(int));
   for (int i=0; i<nExpectedValues; i++) {
-    string str;
-    getline(fin, str, '\0'); //unit
+    string unit0;
+    getline(fin, unit0, '\0'); //unit
     int binSize;
     fin.read((char*)&binSize, sizeof(int));
 
     int nValues;
     fin.read((char*)&nValues, sizeof(int));
-    bool store = c1 == c2 && str == unit && binSize == resolution;
+    bool store = c1 == c2 && matrix == "oe" && norm == "NONE" && unit0 == unit && binSize == resolution;
     for (int j=0; j<nValues; j++) {
       double v;
       fin.read((char*)&v, sizeof(double));
@@ -258,25 +258,31 @@ bool readFooter(istream& fin, long master, int c1, int c2, string norm, string u
       }
     }
   }
-  if (norm == "OE") {
-    if (c1 == c2 && expectedValues.size() == 0) {
+  if (c1 == c2 && matrix == "oe" && norm == "NONE") {
+    if (expectedValues.size() == 0) {
       cerr << "File did not contain expected values vectors at " << resolution << " " << unit << endl;
+      return false;
     }
     return true;
   }
   fin.read((char*)&nExpectedValues, sizeof(int));
   for (int i=0; i<nExpectedValues; i++) {
-    string str;
-    getline(fin, str, '\0'); //typeString
-    getline(fin, str, '\0'); //unit
+    string type;
+    getline(fin, type, '\0'); //typeString
+    string unit0;
+    getline(fin, unit0, '\0'); //unit
     int binSize;
     fin.read((char*)&binSize, sizeof(int));
 
     int nValues;
     fin.read((char*)&nValues, sizeof(int));
+    bool store = c1 == c2 && matrix == "oe" && type == norm && unit0 == unit && binSize == resolution;
     for (int j=0; j<nValues; j++) {
       double v;
       fin.read((char*)&v, sizeof(double));
+      if (store) {
+        expectedValues.push_back(v);
+      }
     }
     int nNormalizationFactors;
     fin.read((char*)&nNormalizationFactors, sizeof(int));
@@ -285,6 +291,17 @@ bool readFooter(istream& fin, long master, int c1, int c2, string norm, string u
       fin.read((char*)&chrIdx, sizeof(int));
       double v;
       fin.read((char*)&v, sizeof(double));
+      if (store && chrIdx == c1) {
+        for (vector<double>::iterator it=expectedValues.begin(); it!=expectedValues.end(); ++it) {
+          *it = *it / v;
+        }
+      }
+    }
+  }
+  if (c1 == c2 && matrix == "oe" && norm != "NONE") {
+    if (expectedValues.size() == 0) {
+      cerr << "File did not contain normalized expected values vectors at " << resolution << " " << unit << endl;
+      return false;
     }
   }
   // Index of normalization vectors
@@ -725,11 +742,11 @@ vector<double> readNormalizationVector(istream& bufferin) {
   return values;
 }
 
-vector<contactRecord> straw(string norm, string fname, string chr1loc, string chr2loc, string unit, int binsize)
+vector<contactRecord> straw(string matrix, string norm, string fname, string chr1loc, string chr2loc, string unit, int binsize)
 {
   if (!(unit=="BP"||unit=="FRAG")) {
     cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl;
-    cerr << "Usage: straw <NONE/VC/VC_SQRT/KR/OE> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
+    cerr << "Usage: straw <observed/oe> <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
     vector<contactRecord> v;
     return v;
   }
@@ -846,12 +863,12 @@ vector<contactRecord> straw(string norm, string fname, string chr1loc, string ch
     buffer2 = getData(curl, master, bytes_to_read);
     membuf sbuf2(buffer2, buffer2 + bytes_to_read);
     istream bufin2(&sbuf2);
-    foundFooter = readFooter(bufin2, master, c1, c2, norm, unit, binsize, myFilePos, c1NormEntry, c2NormEntry, expectedValues);
+    foundFooter = readFooter(bufin2, master, c1, c2, matrix, norm, unit, binsize, myFilePos, c1NormEntry, c2NormEntry, expectedValues);
     delete buffer2;
   }
   else {
     fin.seekg(master, ios::beg);
-    foundFooter = readFooter(fin, master, c1, c2, norm, unit, binsize, myFilePos, c1NormEntry, c2NormEntry, expectedValues);
+    foundFooter = readFooter(fin, master, c1, c2, matrix, norm, unit, binsize, myFilePos, c1NormEntry, c2NormEntry, expectedValues);
   }
   // readFooter will assign the above variables
 
@@ -863,7 +880,7 @@ vector<contactRecord> straw(string norm, string fname, string chr1loc, string ch
   vector<double> c1Norm;
   vector<double> c2Norm;
 
-  if (norm != "OE" && norm != "NONE") {
+  if (norm != "NONE") {
     char* buffer3;
     if (isHttp) {
       buffer3 = getData(curl, c1NormEntry.position, c1NormEntry.size);
@@ -905,6 +922,7 @@ vector<contactRecord> straw(string norm, string fname, string chr1loc, string ch
     // readMatrix will assign blockBinCount and blockColumnCount
     blockMap = readMatrix(fin, myFilePos, unit, binsize, sumCounts, blockBinCount, blockColumnCount);
   }
+
   double avgCount;
   if (c1 != c2) {
     long nBins1 = chromosomeMap[chr1].length / binsize;
@@ -926,16 +944,16 @@ vector<contactRecord> straw(string norm, string fname, string chr1loc, string ch
       int x = rec.binX * binsize;
       int y = rec.binY * binsize;
       float c = rec.counts;
-      if (norm == "OE") {
+      if (norm != "NONE") {
+        c = c / (c1Norm[rec.binX] * c2Norm[rec.binY]);
+      }
+      if (matrix == "oe") {
         if (c1 == c2) {
           c = c / expectedValues[min(expectedValues.size() - 1, (size_t)floor(abs(y - x) / binsize))];
         }
         else {
           c = c / avgCount;
         }
-      }
-      else if (norm != "NONE") {
-        c = c / (c1Norm[rec.binX] * c2Norm[rec.binY]);
       }
 
       if ((x >= origRegionIndices[0] && x <= origRegionIndices[1] &&
@@ -959,11 +977,11 @@ vector<contactRecord> straw(string norm, string fname, string chr1loc, string ch
 }
 
 
-int getSize(string norm, string fname, string chr1loc, string chr2loc, string unit, int binsize)
+int getSize(string matrix, string norm, string fname, string chr1loc, string chr2loc, string unit, int binsize)
 {
   if (!(unit=="BP"||unit=="FRAG")) {
     cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl;
-    cerr << "Usage: straw <NONE/VC/VC_SQRT/KR/OE> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
+    cerr << "Usage: straw <observed/oe> <NONE/VC/VC_SQRT/KR/OE> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
     return 0;
   }
 
@@ -1074,12 +1092,12 @@ int getSize(string norm, string fname, string chr1loc, string chr2loc, string un
     buffer2 = getData(curl, master, bytes_to_read);
     membuf sbuf2(buffer2, buffer2 + bytes_to_read);
     istream bufin2(&sbuf2);
-    foundFooter = readFooter(bufin2, master, c1, c2, norm, unit, binsize, myFilePos, c1NormEntry, c2NormEntry, expectedValues);
+    foundFooter = readFooter(bufin2, master, c1, c2, matrix, norm, unit, binsize, myFilePos, c1NormEntry, c2NormEntry, expectedValues);
     delete buffer2;
   }
   else {
     fin.seekg(master, ios::beg);
-    foundFooter = readFooter(fin, master, c1, c2, norm, unit, binsize, myFilePos, c1NormEntry, c2NormEntry, expectedValues);
+    foundFooter = readFooter(fin, master, c1, c2, matrix, norm, unit, binsize, myFilePos, c1NormEntry, c2NormEntry, expectedValues);
   }
   // readFooter will assign the above variables
 
@@ -1088,7 +1106,7 @@ int getSize(string norm, string fname, string chr1loc, string chr2loc, string un
   vector<double> c1Norm;
   vector<double> c2Norm;
 
-  if (norm != "OE" && norm != "NONE") {
+  if (norm != "NONE") {
     char* buffer3;
     if (isHttp) {
       buffer3 = getData(curl, c1NormEntry.position, c1NormEntry.size);

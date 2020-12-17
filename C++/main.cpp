@@ -28,22 +28,23 @@ using namespace std;
 
 int main(int argc, char *argv[])
 {
-  if (argc != 7) {
+  if (argc != 8) {
     cerr << "Not enough arguments" << endl;
-    cerr << "Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
+    cerr << "Usage: straw <observed/oe> <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
     exit(1);
   }
 
-  string norm=argv[1];
-  string fname=argv[2];
-  string chr1loc=argv[3];
-  string chr2loc=argv[4];
-  string unit=argv[5];
-  string size=argv[6];
+  string matrix=argv[1];
+  string norm=argv[2];
+  string fname=argv[3];
+  string chr1loc=argv[4];
+  string chr2loc=argv[5];
+  string unit=argv[6];
+  string size=argv[7];
   int binsize=stoi(size);
   vector<contactRecord> records;
 
-  records = straw(norm, fname, chr1loc, chr2loc, unit, binsize);
+  records = straw(matrix, norm, fname, chr1loc, chr2loc, unit, binsize);
   int length=records.size();
   for (int i=0; i<length; i++) {
     printf("%d\t%d\t%.14g\n", records[i].binX, records[i].binY, records[i].counts);

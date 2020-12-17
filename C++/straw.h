@@ -51,12 +51,12 @@ struct chromosome {
 
 bool readMagicString(std::ifstream& fin);
 std::map<std::string, chromosome> readHeader(std::istream& fin, long &master);
-bool readFooter(std::istream& fin, long master, int c1, int c2, std::string norm, std::string unit, int resolution, long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry, std::vector<double> &expectedValues);
+bool readFooter(std::istream& fin, long master, int c1, int c2, std::string matrix, std::string norm, std::string unit, int resolution, long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry, std::vector<double> &expectedValues);
 std::map<int, indexEntry> readMatrixZoomData(std::istream& fin, std::string myunit, int mybinsize, float &mySumCounts, int &myBlockBinCount, int &myBlockColumnCount, bool &found);
 std::map<int, indexEntry> readMatrix(std::istream& fin, int myFilePosition, std::string unit, int resolution, float &mySumCounts, int &myBlockBinCount, int &myBlockColumnCount);
 std::set<int> getBlockNumbersForRegionFromBinPosition(int* regionIndices, int blockBinCount, int blockColumnCount, bool intra);
 std::vector<contactRecord> readBlock(std::istream& fin, int blockNumber);
 std::vector<double> readNormalizationVector(std::istream& fin, indexEntry entry);
-std::vector<contactRecord> straw(std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, std::string unit, int binsize);
-int getSize(std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, std::string unit, int binsize);
+std::vector<contactRecord> straw(std::string matrix, std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, std::string unit, int binsize);
+int getSize(std::string matrix, std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, std::string unit, int binsize);
 #endif
