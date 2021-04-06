@@ -23,7 +23,7 @@
 #'     100, 50, 20, 5, 2, 1>.
 #' @return Data.frame of a sparse matrix of data from hic file. x,y,counts
 #' @export
-straw <- function(matrix, norm, fname, chr1loc, chr2loc, unit, binsize) {
+straw <- function(norm, fname, chr1loc, chr2loc, unit, binsize, matrix = "observed") {
     .Call('_strawr_straw', PACKAGE = 'strawr', matrix, norm, fname, chr1loc, chr2loc, unit, binsize)
 }
 
