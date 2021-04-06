@@ -8,8 +8,9 @@
 #' of data, and outputs as data.frame in sparse upper triangular format.
 #' Currently only supporting matrices.
 #' 
-#' Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>
-#' 
+#' Usage: straw <observed/oe> <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>
+#' @param matrix Type of matrix to output. Must be one of observed/oe.
+#'     observed is observed counts, oe is observed/expected counts.
 #' @param norm Normalization to apply. Must be one of NONE/VC/VC_SQRT/KR.
 #'     VC is vanilla coverage, VC_SQRT is square root of vanilla coverage, and KR is Knight-Ruiz or
 #'     Balanced normalization.
@@ -22,7 +23,7 @@
 #'     100, 50, 20, 5, 2, 1>.
 #' @return Data.frame of a sparse matrix of data from hic file. x,y,counts
 #' @export
-straw <- function(norm, fname, chr1loc, chr2loc, unit, binsize) {
-    .Call('_strawr_straw', PACKAGE = 'strawr', norm, fname, chr1loc, chr2loc, unit, binsize)
+straw <- function(matrix, norm, fname, chr1loc, chr2loc, unit, binsize) {
+    .Call('_strawr_straw', PACKAGE = 'strawr', matrix, norm, fname, chr1loc, chr2loc, unit, binsize)
 }
 

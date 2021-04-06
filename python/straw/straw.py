@@ -134,6 +134,11 @@ def read_metadata(infile,verbose=False):
         genome += c
         c=req.read(1).decode("utf-8") 
     metadata['Genome ID']=genome        
+    if (version > 8):
+        nvi = struct.unpack('<q',req.read(8))[0]
+        nvisize = struct.unpack('<q',req.read(8))[0]
+        metadata['NVI'] = nvi
+        metadata['NVI size'] = nvisize
     ## read and throw away attribute dictionary (stats+graphs)
     nattributes = struct.unpack('<i',req.read(4))[0]
     d={}
@@ -146,7 +151,10 @@ def read_metadata(infile,verbose=False):
     d={}
     for x in range(0, nChrs):
         key = __readcstr(req)
-        value = struct.unpack('<i',req.read(4))[0]
+        if (version > 8):
+            value = struct.unpack('q',req.read(8))[0]
+        else:
+            value = struct.unpack('<i',req.read(4))[0]
         d[key]=value
     metadata["Chromosomes"]=d
     nBpRes = struct.unpack('<i',req.read(4))[0]
@@ -702,6 +710,9 @@ class straw:
                 c2Norm = c1Norm
             else:
                 c2Norm = futureNorm2.result()
+        else:
+            c1Norm, c2Norm = None, None
+            
         blockBinCount, blockColumnCount = futureMatrix.result()
         return normalizedmatrix(self.infile, self.is_synapse, binsize, isIntra, neededToFlipIndices, blockBinCount,
                                 blockColumnCount, blockMap, norm, c1Norm, c2Norm, self.version)

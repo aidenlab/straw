@@ -40,7 +40,7 @@ using namespace std;
 
   Currently only supporting matrices.
 
-  Usage: juicebox-quick-dump <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>
+  Usage: juicebox-quick-dump <observed/oe> <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>
  */
 // pointer structure for reading blocks or matrices, holds the size and position
 struct indexEntry {
@@ -77,7 +77,7 @@ bool readMagicString(ifstream& fin) {
 }
 
 // reads the header, storing the positions of the normalization vectors and returning the master pointer
-long readHeader(ifstream& fin, string chr1, string chr2, int &c1pos1, int &c1pos2, int &c2pos1, int &c2pos2, int &chr1ind, int &chr2ind) {
+long readHeader(ifstream& fin, string chr1, string chr2, int &c1pos1, int &c1pos2, int &c2pos1, int &c2pos2, int &chr1ind, int &chr2ind, int &chr1len, int &chr2len) {
   if (!readMagicString(fin)) {
     cerr << "Hi-C magic string is missing, does not appear to be a hic file" << endl;
     stop("\n");
@@ -115,6 +115,7 @@ long readHeader(ifstream& fin, string chr1, string chr2, int &c1pos1, int &c1pos
     if (name==chr1) {
       found1=true;
       chr1ind = i;
+      chr1len = length;
       if (c1pos1 == -100) {
 	c1pos1 = 0;
 	c1pos2 = length;
@@ -123,6 +124,7 @@ long readHeader(ifstream& fin, string chr1, string chr2, int &c1pos1, int &c1pos
     if (name==chr2) {
       found2=true;
       chr2ind = i;
+      chr2len = length;
       if (c2pos1 == -100) {
 	c2pos1 = 0;
 	c2pos2 = length;
@@ -140,7 +142,7 @@ long readHeader(ifstream& fin, string chr1, string chr2, int &c1pos1, int &c1pos
 // reads the footer from the master pointer location. takes in the chromosomes, norm, unit (BP or FRAG) and resolution or
 // binsize, and sets the file position of the matrix and the normalization vectors for those chromosomes at the given
 // normalization and resolution
-void readFooter(ifstream& fin, long master, int c1, int c2, string norm, string unit, int resolution, long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry) {
+void readFooter(ifstream& fin, long master, int c1, int c2, string matrix, string norm, string unit, int resolution, long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry, vector<double> &expectedValues) {
   fin.seekg(master, ios::beg);
   int nBytes;
   fin.read((char*)&nBytes, sizeof(int));
@@ -170,23 +172,27 @@ void readFooter(ifstream& fin, long master, int c1, int c2, string norm, string 
     // exit(1);
   }
 
-  if (norm=="NONE") return; // no need to read norm vector index
+  if ((matrix=="observed" && norm=="NONE") || (matrix=="oe" && norm=="NONE" && c1!=c2)) return; // no need to read norm vector index
 
   // read in and ignore expected value maps; don't store; reading these to
   // get to norm vector index
   int nExpectedValues;
   fin.read((char*)&nExpectedValues, sizeof(int));
   for (int i=0; i<nExpectedValues; i++) {
-    string str;
-    getline(fin, str, '\0'); //unit
+    string unit0;
+    getline(fin, unit0, '\0'); //unit
     int binSize;
     fin.read((char*)&binSize, sizeof(int));
 
     int nValues;
     fin.read((char*)&nValues, sizeof(int));
+    bool store = c1 == c2 && matrix == "oe" && norm == "NONE" && unit0 == unit && binSize == resolution;
     for (int j=0; j<nValues; j++) {
       double v;
       fin.read((char*)&v, sizeof(double));
+      if (store) {
+        expectedValues.push_back(v);
+      }
     }
 
     int nNormalizationFactors;
@@ -196,21 +202,39 @@ void readFooter(ifstream& fin, long master, int c1, int c2, string norm, string 
       fin.read((char*)&chrIdx, sizeof(int));
       double v;
       fin.read((char*)&v, sizeof(double));
+      if (store && chrIdx == c1) {
+        for (vector<double>::iterator it=expectedValues.begin(); it!=expectedValues.end(); ++it) {
+          *it = *it / v;
+        }
+      }
     }
+  }
+  if (c1 == c2 && matrix == "oe" && norm == "NONE") {
+    if (expectedValues.size() == 0) {
+      cerr << "File did not contain expected values vectors at " << resolution << " " << unit << endl;
+      stop("\n");
+      // exit(1);
+    }
+    return;
   }
   fin.read((char*)&nExpectedValues, sizeof(int));
   for (int i=0; i<nExpectedValues; i++) {
-    string str;
-    getline(fin, str, '\0'); //typeString
-    getline(fin, str, '\0'); //unit
+    string type;
+    getline(fin, type, '\0'); //typeString
+    string unit0;
+    getline(fin, unit0, '\0'); //unit
     int binSize;
     fin.read((char*)&binSize, sizeof(int));
 
     int nValues;
     fin.read((char*)&nValues, sizeof(int));
+    bool store = c1 == c2 && matrix == "oe" && type == norm && unit0 == unit && binSize == resolution;
     for (int j=0; j<nValues; j++) {
       double v;
       fin.read((char*)&v, sizeof(double));
+      if (store) {
+        expectedValues.push_back(v);
+      }
     }
     int nNormalizationFactors;
     fin.read((char*)&nNormalizationFactors, sizeof(int));
@@ -219,6 +243,18 @@ void readFooter(ifstream& fin, long master, int c1, int c2, string norm, string 
       fin.read((char*)&chrIdx, sizeof(int));
       double v;
       fin.read((char*)&v, sizeof(double));
+      if (store && chrIdx == c1) {
+        for (vector<double>::iterator it=expectedValues.begin(); it!=expectedValues.end(); ++it) {
+          *it = *it / v;
+        }
+      }
+    }
+  }
+  if (c1 == c2 && matrix == "oe" && norm != "NONE") {
+    if (expectedValues.size() == 0) {
+      cerr << "File did not contain normalized expected values vectors at " << resolution << " " << unit << endl;
+      stop("\n");
+      // exit(1);
     }
   }
   // Index of normalization vectors
@@ -257,13 +293,14 @@ void readFooter(ifstream& fin, long master, int c1, int c2, string norm, string 
 }
 
 // reads the raw binned contact matrix at specified resolution, setting the block bin count and block column count
-bool readMatrixZoomData(ifstream& fin, string myunit, int mybinsize, int &myBlockBinCount, int &myBlockColumnCount) {
+bool readMatrixZoomData(ifstream& fin, string myunit, int mybinsize, float &mySumCounts, int &myBlockBinCount, int &myBlockColumnCount) {
   string unit;
   getline(fin, unit, '\0' ); // unit
   int tmp;
   fin.read((char*)&tmp, sizeof(int)); // Old "zoom" index -- not used
+  float sumCounts;
+  fin.read((char*)&sumCounts, sizeof(float)); // sumCounts
   float tmp2;
-  fin.read((char*)&tmp2, sizeof(float)); // sumCounts
   fin.read((char*)&tmp2, sizeof(float)); // occupiedCellCount
   fin.read((char*)&tmp2, sizeof(float)); // stdDev
   fin.read((char*)&tmp2, sizeof(float)); // percent95
@@ -276,6 +313,7 @@ bool readMatrixZoomData(ifstream& fin, string myunit, int mybinsize, int &myBloc
 
   bool storeBlockData = false;
   if (myunit==unit && mybinsize==binSize) {
+    mySumCounts = sumCounts;
     myBlockBinCount = blockBinCount;
     myBlockColumnCount = blockColumnCount;
     storeBlockData = true;
@@ -301,7 +339,7 @@ bool readMatrixZoomData(ifstream& fin, string myunit, int mybinsize, int &myBloc
 
 // goes to the specified file pointer and finds the raw contact matrix at specified resolution, calling readMatrixZoomData.
 // sets blockbincount and blockcolumncount
-void readMatrix(ifstream& fin, long myFilePosition, string unit, int resolution, int &myBlockBinCount, int &myBlockColumnCount) {
+void readMatrix(ifstream& fin, long myFilePosition, string unit, int resolution, float &mySumCounts, int &myBlockBinCount, int &myBlockColumnCount) {
   fin.seekg(myFilePosition, ios::beg);
   int c1,c2;
   fin.read((char*)&c1, sizeof(int)); //chr1
@@ -311,7 +349,7 @@ void readMatrix(ifstream& fin, long myFilePosition, string unit, int resolution,
   int i=0;
   bool found=false;
   while (i<nRes && !found) {
-    found = readMatrixZoomData(fin, unit, resolution, myBlockBinCount, myBlockColumnCount);
+    found = readMatrixZoomData(fin, unit, resolution, mySumCounts, myBlockBinCount, myBlockColumnCount);
     i++;
   }
   if (!found) {
@@ -481,7 +519,7 @@ vector<contactRecord> readBlock(ifstream& fin, int blockNumber) {
       }
     }
   }
-  delete uncompressedBytes; // don't forget to delete your heap arrays in C++!
+  delete[] uncompressedBytes; // don't forget to delete your heap arrays in C++!
   return v;
 }
 
@@ -515,9 +553,11 @@ vector<double> readNormalizationVector(ifstream& fin, indexEntry entry) {
 //' Java version. Reads the .hic file, finds the appropriate matrix and slice
 //' of data, and outputs as data.frame in sparse upper triangular format.
 //' Currently only supporting matrices.
-//' 
-//' Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>
-//' 
+//'
+//' Usage: straw <observed/oe> <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>
+//'
+//' @param matrix Type of matrix to output. Must be one of observed/oe.
+//'     observed is observed counts, oe is observed/expected counts.
 //' @param norm Normalization to apply. Must be one of NONE/VC/VC_SQRT/KR.
 //'     VC is vanilla coverage, VC_SQRT is square root of vanilla coverage, and KR is Knight-Ruiz or
 //'     Balanced normalization.
@@ -531,12 +571,12 @@ vector<double> readNormalizationVector(ifstream& fin, indexEntry entry) {
 //' @return Data.frame of a sparse matrix of data from hic file. x,y,counts
 //' @export
 // [[Rcpp::export]]
-Rcpp::DataFrame straw(std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, std::string unit, int binsize)
+Rcpp::DataFrame straw(std::string matrix, std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, std::string unit, int binsize)
 {
   blockMap.clear();
   if (!(unit=="BP"||unit=="FRAG")) {
     cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl;
-    cerr << "Usage: juicebox-quick-dump <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
+    cerr << "Usage: juicebox-quick-dump <observed/oe> <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
     stop("\n");
   }
 
@@ -548,6 +588,7 @@ Rcpp::DataFrame straw(std::string norm, std::string fname, std::string chr1loc, 
   stringstream ss(chr1loc);
   string chr1, chr2, x, y;
   int c1pos1=-100, c1pos2=-100, c2pos1=-100, c2pos2=-100;
+  int chr1len, chr2len;
   getline(ss, chr1, ':');
   if (getline(ss, x, ':') && getline(ss, y, ':')) {
     c1pos1 = stoi(x);
@@ -560,7 +601,7 @@ Rcpp::DataFrame straw(std::string norm, std::string fname, std::string chr1loc, 
     c2pos2 = stoi(y);
   }
   int chr1ind, chr2ind;
-  long master = readHeader(fin, chr1, chr2, c1pos1, c1pos2, c2pos1, c2pos2, chr1ind, chr2ind);
+  long master = readHeader(fin, chr1, chr2, c1pos1, c1pos2, c2pos1, c2pos2, chr1ind, chr2ind, chr1len, chr2len);
 
   int c1=min(chr1ind,chr2ind);
   int c2=max(chr1ind,chr2ind);
@@ -590,9 +631,10 @@ Rcpp::DataFrame straw(std::string norm, std::string fname, std::string chr1loc, 
 
   indexEntry c1NormEntry, c2NormEntry;
   long myFilePos;
+  vector<double> expectedValues;
 
   // readFooter will assign the above variables
-  readFooter(fin, master, c1, c2, norm, unit, binsize, myFilePos, c1NormEntry, c2NormEntry);
+  readFooter(fin, master, c1, c2, matrix, norm, unit, binsize, myFilePos, c1NormEntry, c2NormEntry, expectedValues);
 
   vector<double> c1Norm;
   vector<double> c2Norm;
@@ -601,9 +643,16 @@ Rcpp::DataFrame straw(std::string norm, std::string fname, std::string chr1loc, 
     c1Norm = readNormalizationVector(fin, c1NormEntry);
     c2Norm = readNormalizationVector(fin, c2NormEntry);
   }
+  float sumCounts;
   int blockBinCount, blockColumnCount;
-  // readMatrix will assign blockBinCount and blockColumnCount
-  readMatrix(fin, myFilePos, unit, binsize, blockBinCount, blockColumnCount);
+  // readMatrix will assign sumCounts, blockBinCount, and blockColumnCount
+  readMatrix(fin, myFilePos, unit, binsize, sumCounts, blockBinCount, blockColumnCount);
+  double avgCount;
+  if (c1 != c2) {
+    long nBins1 = chr1len / binsize;
+    long nBins2 = chr2len / binsize;
+    avgCount = (sumCounts / nBins1) / nBins2;   // <= trying to avoid overflows
+  }
 
   set<int> blockNumbers = getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount, c1==c2);
 
@@ -621,7 +670,15 @@ Rcpp::DataFrame straw(std::string norm, std::string fname, std::string chr1loc, 
       int yActual = rec.binY * binsize;
       float counts = rec.counts;
       if (norm != "NONE") {
-	counts = counts / (c1Norm[rec.binX] * c2Norm[rec.binY]);
+        counts = counts / (c1Norm[rec.binX] * c2Norm[rec.binY]);
+      }
+      if (matrix == "oe") {
+        if (c1 == c2) {
+          counts = counts / expectedValues[min(expectedValues.size() - 1, (size_t)floor(abs(yActual - xActual) / binsize))];
+        }
+        else {
+          counts = counts / avgCount;
+        }
       }
 //      cout << xActual << " " << yActual << " " << counts << endl;
       if ((xActual >= origRegionIndices[0] && xActual <= origRegionIndices[1] &&
