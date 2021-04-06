@@ -74,7 +74,4 @@ std::vector<double> readNormalizationVector(std::istream &fin, indexEntry entry)
 std::vector<contactRecord>
 straw(std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, std::string unit, int binsize);
 
-int
-getSize(std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, std::string unit, int binsize);
-
 #endif
