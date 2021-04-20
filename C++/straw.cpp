@@ -833,59 +833,63 @@ vector<double> readNormalizationVector(istream& bufferin) {
     return values;
 }
 
-vector<contactRecord> straw(string matrix, string norm, string fname, string chr1loc, string chr2loc, string unit, int binsize) {
+class HiCFile {
+public:
+    string prefix = "http"; // HTTP code
+    bool isHttp = false;
+    ifstream fin;
+    CURL *curl;
+    long master;
+    map<string, chromosome> chromosomeMap;
+
+    HiCFile(string fname) {
+
+        // read header into buffer; 100K should be sufficient
+        if (std::strncmp(fname.c_str(), prefix.c_str(), prefix.size()) == 0) {
+            isHttp = true;
+            char *buffer;
+            curl = initCURL(fname.c_str());
+            if (curl) {
+                buffer = getData(curl, 0, 100000);
+            } else {
+                cerr << "URL " << fname << " cannot be opened for reading" << endl;
+                exit(1);
+            }
+            membuf sbuf(buffer, buffer + 100000);
+            istream bufin(&sbuf);
+            chromosomeMap = readHeader(bufin, master);
+            delete buffer;
+        } else {
+            fin.open(fname, fstream::in);
+            if (!fin) {
+                cerr << "File " << fname << " cannot be opened for reading" << endl;
+                exit(2);
+            }
+            chromosomeMap = readHeader(fin, master);
+        }
+    }
+};
+
+vector<contactRecord>
+straw(string matrix, string norm, string fname, string chr1loc, string chr2loc, string unit, int binsize) {
     if (!(unit == "BP" || unit == "FRAG")) {
         cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl;
         cerr << "Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>"
              << endl;
-        vector <contactRecord> v;
+        vector<contactRecord> v;
         return v;
     }
 
-    // HTTP code
-    string prefix = "http";
-    bool isHttp = false;
-    ifstream fin;
-
-    // read header into buffer; 100K should be sufficient
-    CURL *curl;
-
-    long master;
-    map <string, chromosome> chromosomeMap;
-
-    if (std::strncmp(fname.c_str(), prefix.c_str(), prefix.size()) == 0) {
-        isHttp = true;
-        char *buffer;
-        curl = initCURL(fname.c_str());
-        if (curl) {
-            buffer = getData(curl, 0, 100000);
-        } else {
-            cerr << "URL " << fname << " cannot be opened for reading" << endl;
-            vector <contactRecord> v;
-            return v;
-        }
-        membuf sbuf(buffer, buffer + 100000);
-        istream bufin(&sbuf);
-        chromosomeMap = readHeader(bufin, master);
-        delete buffer;
-    } else {
-        fin.open(fname, fstream::in);
-        if (!fin) {
-            cerr << "File " << fname << " cannot be opened for reading" << endl;
-            vector <contactRecord> v;
-            return v;
-        }
-        chromosomeMap = readHeader(fin, master);
-    }
+    HiCFile hiCFile = HiCFile(fname);
 
     // parse chromosome positions
     stringstream ss(chr1loc);
     string chr1, chr2, x, y;
     long c1pos1 = -100, c1pos2 = -100, c2pos1 = -100, c2pos2 = -100;
     getline(ss, chr1, ':');
-    if (chromosomeMap.count(chr1) == 0) {
+    if (hiCFile.chromosomeMap.count(chr1) == 0) {
         cerr << chr1 << " not found in the file." << endl;
-        vector <contactRecord> v;
+        vector<contactRecord> v;
         return v;
     }
 
@@ -894,14 +898,14 @@ vector<contactRecord> straw(string matrix, string norm, string fname, string chr
         c1pos2 = stol(y);
     } else {
         c1pos1 = 0;
-        c1pos2 = chromosomeMap[chr1].length;
+        c1pos2 = hiCFile.chromosomeMap[chr1].length;
     }
 
     stringstream ss1(chr2loc);
     getline(ss1, chr2, ':');
-    if (chromosomeMap.count(chr2) == 0) {
+    if (hiCFile.chromosomeMap.count(chr2) == 0) {
         cerr << chr2 << " not found in the file." << endl;
-        vector <contactRecord> v;
+        vector<contactRecord> v;
         return v;
     }
 
@@ -910,15 +914,15 @@ vector<contactRecord> straw(string matrix, string norm, string fname, string chr
         c2pos2 = stol(y);
     } else {
         c2pos1 = 0;
-        c2pos2 = chromosomeMap[chr2].length;
+        c2pos2 = hiCFile.chromosomeMap[chr2].length;
     }
 
     // from header have size of chromosomes, set region to read
-    int c1 = min(chromosomeMap[chr1].index, chromosomeMap[chr2].index);
-    int c2 = max(chromosomeMap[chr1].index, chromosomeMap[chr2].index);
+    int c1 = min(hiCFile.chromosomeMap[chr1].index, hiCFile.chromosomeMap[chr2].index);
+    int c2 = max(hiCFile.chromosomeMap[chr1].index, hiCFile.chromosomeMap[chr2].index);
     long origRegionIndices[4]; // as given by user
     // reverse order if necessary
-    if (chromosomeMap[chr1].index > chromosomeMap[chr2].index) {
+    if (hiCFile.chromosomeMap[chr1].index > hiCFile.chromosomeMap[chr2].index) {
         origRegionIndices[0] = c2pos1;
         origRegionIndices[1] = c2pos2;
         origRegionIndices[2] = c1pos1;
@@ -939,18 +943,20 @@ vector<contactRecord> straw(string matrix, string norm, string fname, string chr
     long myFilePos;
     vector<double> expectedValues;
 
-    long bytes_to_read = total_bytes - master;
+    long bytes_to_read = total_bytes - hiCFile.master;
     bool foundFooter = false;
-    if (isHttp) {
+    if (hiCFile.isHttp) {
         char *buffer2;
-        buffer2 = getData(curl, master, bytes_to_read);
+        buffer2 = getData(hiCFile.curl, hiCFile.master, bytes_to_read);
         membuf sbuf2(buffer2, buffer2 + bytes_to_read);
         istream bufin2(&sbuf2);
-        foundFooter = readFooter(bufin2, master, c1, c2, matrix, norm, unit, binsize, myFilePos, c1NormEntry, c2NormEntry, expectedValues);
+        foundFooter = readFooter(bufin2, hiCFile.master, c1, c2, matrix, norm, unit, binsize, myFilePos, c1NormEntry,
+                                 c2NormEntry, expectedValues);
         delete buffer2;
     } else {
-        fin.seekg(master, ios::beg);
-        foundFooter = readFooter(fin, master, c1, c2, matrix, norm, unit, binsize, myFilePos, c1NormEntry, c2NormEntry, expectedValues);
+        hiCFile.fin.seekg(hiCFile.master, ios::beg);
+        foundFooter = readFooter(hiCFile.fin, hiCFile.master, c1, c2, matrix, norm, unit, binsize, myFilePos,
+                                 c1NormEntry, c2NormEntry, expectedValues);
     }
     // readFooter will assign the above variables
 
@@ -964,24 +970,24 @@ vector<contactRecord> straw(string matrix, string norm, string fname, string chr
 
     if (norm != "NONE") {
         char *buffer3;
-        if (isHttp) {
-            buffer3 = getData(curl, c1NormEntry.position, c1NormEntry.size);
+        if (hiCFile.isHttp) {
+            buffer3 = getData(hiCFile.curl, c1NormEntry.position, c1NormEntry.size);
         } else {
             buffer3 = new char[c1NormEntry.size];
-            fin.seekg(c1NormEntry.position, ios::beg);
-            fin.read(buffer3, c1NormEntry.size);
+            hiCFile.fin.seekg(c1NormEntry.position, ios::beg);
+            hiCFile.fin.read(buffer3, c1NormEntry.size);
         }
         membuf sbuf3(buffer3, buffer3 + c1NormEntry.size);
         istream bufferin(&sbuf3);
         c1Norm = readNormalizationVector(bufferin);
 
         char *buffer4;
-        if (isHttp) {
-            buffer4 = getData(curl, c2NormEntry.position, c2NormEntry.size);
+        if (hiCFile.isHttp) {
+            buffer4 = getData(hiCFile.curl, c2NormEntry.position, c2NormEntry.size);
         } else {
             buffer4 = new char[c2NormEntry.size];
-            fin.seekg(c2NormEntry.position, ios::beg);
-            fin.read(buffer4, c2NormEntry.size);
+            hiCFile.fin.seekg(c2NormEntry.position, ios::beg);
+            hiCFile.fin.read(buffer4, c2NormEntry.size);
         }
         membuf sbuf4(buffer4, buffer4 + c2NormEntry.size);
         istream bufferin2(&sbuf4);
@@ -994,17 +1000,17 @@ vector<contactRecord> straw(string matrix, string norm, string fname, string chr
     int blockBinCount, blockColumnCount;
     map<int, indexEntry> blockMap;
 
-    if (isHttp) {
+    if (hiCFile.isHttp) {
         // readMatrix will assign blockBinCount and blockColumnCount
-        blockMap = readMatrixHttp(curl, myFilePos, unit, binsize, sumCounts, blockBinCount, blockColumnCount);
+        blockMap = readMatrixHttp(hiCFile.curl, myFilePos, unit, binsize, sumCounts, blockBinCount, blockColumnCount);
     } else {
         // readMatrix will assign blockBinCount and blockColumnCount
-        blockMap = readMatrix(fin, myFilePos, unit, binsize, sumCounts, blockBinCount, blockColumnCount);
+        blockMap = readMatrix(hiCFile.fin, myFilePos, unit, binsize, sumCounts, blockBinCount, blockColumnCount);
     }
     double avgCount;
     if (c1 != c2) {
-        long nBins1 = chromosomeMap[chr1].length / binsize;
-        long nBins2 = chromosomeMap[chr2].length / binsize;
+        long nBins1 = hiCFile.chromosomeMap[chr1].length / binsize;
+        long nBins2 = hiCFile.chromosomeMap[chr2].length / binsize;
         avgCount = (sumCounts / nBins1) / nBins2;   // <= trying to avoid overflows
     }
 
@@ -1016,13 +1022,12 @@ vector<contactRecord> straw(string matrix, string norm, string fname, string chr
                                                                c1 == c2);
     }
 
-
     // getBlockIndices
     vector<contactRecord> records;
     vector<contactRecord> tmp_records;
     for (set<int>::iterator it = blockNumbers.begin(); it != blockNumbers.end(); ++it) {
         // get contacts in this block
-        tmp_records = readBlock(fin, curl, isHttp, blockMap[*it]);
+        tmp_records = readBlock(hiCFile.fin, hiCFile.curl, hiCFile.isHttp, blockMap[*it]);
         for (vector<contactRecord>::iterator it2 = tmp_records.begin(); it2 != tmp_records.end(); ++it2) {
             contactRecord rec = *it2;
 
@@ -1055,15 +1060,5 @@ vector<contactRecord> straw(string matrix, string norm, string fname, string chr
             }
         }
     }
-    //      free(chunk.memory);
-    /* always cleanup */
-    // curl_easy_cleanup(curl);
-    //    curl_global_cleanup();
     return records;
 }
-
-class HiCFile {
-public:
-
-
-};
