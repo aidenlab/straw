@@ -870,6 +870,24 @@ public:
     }
 };
 
+void parsePositions(string chrLoc, string &chrom, long &pos1, long &pos2, map<string, chromosome> map) {
+    string x, y;
+    stringstream ss(chrLoc);
+    getline(ss, chrom, ':');
+    if (map.count(chrom) == 0) {
+        cerr << chrom << " not found in the file." << endl;
+        exit(6);
+    }
+
+    if (getline(ss, x, ':') && getline(ss, y, ':')) {
+        pos1 = stol(x);
+        pos2 = stol(y);
+    } else {
+        pos1 = 0;
+        pos2 = map[chrom].length;
+    }
+}
+
 vector<contactRecord>
 straw(string matrix, string norm, string fname, string chr1loc, string chr2loc, string unit, int binsize) {
     if (!(unit == "BP" || unit == "FRAG")) {
@@ -883,39 +901,12 @@ straw(string matrix, string norm, string fname, string chr1loc, string chr2loc, 
     HiCFile hiCFile = HiCFile(fname);
 
     // parse chromosome positions
-    stringstream ss(chr1loc);
-    string chr1, chr2, x, y;
+
+    string chr1, chr2;
     long c1pos1 = -100, c1pos2 = -100, c2pos1 = -100, c2pos2 = -100;
-    getline(ss, chr1, ':');
-    if (hiCFile.chromosomeMap.count(chr1) == 0) {
-        cerr << chr1 << " not found in the file." << endl;
-        vector<contactRecord> v;
-        return v;
-    }
 
-    if (getline(ss, x, ':') && getline(ss, y, ':')) {
-        c1pos1 = stol(x);
-        c1pos2 = stol(y);
-    } else {
-        c1pos1 = 0;
-        c1pos2 = hiCFile.chromosomeMap[chr1].length;
-    }
-
-    stringstream ss1(chr2loc);
-    getline(ss1, chr2, ':');
-    if (hiCFile.chromosomeMap.count(chr2) == 0) {
-        cerr << chr2 << " not found in the file." << endl;
-        vector<contactRecord> v;
-        return v;
-    }
-
-    if (getline(ss1, x, ':') && getline(ss1, y, ':')) {
-        c2pos1 = stol(x);
-        c2pos2 = stol(y);
-    } else {
-        c2pos1 = 0;
-        c2pos2 = hiCFile.chromosomeMap[chr2].length;
-    }
+    parsePositions(chr1loc, chr1, c1pos1, c1pos2, hiCFile.chromosomeMap);
+    parsePositions(chr2loc, chr2, c2pos1, c2pos2, hiCFile.chromosomeMap);
 
     // from header have size of chromosomes, set region to read
     int c1 = min(hiCFile.chromosomeMap[chr1].index, hiCFile.chromosomeMap[chr2].index);
