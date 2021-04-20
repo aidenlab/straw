@@ -1061,3 +1061,9 @@ vector<contactRecord> straw(string matrix, string norm, string fname, string chr
     //    curl_global_cleanup();
     return records;
 }
+
+class HiCFile {
+public:
+
+
+};
