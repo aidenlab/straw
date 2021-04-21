@@ -180,7 +180,7 @@ double readDoubleFromFile(istream &fin) {
 }
 
 // reads the header, storing the positions of the normalization vectors and returning the masterIndexPosition pointer
-map<string, chromosome> readHeader(istream &fin, long &masterIndexPosition) {
+map<string, chromosome> readHeader(istream &fin, long &masterIndexPosition, string &genomeID) {
     map<string, chromosome> chromosomeMap;
     if (!readMagicString(fin)) {
         cerr << "Hi-C magic string is missing, does not appear to be a hic file" << endl;
@@ -195,7 +195,6 @@ map<string, chromosome> readHeader(istream &fin, long &masterIndexPosition) {
         return chromosomeMap;
     }
     fin.read((char *) &masterIndexPosition, sizeof(long));
-    string genomeID;
     getline(fin, genomeID, '\0');
 
     if (version > 8) {
@@ -842,6 +841,7 @@ public:
     CURL *curl;
     long master;
     map<string, chromosome> chromosomeMap;
+    string genomeID;
 
     HiCFile(string fname) {
 
@@ -858,7 +858,7 @@ public:
             }
             membuf sbuf(buffer, buffer + 100000);
             istream bufin(&sbuf);
-            chromosomeMap = readHeader(bufin, master);
+            chromosomeMap = readHeader(bufin, master, genomeID);
             delete buffer;
         } else {
             fin.open(fname, fstream::in);
@@ -866,7 +866,7 @@ public:
                 cerr << "File " << fname << " cannot be opened for reading" << endl;
                 exit(2);
             }
-            chromosomeMap = readHeader(fin, master);
+            chromosomeMap = readHeader(fin, master, genomeID);
         }
     }
 };
