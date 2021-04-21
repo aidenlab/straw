@@ -35,7 +35,7 @@ struct indexEntry {
     long position;
 };
 
-// sparse matrix entry
+// sparse matrixType entry
 struct contactRecord {
   int binX;
   int binY;
@@ -74,7 +74,7 @@ std::vector<contactRecord> readBlock(std::istream &fin, int blockNumber);
 std::vector<double> readNormalizationVector(std::istream &fin, indexEntry entry);
 
 std::vector<contactRecord>
-straw(std::string matrix, std::string norm, std::string fname, std::string chr1loc, std::string chr2loc,
+straw(std::string matrixType, std::string norm, std::string fname, std::string chr1loc, std::string chr2loc,
       std::string unit, int binsize);
 
 #endif

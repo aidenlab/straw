@@ -37,7 +37,7 @@ using namespace std;
 
 /*
   Straw: fast C++ implementation of dump. Not as fully featured as the
-  Java version. Reads the .hic file, finds the appropriate matrix and slice
+  Java version. Reads the .hic file, finds the appropriate matrixType and slice
   of data, and outputs as text in sparse upper triangular format.
 
   Currently only supporting matrices.
@@ -207,7 +207,7 @@ map<string, chromosome> readHeader(istream &fin, long &masterIndexPosition, stri
     }
 
     numChromosomes = readIntFromFile(fin);
-    // chromosome map for finding matrix
+    // chromosome map for finding matrixType
     for (int i = 0; i < numChromosomes; i++) {
         string name;
         long length;
@@ -229,9 +229,9 @@ map<string, chromosome> readHeader(istream &fin, long &masterIndexPosition, stri
 
 // reads the footer from the master pointer location. takes in the chromosomes,
 // norm, unit (BP or FRAG) and resolution or binsize, and sets the file
-// position of the matrix and the normalization vectors for those chromosomes
+// position of the matrixType and the normalization vectors for those chromosomes
 // at the given normalization and resolution
-bool readFooter(istream &fin, long master, int version, int c1, int c2, string matrix, string norm, string unit,
+bool readFooter(istream &fin, long master, int version, int c1, int c2, string matrixType, string norm, string unit,
                 int resolution,
                 long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry, vector<double> &expectedValues) {
     if (version > 8) {
@@ -261,7 +261,8 @@ bool readFooter(istream &fin, long master, int version, int c1, int c2, string m
         return false;
     }
 
-    if ((matrix=="observed" && norm=="NONE") || (matrix=="oe" && norm=="NONE" && c1!=c2)) return true; // no need to read norm vector index
+    if ((matrixType == "observed" && norm == "NONE") || (matrixType == "oe" && norm == "NONE" && c1 != c2))
+        return true; // no need to read norm vector index
 
     // read in and ignore expected value maps; don't store; reading these to
     // get to norm vector index
@@ -278,7 +279,7 @@ bool readFooter(istream &fin, long master, int version, int c1, int c2, string m
             nValues = (long) readIntFromFile(fin);
         }
 
-        bool store = c1 == c2 && matrix == "oe" && norm == "NONE" && unit0 == unit && binSize == resolution;
+        bool store = c1 == c2 && matrixType == "oe" && norm == "NONE" && unit0 == unit && binSize == resolution;
 
         if (version > 8) {
             for (long j = 0; j < nValues; j++) {
@@ -313,7 +314,7 @@ bool readFooter(istream &fin, long master, int version, int c1, int c2, string m
         }
     }
 
-    if (c1 == c2 && matrix == "oe" && norm == "NONE") {
+    if (c1 == c2 && matrixType == "oe" && norm == "NONE") {
         if (expectedValues.size() == 0) {
             cerr << "File did not contain expected values vectors at " << resolution << " " << unit << endl;
             return false;
@@ -334,7 +335,7 @@ bool readFooter(istream &fin, long master, int version, int c1, int c2, string m
         } else {
             nValues = (long) readIntFromFile(fin);
         }
-        bool store = c1 == c2 && matrix == "oe" && type == norm && unit0 == unit && binSize == resolution;
+        bool store = c1 == c2 && matrixType == "oe" && type == norm && unit0 == unit && binSize == resolution;
 
         if (version > 8) {
             for (long j = 0; j < nValues; j++) {
@@ -370,7 +371,7 @@ bool readFooter(istream &fin, long master, int version, int c1, int c2, string m
         }
     }
 
-    if (c1 == c2 && matrix == "oe" && norm != "NONE") {
+    if (c1 == c2 && matrixType == "oe" && norm != "NONE") {
         if (expectedValues.size() == 0) {
             cerr << "File did not contain normalized expected values vectors at " << resolution << " " << unit << endl;
             return false;
@@ -415,7 +416,7 @@ bool readFooter(istream &fin, long master, int version, int c1, int c2, string m
 }
 
 
-// reads the raw binned contact matrix at specified resolution, setting the block bin count and block column count
+// reads the raw binned contact matrixType at specified resolution, setting the block bin count and block column count
 map <int, indexEntry> readMatrixZoomData(istream& fin, string myunit, int mybinsize, float &mySumCounts, int &myBlockBinCount, int &myBlockColumnCount, bool &found) {
     
     map<int, indexEntry> blockMap;
@@ -452,7 +453,7 @@ map <int, indexEntry> readMatrixZoomData(istream& fin, string myunit, int mybins
     return blockMap;
 }
 
-// reads the raw binned contact matrix at specified resolution, setting the block bin count and block column count
+// reads the raw binned contact matrixType at specified resolution, setting the block bin count and block column count
 map <int, indexEntry> readMatrixZoomDataHttp(CURL* curl, long &myFilePosition, string myunit, int mybinsize, float &mySumCounts, int &myBlockBinCount, int &myBlockColumnCount, bool &found) {
 
     map<int, indexEntry> blockMap;
@@ -513,7 +514,7 @@ map <int, indexEntry> readMatrixZoomDataHttp(CURL* curl, long &myFilePosition, s
     return blockMap;
 }
 
-// goes to the specified file pointer in http and finds the raw contact matrix at specified resolution, calling readMatrixZoomData.
+// goes to the specified file pointer in http and finds the raw contact matrixType at specified resolution, calling readMatrixZoomData.
 // sets blockbincount and blockcolumncount
 map <int, indexEntry> readMatrixHttp(CURL *curl, long myFilePosition, string unit, int resolution, float &mySumCounts, int &myBlockBinCount, int &myBlockColumnCount) {
     char *buffer;
@@ -543,7 +544,7 @@ map <int, indexEntry> readMatrixHttp(CURL *curl, long myFilePosition, string uni
     return blockMap;
 }
 
-// goes to the specified file pointer and finds the raw contact matrix at specified resolution, calling readMatrixZoomData.
+// goes to the specified file pointer and finds the raw contact matrixType at specified resolution, calling readMatrixZoomData.
 // sets blockbincount and blockcolumncount
 map <int, indexEntry> readMatrix(istream& fin, long myFilePosition, string unit, int resolution, float &mySumCounts, int &myBlockBinCount, int &myBlockColumnCount) {
     map<int, indexEntry> blockMap;
@@ -573,7 +574,7 @@ set<int> getBlockNumbersForRegionFromBinPosition(long *regionIndices, int blockB
     int row2 = (regionIndices[3] + 1) / blockBinCount;
 
     set<int> blocksSet;
-    // first check the upper triangular matrix
+    // first check the upper triangular matrixType
     for (int r = row1; r <= row2; r++) {
         for (int c = col1; c <= col2; c++) {
             int blockNumber = r * blockColumnCount + c;
@@ -886,7 +887,7 @@ vector<double> readNormalizationVectorFromFooter(HiCFile *hiCFile, indexEntry cN
     return cNorm;
 }
 
-class Footer {
+class MatrixZoomData {
 public:
     indexEntry c1NormEntry, c2NormEntry;
     long myFilePos;
@@ -896,7 +897,7 @@ public:
     vector<double> c2Norm;
     int c1;
     int c2;
-    string matrix;
+    string matrixType;
     string norm;
     string unit;
     int resolution;
@@ -904,7 +905,8 @@ public:
     int numBins2;
 
 // hiCFile.isHttp, hiCFile.master
-    Footer(HiCFile *hiCFile, string chr1, string chr2, string matrix, string norm, string unit, int resolution) {
+    MatrixZoomData(HiCFile *hiCFile, string chr1, string chr2, string matrixType, string norm, string unit,
+                   int resolution) {
         int c01 = hiCFile->chromosomeMap[chr1].index;
         int c02 = hiCFile->chromosomeMap[chr2].index;
         if (c01 <= c02) { // default is ok
@@ -919,7 +921,7 @@ public:
             this->numBins2 = hiCFile->chromosomeMap[chr1].length / resolution;
         }
 
-        this->matrix = matrix;
+        this->matrixType = matrixType;
         this->norm = norm;
         this->unit = unit;
         this->resolution = resolution;
@@ -930,13 +932,14 @@ public:
             buffer2 = getData(hiCFile->curl, hiCFile->master, bytes_to_read);
             membuf sbuf2(buffer2, buffer2 + bytes_to_read);
             istream bufin2(&sbuf2);
-            foundFooter = readFooter(bufin2, hiCFile->master, hiCFile->version, c1, c2, matrix, norm, unit, resolution,
+            foundFooter = readFooter(bufin2, hiCFile->master, hiCFile->version, c1, c2, matrixType, norm, unit,
+                                     resolution,
                                      myFilePos,
                                      c1NormEntry, c2NormEntry, expectedValues);
             delete buffer2;
         } else {
             hiCFile->fin.seekg(hiCFile->master, ios::beg);
-            foundFooter = readFooter(hiCFile->fin, hiCFile->master, hiCFile->version, c1, c2, matrix, norm, unit,
+            foundFooter = readFooter(hiCFile->fin, hiCFile->master, hiCFile->version, c1, c2, matrixType, norm, unit,
                                      resolution, myFilePos,
                                      c1NormEntry, c2NormEntry, expectedValues);
         }
@@ -974,7 +977,7 @@ void parsePositions(string chrLoc, string &chrom, long &pos1, long &pos2, map<st
     }
 }
 
-class MatrixZoomData {
+class BlocksRecords {
 public:
     float sumCounts;
     int blockBinCount, blockColumnCount;
@@ -983,7 +986,7 @@ public:
     double avgCount;
     bool isIntra;
 
-    MatrixZoomData(HiCFile *hiCFile, Footer *footer, long regionIndices[4], long origRegionIndices[4]) {
+    BlocksRecords(HiCFile *hiCFile, MatrixZoomData *footer, long regionIndices[4], long origRegionIndices[4]) {
 
         isIntra = footer->c1 == footer->c2;
 
@@ -1035,7 +1038,7 @@ public:
                     if (footer->norm != "NONE") {
                         c = c / (footer->c1Norm[rec.binX] * footer->c2Norm[rec.binY]);
                     }
-                    if (footer->matrix == "oe") {
+                    if (footer->matrixType == "oe") {
                         if (isIntra) {
                             c = c / footer->expectedValues[min(footer->expectedValues.size() - 1,
                                                                (size_t) floor(abs(y - x) / footer->resolution))];
@@ -1057,7 +1060,7 @@ public:
 };
 
 vector<contactRecord>
-straw(string matrix, string norm, string fname, string chr1loc, string chr2loc, string unit, int binsize) {
+straw(string matrixType, string norm, string fname, string chr1loc, string chr2loc, string unit, int binsize) {
     if (!(unit == "BP" || unit == "FRAG")) {
         cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl;
         cerr << "Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>"
@@ -1097,14 +1100,14 @@ straw(string matrix, string norm, string fname, string chr1loc, string chr2loc, 
     regionIndices[2] = origRegionIndices[2] / binsize;
     regionIndices[3] = origRegionIndices[3] / binsize;
 
-    Footer *footer = new Footer(hiCFile, chr1, chr2, matrix, norm, unit, binsize);
+    MatrixZoomData *mzd = new MatrixZoomData(hiCFile, chr1, chr2, matrixType, norm, unit, binsize);
 
-    if (!footer->foundFooter) {
+    if (!mzd->foundFooter) {
         vector<contactRecord> v;
         return v;
     }
 
-    MatrixZoomData *matrixZoomData = new MatrixZoomData(hiCFile, footer, regionIndices, origRegionIndices);
+    BlocksRecords *blocksRecords = new BlocksRecords(hiCFile, mzd, regionIndices, origRegionIndices);
 
-    return matrixZoomData->records;
+    return blocksRecords->records;
 }
