@@ -870,6 +870,22 @@ public:
     }
 };
 
+vector<double> readNormalizationVectorFromFooter(HiCFile *hiCFile, indexEntry cNormEntry) {
+    char *buffer;
+    if (hiCFile->isHttp) {
+        buffer = getData(hiCFile->curl, cNormEntry.position, cNormEntry.size);
+    } else {
+        buffer = new char[cNormEntry.size];
+        hiCFile->fin.seekg(cNormEntry.position, ios::beg);
+        hiCFile->fin.read(buffer, cNormEntry.size);
+    }
+    membuf sbuf3(buffer, buffer + cNormEntry.size);
+    istream bufferin(&sbuf3);
+    vector<double> cNorm = readNormalizationVector(bufferin);
+    delete buffer;
+    return cNorm;
+}
+
 class Footer {
 public:
     indexEntry c1NormEntry, c2NormEntry;
@@ -903,31 +919,12 @@ public:
         }
 
         if (norm != "NONE") {
-            char *buffer3;
-            if (hiCFile->isHttp) {
-                buffer3 = getData(hiCFile->curl, c1NormEntry.position, c1NormEntry.size);
+            c1Norm = readNormalizationVectorFromFooter(hiCFile, c1NormEntry);
+            if (c1 == c2) {
+                c2Norm = c1Norm;
             } else {
-                buffer3 = new char[c1NormEntry.size];
-                hiCFile->fin.seekg(c1NormEntry.position, ios::beg);
-                hiCFile->fin.read(buffer3, c1NormEntry.size);
+                c2Norm = readNormalizationVectorFromFooter(hiCFile, c2NormEntry);
             }
-            membuf sbuf3(buffer3, buffer3 + c1NormEntry.size);
-            istream bufferin(&sbuf3);
-            c1Norm = readNormalizationVector(bufferin);
-
-            char *buffer4;
-            if (hiCFile->isHttp) {
-                buffer4 = getData(hiCFile->curl, c2NormEntry.position, c2NormEntry.size);
-            } else {
-                buffer4 = new char[c2NormEntry.size];
-                hiCFile->fin.seekg(c2NormEntry.position, ios::beg);
-                hiCFile->fin.read(buffer4, c2NormEntry.size);
-            }
-            membuf sbuf4(buffer4, buffer4 + c2NormEntry.size);
-            istream bufferin2(&sbuf4);
-            c2Norm = readNormalizationVector(bufferin2);
-            delete buffer3;
-            delete buffer4;
         }
     }
 };
