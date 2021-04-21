@@ -57,12 +57,6 @@ struct MemoryStruct {
     size_t size;
 };
 
-// version number
-int version;
-
-// map of block numbers to pointers
-
-
 long total_bytes;
 
 size_t hdf(char* b, size_t size, size_t nitems, void *userdata) {
@@ -180,7 +174,8 @@ double readDoubleFromFile(istream &fin) {
 }
 
 // reads the header, storing the positions of the normalization vectors and returning the masterIndexPosition pointer
-map<string, chromosome> readHeader(istream &fin, long &masterIndexPosition, string &genomeID) {
+map<string, chromosome> readHeader(istream &fin, long &masterIndexPosition, string &genomeID, int &numChromosomes,
+                                   int &version) {
     map<string, chromosome> chromosomeMap;
     if (!readMagicString(fin)) {
         cerr << "Hi-C magic string is missing, does not appear to be a hic file" << endl;
@@ -210,9 +205,10 @@ map<string, chromosome> readHeader(istream &fin, long &masterIndexPosition, stri
         getline(fin, key, '\0');
         getline(fin, value, '\0');
     }
-    int nChrs = readIntFromFile(fin);
+
+    numChromosomes = readIntFromFile(fin);
     // chromosome map for finding matrix
-    for (int i = 0; i < nChrs; i++) {
+    for (int i = 0; i < numChromosomes; i++) {
         string name;
         long length;
         getline(fin, name, '\0');
@@ -235,7 +231,8 @@ map<string, chromosome> readHeader(istream &fin, long &masterIndexPosition, stri
 // norm, unit (BP or FRAG) and resolution or binsize, and sets the file
 // position of the matrix and the normalization vectors for those chromosomes
 // at the given normalization and resolution
-bool readFooter(istream &fin, long master, int c1, int c2, string matrix, string norm, string unit, int resolution,
+bool readFooter(istream &fin, long master, int version, int c1, int c2, string matrix, string norm, string unit,
+                int resolution,
                 long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry, vector<double> &expectedValues) {
     if (version > 8) {
         long nBytes = readLongFromFile(fin);
@@ -623,7 +620,7 @@ set<int> getBlockNumbersForRegionFromBinPositionV9Intra(long *regionIndices, int
 
 // this is the meat of reading the data.  takes in the block number and returns the set of contact records corresponding to
 // that block.  the block data is compressed and must be decompressed using the zlib library functions
-vector<contactRecord> readBlock(istream &fin, CURL *curl, bool isHttp, indexEntry idx) {
+vector<contactRecord> readBlock(istream &fin, CURL *curl, bool isHttp, indexEntry idx, int version) {
     if (idx.size == 0) {
         vector<contactRecord> v;
         return v;
@@ -809,7 +806,7 @@ vector<contactRecord> readBlock(istream &fin, CURL *curl, bool isHttp, indexEntr
 }
 
 // reads the normalization vector from the file at the specified location
-vector<double> readNormalizationVector(istream& bufferin) {
+vector<double> readNormalizationVector(istream &bufferin, int version) {
     long nValues;
     if (version > 8) {
         bufferin.read((char *) &nValues, sizeof(long));
@@ -842,6 +839,8 @@ public:
     long master;
     map<string, chromosome> chromosomeMap;
     string genomeID;
+    int numChromosomes;
+    int version;
 
     HiCFile(string fname) {
 
@@ -858,7 +857,7 @@ public:
             }
             membuf sbuf(buffer, buffer + 100000);
             istream bufin(&sbuf);
-            chromosomeMap = readHeader(bufin, master, genomeID);
+            chromosomeMap = readHeader(bufin, master, genomeID, numChromosomes, version);
             delete buffer;
         } else {
             fin.open(fname, fstream::in);
@@ -866,7 +865,7 @@ public:
                 cerr << "File " << fname << " cannot be opened for reading" << endl;
                 exit(2);
             }
-            chromosomeMap = readHeader(fin, master, genomeID);
+            chromosomeMap = readHeader(fin, master, genomeID, numChromosomes, version);
         }
     }
 };
@@ -882,7 +881,7 @@ vector<double> readNormalizationVectorFromFooter(HiCFile *hiCFile, indexEntry cN
     }
     membuf sbuf3(buffer, buffer + cNormEntry.size);
     istream bufferin(&sbuf3);
-    vector<double> cNorm = readNormalizationVector(bufferin);
+    vector<double> cNorm = readNormalizationVector(bufferin, hiCFile->version);
     delete buffer;
     return cNorm;
 }
@@ -932,12 +931,14 @@ public:
             buffer2 = getData(hiCFile->curl, hiCFile->master, bytes_to_read);
             membuf sbuf2(buffer2, buffer2 + bytes_to_read);
             istream bufin2(&sbuf2);
-            foundFooter = readFooter(bufin2, hiCFile->master, c1, c2, matrix, norm, unit, resolution, myFilePos,
+            foundFooter = readFooter(bufin2, hiCFile->master, hiCFile->version, c1, c2, matrix, norm, unit, resolution,
+                                     myFilePos,
                                      c1NormEntry, c2NormEntry, expectedValues);
             delete buffer2;
         } else {
             hiCFile->fin.seekg(hiCFile->master, ios::beg);
-            foundFooter = readFooter(hiCFile->fin, hiCFile->master, c1, c2, matrix, norm, unit, resolution, myFilePos,
+            foundFooter = readFooter(hiCFile->fin, hiCFile->master, hiCFile->version, c1, c2, matrix, norm, unit,
+                                     resolution, myFilePos,
                                      c1NormEntry, c2NormEntry, expectedValues);
         }
 
@@ -1005,7 +1006,7 @@ public:
 
         set<int> blockNumbers;
 
-        if (version > 8 && isIntra) {
+        if (hiCFile->version > 8 && isIntra) {
             blockNumbers = getBlockNumbersForRegionFromBinPositionV9Intra(regionIndices, blockBinCount,
                                                                           blockColumnCount);
         } else {
@@ -1018,7 +1019,7 @@ public:
         vector<contactRecord> tmp_records;
         for (set<int>::iterator it = blockNumbers.begin(); it != blockNumbers.end(); ++it) {
             // get contacts in this block
-            tmp_records = readBlock(hiCFile->fin, hiCFile->curl, hiCFile->isHttp, blockMap[*it]);
+            tmp_records = readBlock(hiCFile->fin, hiCFile->curl, hiCFile->isHttp, blockMap[*it], hiCFile->version);
             for (vector<contactRecord>::iterator it2 = tmp_records.begin(); it2 != tmp_records.end(); ++it2) {
                 contactRecord rec = *it2;
 
