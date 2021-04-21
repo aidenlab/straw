@@ -869,93 +869,102 @@ public:
             chromosomeMap = readHeader(fin, master, genomeID, numChromosomes, version);
         }
     }
-};
 
-vector<double> readNormalizationVectorFromFooter(HiCFile *hiCFile, indexEntry cNormEntry) {
-    char *buffer;
-    if (hiCFile->isHttp) {
-        buffer = getData(hiCFile->curl, cNormEntry.position, cNormEntry.size);
-    } else {
-        buffer = new char[cNormEntry.size];
-        hiCFile->fin.seekg(cNormEntry.position, ios::beg);
-        hiCFile->fin.read(buffer, cNormEntry.size);
-    }
-    membuf sbuf3(buffer, buffer + cNormEntry.size);
-    istream bufferin(&sbuf3);
-    vector<double> cNorm = readNormalizationVector(bufferin, hiCFile->version);
-    delete buffer;
-    return cNorm;
-}
-
-class MatrixZoomData {
-public:
-    indexEntry c1NormEntry, c2NormEntry;
-    long myFilePos;
-    vector<double> expectedValues;
-    bool foundFooter = false;
-    vector<double> c1Norm;
-    vector<double> c2Norm;
-    int c1;
-    int c2;
-    string matrixType;
-    string norm;
-    string unit;
-    int resolution;
-    int numBins1;
-    int numBins2;
-
-// hiCFile.isHttp, hiCFile.master
-    MatrixZoomData(HiCFile *hiCFile, string chr1, string chr2, string matrixType, string norm, string unit,
-                   int resolution) {
-        int c01 = hiCFile->chromosomeMap[chr1].index;
-        int c02 = hiCFile->chromosomeMap[chr2].index;
-        if (c01 <= c02) { // default is ok
-            this->c1 = c01;
-            this->c2 = c02;
-            this->numBins1 = hiCFile->chromosomeMap[chr1].length / resolution;
-            this->numBins2 = hiCFile->chromosomeMap[chr2].length / resolution;
-        } else { // flip
-            this->c1 = c02;
-            this->c2 = c01;
-            this->numBins1 = hiCFile->chromosomeMap[chr2].length / resolution;
-            this->numBins2 = hiCFile->chromosomeMap[chr1].length / resolution;
-        }
-
-        this->matrixType = matrixType;
-        this->norm = norm;
-        this->unit = unit;
-        this->resolution = resolution;
-
-        if (hiCFile->isHttp) {
-            char *buffer2;
-            long bytes_to_read = total_bytes - hiCFile->master;
-            buffer2 = getData(hiCFile->curl, hiCFile->master, bytes_to_read);
-            membuf sbuf2(buffer2, buffer2 + bytes_to_read);
-            istream bufin2(&sbuf2);
-            foundFooter = readFooter(bufin2, hiCFile->master, hiCFile->version, c1, c2, matrixType, norm, unit,
-                                     resolution,
-                                     myFilePos,
-                                     c1NormEntry, c2NormEntry, expectedValues);
-            delete buffer2;
+    vector<double> readNormalizationVectorFromFooter(indexEntry cNormEntry) {
+        char *buffer;
+        if (isHttp) {
+            buffer = getData(curl, cNormEntry.position, cNormEntry.size);
         } else {
-            hiCFile->fin.seekg(hiCFile->master, ios::beg);
-            foundFooter = readFooter(hiCFile->fin, hiCFile->master, hiCFile->version, c1, c2, matrixType, norm, unit,
-                                     resolution, myFilePos,
-                                     c1NormEntry, c2NormEntry, expectedValues);
+            buffer = new char[cNormEntry.size];
+            fin.seekg(cNormEntry.position, ios::beg);
+            fin.read(buffer, cNormEntry.size);
         }
+        membuf sbuf3(buffer, buffer + cNormEntry.size);
+        istream bufferin(&sbuf3);
+        vector<double> cNorm = readNormalizationVector(bufferin, version);
+        delete buffer;
+        return cNorm;
+    }
 
-        if (!foundFooter) {
-            return;
-        }
+    class MatrixZoomData {
+    public:
+        indexEntry c1NormEntry, c2NormEntry;
+        long myFilePos;
+        vector<double> expectedValues;
+        bool foundFooter = false;
+        vector<double> c1Norm;
+        vector<double> c2Norm;
+        int c1;
+        int c2;
+        string matrixType;
+        string norm;
+        string unit;
+        int resolution;
+        int numBins1;
+        int numBins2;
 
-        if (norm != "NONE") {
-            c1Norm = readNormalizationVectorFromFooter(hiCFile, c1NormEntry);
-            if (c1 == c2) {
-                c2Norm = c1Norm;
+        MatrixZoomData(HiCFile *hiCFile, chromosome chrom1, chromosome chrom2, string matrixType, string norm,
+                       string unit, int resolution) {
+
+            int c01 = chrom1.index;
+            int c02 = chrom2.index;
+            if (c01 <= c02) { // default is ok
+                this->c1 = c01;
+                this->c2 = c02;
+                this->numBins1 = chrom1.length / resolution;
+                this->numBins2 = chrom2.length / resolution;
+            } else { // flip
+                this->c1 = c02;
+                this->c2 = c01;
+                this->numBins1 = chrom2.length / resolution;
+                this->numBins2 = chrom1.length / resolution;
+            }
+
+            this->matrixType = matrixType;
+            this->norm = norm;
+            this->unit = unit;
+            this->resolution = resolution;
+
+            if (hiCFile->isHttp) {
+                char *buffer2;
+                long bytes_to_read = total_bytes - hiCFile->master;
+                buffer2 = getData(hiCFile->curl, hiCFile->master, bytes_to_read);
+                membuf sbuf2(buffer2, buffer2 + bytes_to_read);
+                istream bufin2(&sbuf2);
+                foundFooter = readFooter(bufin2, hiCFile->master, hiCFile->version, c1, c2, matrixType, norm, unit,
+                                         resolution,
+                                         myFilePos,
+                                         c1NormEntry, c2NormEntry, expectedValues);
+                delete buffer2;
             } else {
-                c2Norm = readNormalizationVectorFromFooter(hiCFile, c2NormEntry);
+                hiCFile->fin.seekg(hiCFile->master, ios::beg);
+                foundFooter = readFooter(hiCFile->fin, hiCFile->master, hiCFile->version, c1, c2, matrixType, norm,
+                                         unit,
+                                         resolution, myFilePos,
+                                         c1NormEntry, c2NormEntry, expectedValues);
+            }
+
+            if (!foundFooter) {
+                return;
+            }
+
+            if (norm != "NONE") {
+                c1Norm = hiCFile->readNormalizationVectorFromFooter(c1NormEntry);
+                if (c1 == c2) {
+                    c2Norm = c1Norm;
+                } else {
+                    c2Norm = hiCFile->readNormalizationVectorFromFooter(c2NormEntry);
+                }
             }
         }
+    };
+
+    MatrixZoomData *getMatrixZoomData(string chr1, string chr2, string matrixType, string norm,
+                                      string unit, int resolution) {
+
+        chromosome chrom1 = chromosomeMap[chr1];
+        chromosome chrom2 = chromosomeMap[chr2];
+        return new MatrixZoomData(this, chrom1, chrom2, matrixType, norm, unit, resolution);
     }
 };
 
@@ -986,7 +995,7 @@ public:
     double avgCount;
     bool isIntra;
 
-    BlocksRecords(HiCFile *hiCFile, MatrixZoomData *footer, long regionIndices[4], long origRegionIndices[4]) {
+    BlocksRecords(HiCFile *hiCFile, HiCFile::MatrixZoomData *footer, long regionIndices[4], long origRegionIndices[4]) {
 
         isIntra = footer->c1 == footer->c2;
 
@@ -1100,7 +1109,7 @@ straw(string matrixType, string norm, string fname, string chr1loc, string chr2l
     regionIndices[2] = origRegionIndices[2] / binsize;
     regionIndices[3] = origRegionIndices[3] / binsize;
 
-    MatrixZoomData *mzd = new MatrixZoomData(hiCFile, chr1, chr2, matrixType, norm, unit, binsize);
+    HiCFile::MatrixZoomData *mzd = hiCFile->getMatrixZoomData(chr1, chr2, matrixType, norm, unit, binsize);
 
     if (!mzd->foundFooter) {
         vector<contactRecord> v;
@@ -1108,6 +1117,5 @@ straw(string matrixType, string norm, string fname, string chr1loc, string chr2l
     }
 
     BlocksRecords *blocksRecords = new BlocksRecords(hiCFile, mzd, regionIndices, origRegionIndices);
-
     return blocksRecords->records;
 }
