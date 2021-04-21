@@ -57,25 +57,6 @@ struct MemoryStruct {
     size_t size;
 };
 
-long total_bytes;
-
-size_t hdf(char* b, size_t size, size_t nitems, void *userdata) {
-    size_t numbytes = size * nitems;
-    b[numbytes + 1] = '\0';
-    string s(b);
-    int found = s.find("Content-Range");
-    if (found != string::npos) {
-        int found2 = s.find("/");
-        //Content-Range: bytes 0-100000/891471462
-        if (found2 != string::npos) {
-            string total = s.substr(found2 + 1);
-            total_bytes = stol(total);
-        }
-    }
-
-    return numbytes;
-}
-
 // callback for libcurl. data written to this buffer
 static size_t
 WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
@@ -114,20 +95,6 @@ char *getData(CURL *curl, long position, long chunksize) {
     //  printf("%lu bytes retrieved\n", (long)chunk.size);
 
     return chunk.memory;
-}
-
-// initialize the CURL stream
-CURL* initCURL(const char* url) {
-    CURL *curl = curl_easy_init();
-    if (curl) {
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
-        curl_easy_setopt(curl, CURLOPT_URL, url);
-        //curl_easy_setopt (curl, CURLOPT_VERBOSE, 1L);
-        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-        curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, hdf);
-        curl_easy_setopt(curl, CURLOPT_USERAGENT, "straw");
-    }
-    return curl;
 }
 
 // returns whether or not this is valid HiC file
@@ -831,6 +798,8 @@ vector<double> readNormalizationVector(istream &bufferin, int version) {
     return values;
 }
 
+static long totalFileSize;
+
 class HiCFile {
 public:
     string prefix = "http"; // HTTP code
@@ -842,6 +811,36 @@ public:
     string genomeID;
     int numChromosomes;
     int version;
+
+    static size_t hdf(char *b, size_t size, size_t nitems, void *userdata) {
+        size_t numbytes = size * nitems;
+        b[numbytes + 1] = '\0';
+        string s(b);
+        int found = s.find("Content-Range");
+        if (found != string::npos) {
+            int found2 = s.find("/");
+            //Content-Range: bytes 0-100000/891471462
+            if (found2 != string::npos) {
+                string total = s.substr(found2 + 1);
+                totalFileSize = stol(total);
+            }
+        }
+
+        return numbytes;
+    }
+
+    CURL *initCURL(const char *url) {
+        CURL *curl = curl_easy_init();
+        if (curl) {
+            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+            curl_easy_setopt(curl, CURLOPT_URL, url);
+            //curl_easy_setopt (curl, CURLOPT_VERBOSE, 1L);
+            curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+            curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, hdf);
+            curl_easy_setopt(curl, CURLOPT_USERAGENT, "straw");
+        }
+        return curl;
+    }
 
     HiCFile(string fname) {
 
@@ -927,7 +926,7 @@ public:
 
             if (hiCFile->isHttp) {
                 char *buffer2;
-                long bytes_to_read = total_bytes - hiCFile->master;
+                long bytes_to_read = totalFileSize - hiCFile->master;
                 buffer2 = getData(hiCFile->curl, hiCFile->master, bytes_to_read);
                 membuf sbuf2(buffer2, buffer2 + bytes_to_read);
                 istream bufin2(&sbuf2);
