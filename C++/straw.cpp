@@ -236,7 +236,8 @@ map<string, chromosome> readHeader(istream &fin, long &masterIndexPosition) {
 // norm, unit (BP or FRAG) and resolution or binsize, and sets the file
 // position of the matrix and the normalization vectors for those chromosomes
 // at the given normalization and resolution
-bool readFooter(istream& fin, long master, int c1, int c2, string matrix, string norm, string unit, int resolution, long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry, vector<double> &expectedValues) {
+bool readFooter(istream &fin, long master, int c1, int c2, string matrix, string norm, string unit, int resolution,
+                long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry, vector<double> &expectedValues) {
     if (version > 8) {
         long nBytes = readLongFromFile(fin);
     } else {
@@ -895,18 +896,44 @@ public:
     bool foundFooter = false;
     vector<double> c1Norm;
     vector<double> c2Norm;
+    int c1;
+    int c2;
+    string matrix;
+    string norm;
+    string unit;
+    int resolution;
+    int numBins1;
+    int numBins2;
 
 // hiCFile.isHttp, hiCFile.master
-    Footer(HiCFile *hiCFile, int c1, int c2, string matrix, string norm, string unit, int resolution) {
+    Footer(HiCFile *hiCFile, string chr1, string chr2, string matrix, string norm, string unit, int resolution) {
+        int c01 = hiCFile->chromosomeMap[chr1].index;
+        int c02 = hiCFile->chromosomeMap[chr2].index;
+        if (c01 <= c02) { // default is ok
+            this->c1 = c01;
+            this->c2 = c02;
+            this->numBins1 = hiCFile->chromosomeMap[chr1].length / resolution;
+            this->numBins2 = hiCFile->chromosomeMap[chr2].length / resolution;
+        } else { // flip
+            this->c1 = c02;
+            this->c2 = c01;
+            this->numBins1 = hiCFile->chromosomeMap[chr2].length / resolution;
+            this->numBins2 = hiCFile->chromosomeMap[chr1].length / resolution;
+        }
+
+        this->matrix = matrix;
+        this->norm = norm;
+        this->unit = unit;
+        this->resolution = resolution;
         bytes_to_read = total_bytes - hiCFile->master;
+
         if (hiCFile->isHttp) {
             char *buffer2;
             buffer2 = getData(hiCFile->curl, hiCFile->master, bytes_to_read);
             membuf sbuf2(buffer2, buffer2 + bytes_to_read);
             istream bufin2(&sbuf2);
             foundFooter = readFooter(bufin2, hiCFile->master, c1, c2, matrix, norm, unit, resolution, myFilePos,
-                                     c1NormEntry,
-                                     c2NormEntry, expectedValues);
+                                     c1NormEntry, c2NormEntry, expectedValues);
             delete buffer2;
         } else {
             hiCFile->fin.seekg(hiCFile->master, ios::beg);
@@ -947,6 +974,88 @@ void parsePositions(string chrLoc, string &chrom, long &pos1, long &pos2, map<st
     }
 }
 
+class MatrixZoomData {
+public:
+    float sumCounts;
+    int blockBinCount, blockColumnCount;
+    map<int, indexEntry> blockMap;
+    vector<contactRecord> records;
+    double avgCount;
+    bool isIntra;
+
+    MatrixZoomData(HiCFile *hiCFile, Footer *footer, long regionIndices[4], long origRegionIndices[4]) {
+
+        isIntra = footer->c1 == footer->c2;
+
+        if (hiCFile->isHttp) {
+            // readMatrix will assign blockBinCount and blockColumnCount
+            blockMap = readMatrixHttp(hiCFile->curl, footer->myFilePos, footer->unit, footer->resolution, sumCounts,
+                                      blockBinCount,
+                                      blockColumnCount);
+        } else {
+            // readMatrix will assign blockBinCount and blockColumnCount
+            blockMap = readMatrix(hiCFile->fin, footer->myFilePos, footer->unit, footer->resolution, sumCounts,
+                                  blockBinCount,
+                                  blockColumnCount);
+        }
+
+        if (!isIntra) {
+            avgCount = (sumCounts / footer->numBins1) / footer->numBins2;   // <= trying to avoid overflows
+        }
+
+        set<int> blockNumbers;
+
+        if (version > 8 && isIntra) {
+            blockNumbers = getBlockNumbersForRegionFromBinPositionV9Intra(regionIndices, blockBinCount,
+                                                                          blockColumnCount);
+        } else {
+            blockNumbers = getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount,
+                                                                   isIntra);
+        }
+
+        // getBlockIndices
+
+        vector<contactRecord> tmp_records;
+        for (set<int>::iterator it = blockNumbers.begin(); it != blockNumbers.end(); ++it) {
+            // get contacts in this block
+            tmp_records = readBlock(hiCFile->fin, hiCFile->curl, hiCFile->isHttp, blockMap[*it]);
+            for (vector<contactRecord>::iterator it2 = tmp_records.begin(); it2 != tmp_records.end(); ++it2) {
+                contactRecord rec = *it2;
+
+                long x = rec.binX * footer->resolution;
+                long y = rec.binY * footer->resolution;
+
+                if ((x >= origRegionIndices[0] && x <= origRegionIndices[1] &&
+                     y >= origRegionIndices[2] && y <= origRegionIndices[3]) ||
+                    // or check regions that overlap with lower left
+                    (isIntra && y >= origRegionIndices[0] && y <= origRegionIndices[1] && x >= origRegionIndices[2] &&
+                     x <= origRegionIndices[3])) {
+
+                    float c = rec.counts;
+                    if (footer->norm != "NONE") {
+                        c = c / (footer->c1Norm[rec.binX] * footer->c2Norm[rec.binY]);
+                    }
+                    if (footer->matrix == "oe") {
+                        if (isIntra) {
+                            c = c / footer->expectedValues[min(footer->expectedValues.size() - 1,
+                                                               (size_t) floor(abs(y - x) / footer->resolution))];
+                        } else {
+                            c = c / avgCount;
+                        }
+                    }
+
+
+                    contactRecord record;
+                    record.binX = x;
+                    record.binY = y;
+                    record.counts = c;
+                    records.push_back(record);
+                }
+            }
+        }
+    }
+};
+
 vector<contactRecord>
 straw(string matrix, string norm, string fname, string chr1loc, string chr2loc, string unit, int binsize) {
     if (!(unit == "BP" || unit == "FRAG")) {
@@ -968,8 +1077,7 @@ straw(string matrix, string norm, string fname, string chr1loc, string chr2loc, 
     parsePositions(chr2loc, chr2, c2pos1, c2pos2, hiCFile->chromosomeMap);
 
     // from header have size of chromosomes, set region to read
-    int c1 = min(hiCFile->chromosomeMap[chr1].index, hiCFile->chromosomeMap[chr2].index);
-    int c2 = max(hiCFile->chromosomeMap[chr1].index, hiCFile->chromosomeMap[chr2].index);
+
     long origRegionIndices[4]; // as given by user
     // reverse order if necessary
     if (hiCFile->chromosomeMap[chr1].index > hiCFile->chromosomeMap[chr2].index) {
@@ -989,79 +1097,14 @@ straw(string matrix, string norm, string fname, string chr1loc, string chr2loc, 
     regionIndices[2] = origRegionIndices[2] / binsize;
     regionIndices[3] = origRegionIndices[3] / binsize;
 
-    Footer footer = Footer(hiCFile, c1, c2, matrix, norm, unit, binsize);
+    Footer *footer = new Footer(hiCFile, chr1, chr2, matrix, norm, unit, binsize);
 
-    if (!footer.foundFooter) {
+    if (!footer->foundFooter) {
         vector<contactRecord> v;
         return v;
     }
 
-    float sumCounts;
-    int blockBinCount, blockColumnCount;
-    map<int, indexEntry> blockMap;
+    MatrixZoomData *matrixZoomData = new MatrixZoomData(hiCFile, footer, regionIndices, origRegionIndices);
 
-    if (hiCFile->isHttp) {
-        // readMatrix will assign blockBinCount and blockColumnCount
-        blockMap = readMatrixHttp(hiCFile->curl, footer.myFilePos, unit, binsize, sumCounts, blockBinCount,
-                                  blockColumnCount);
-    } else {
-        // readMatrix will assign blockBinCount and blockColumnCount
-        blockMap = readMatrix(hiCFile->fin, footer.myFilePos, unit, binsize, sumCounts, blockBinCount,
-                              blockColumnCount);
-    }
-    double avgCount;
-    if (c1 != c2) {
-        long nBins1 = hiCFile->chromosomeMap[chr1].length / binsize;
-        long nBins2 = hiCFile->chromosomeMap[chr2].length / binsize;
-        avgCount = (sumCounts / nBins1) / nBins2;   // <= trying to avoid overflows
-    }
-
-    set<int> blockNumbers;
-    if (version > 8 && c1 == c2) {
-        blockNumbers = getBlockNumbersForRegionFromBinPositionV9Intra(regionIndices, blockBinCount, blockColumnCount);
-    } else {
-        blockNumbers = getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount,
-                                                               c1 == c2);
-    }
-
-    // getBlockIndices
-    vector<contactRecord> records;
-    vector<contactRecord> tmp_records;
-    for (set<int>::iterator it = blockNumbers.begin(); it != blockNumbers.end(); ++it) {
-        // get contacts in this block
-        tmp_records = readBlock(hiCFile->fin, hiCFile->curl, hiCFile->isHttp, blockMap[*it]);
-        for (vector<contactRecord>::iterator it2 = tmp_records.begin(); it2 != tmp_records.end(); ++it2) {
-            contactRecord rec = *it2;
-
-            long x = rec.binX * binsize;
-            long y = rec.binY * binsize;
-            float c = rec.counts;
-            if (norm != "NONE") {
-                c = c / (footer.c1Norm[rec.binX] * footer.c2Norm[rec.binY]);
-            }
-            if (matrix == "oe") {
-                if (c1 == c2) {
-                    c = c / footer.expectedValues[min(footer.expectedValues.size() - 1,
-                                                      (size_t) floor(abs(y - x) / binsize))];
-                }
-                else {
-                    c = c / avgCount;
-                }
-            }
-
-            if ((x >= origRegionIndices[0] && x <= origRegionIndices[1] &&
-                 y >= origRegionIndices[2] && y <= origRegionIndices[3]) ||
-                // or check regions that overlap with lower left
-                ((c1 == c2) && y >= origRegionIndices[0] && y <= origRegionIndices[1] && x >= origRegionIndices[2] &&
-                 x <= origRegionIndices[3])) {
-                contactRecord record;
-                record.binX = x;
-                record.binY = y;
-                record.counts = c;
-                records.push_back(record);
-                //printf("%d\t%d\t%.14g\n", x, y, c);
-            }
-        }
-    }
-    return records;
+    return matrixZoomData->records;
 }
