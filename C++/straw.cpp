@@ -870,6 +870,68 @@ public:
     }
 };
 
+class Footer {
+public:
+    indexEntry c1NormEntry, c2NormEntry;
+    long myFilePos;
+    vector<double> expectedValues;
+    long bytes_to_read;
+    bool foundFooter = false;
+    vector<double> c1Norm;
+    vector<double> c2Norm;
+
+// hiCFile.isHttp, hiCFile.master
+    Footer(HiCFile *hiCFile, int c1, int c2, string matrix, string norm, string unit, int resolution) {
+        bytes_to_read = total_bytes - hiCFile->master;
+        if (hiCFile->isHttp) {
+            char *buffer2;
+            buffer2 = getData(hiCFile->curl, hiCFile->master, bytes_to_read);
+            membuf sbuf2(buffer2, buffer2 + bytes_to_read);
+            istream bufin2(&sbuf2);
+            foundFooter = readFooter(bufin2, hiCFile->master, c1, c2, matrix, norm, unit, resolution, myFilePos,
+                                     c1NormEntry,
+                                     c2NormEntry, expectedValues);
+            delete buffer2;
+        } else {
+            hiCFile->fin.seekg(hiCFile->master, ios::beg);
+            foundFooter = readFooter(hiCFile->fin, hiCFile->master, c1, c2, matrix, norm, unit, resolution, myFilePos,
+                                     c1NormEntry, c2NormEntry, expectedValues);
+        }
+
+        if (!foundFooter) {
+            return;
+        }
+
+        if (norm != "NONE") {
+            char *buffer3;
+            if (hiCFile->isHttp) {
+                buffer3 = getData(hiCFile->curl, c1NormEntry.position, c1NormEntry.size);
+            } else {
+                buffer3 = new char[c1NormEntry.size];
+                hiCFile->fin.seekg(c1NormEntry.position, ios::beg);
+                hiCFile->fin.read(buffer3, c1NormEntry.size);
+            }
+            membuf sbuf3(buffer3, buffer3 + c1NormEntry.size);
+            istream bufferin(&sbuf3);
+            c1Norm = readNormalizationVector(bufferin);
+
+            char *buffer4;
+            if (hiCFile->isHttp) {
+                buffer4 = getData(hiCFile->curl, c2NormEntry.position, c2NormEntry.size);
+            } else {
+                buffer4 = new char[c2NormEntry.size];
+                hiCFile->fin.seekg(c2NormEntry.position, ios::beg);
+                hiCFile->fin.read(buffer4, c2NormEntry.size);
+            }
+            membuf sbuf4(buffer4, buffer4 + c2NormEntry.size);
+            istream bufferin2(&sbuf4);
+            c2Norm = readNormalizationVector(bufferin2);
+            delete buffer3;
+            delete buffer4;
+        }
+    }
+};
+
 void parsePositions(string chrLoc, string &chrom, long &pos1, long &pos2, map<string, chromosome> map) {
     string x, y;
     stringstream ss(chrLoc);
@@ -898,22 +960,22 @@ straw(string matrix, string norm, string fname, string chr1loc, string chr2loc, 
         return v;
     }
 
-    HiCFile hiCFile = HiCFile(fname);
+    HiCFile *hiCFile = new HiCFile(fname);
 
     // parse chromosome positions
 
     string chr1, chr2;
     long c1pos1 = -100, c1pos2 = -100, c2pos1 = -100, c2pos2 = -100;
 
-    parsePositions(chr1loc, chr1, c1pos1, c1pos2, hiCFile.chromosomeMap);
-    parsePositions(chr2loc, chr2, c2pos1, c2pos2, hiCFile.chromosomeMap);
+    parsePositions(chr1loc, chr1, c1pos1, c1pos2, hiCFile->chromosomeMap);
+    parsePositions(chr2loc, chr2, c2pos1, c2pos2, hiCFile->chromosomeMap);
 
     // from header have size of chromosomes, set region to read
-    int c1 = min(hiCFile.chromosomeMap[chr1].index, hiCFile.chromosomeMap[chr2].index);
-    int c2 = max(hiCFile.chromosomeMap[chr1].index, hiCFile.chromosomeMap[chr2].index);
+    int c1 = min(hiCFile->chromosomeMap[chr1].index, hiCFile->chromosomeMap[chr2].index);
+    int c2 = max(hiCFile->chromosomeMap[chr1].index, hiCFile->chromosomeMap[chr2].index);
     long origRegionIndices[4]; // as given by user
     // reverse order if necessary
-    if (hiCFile.chromosomeMap[chr1].index > hiCFile.chromosomeMap[chr2].index) {
+    if (hiCFile->chromosomeMap[chr1].index > hiCFile->chromosomeMap[chr2].index) {
         origRegionIndices[0] = c2pos1;
         origRegionIndices[1] = c2pos2;
         origRegionIndices[2] = c1pos1;
@@ -930,78 +992,30 @@ straw(string matrix, string norm, string fname, string chr1loc, string chr2loc, 
     regionIndices[2] = origRegionIndices[2] / binsize;
     regionIndices[3] = origRegionIndices[3] / binsize;
 
-    indexEntry c1NormEntry, c2NormEntry;
-    long myFilePos;
-    vector<double> expectedValues;
+    Footer footer = Footer(hiCFile, c1, c2, matrix, norm, unit, binsize);
 
-    long bytes_to_read = total_bytes - hiCFile.master;
-    bool foundFooter = false;
-    if (hiCFile.isHttp) {
-        char *buffer2;
-        buffer2 = getData(hiCFile.curl, hiCFile.master, bytes_to_read);
-        membuf sbuf2(buffer2, buffer2 + bytes_to_read);
-        istream bufin2(&sbuf2);
-        foundFooter = readFooter(bufin2, hiCFile.master, c1, c2, matrix, norm, unit, binsize, myFilePos, c1NormEntry,
-                                 c2NormEntry, expectedValues);
-        delete buffer2;
-    } else {
-        hiCFile.fin.seekg(hiCFile.master, ios::beg);
-        foundFooter = readFooter(hiCFile.fin, hiCFile.master, c1, c2, matrix, norm, unit, binsize, myFilePos,
-                                 c1NormEntry, c2NormEntry, expectedValues);
-    }
-    // readFooter will assign the above variables
-
-    if (!foundFooter) {
-        vector <contactRecord> v;
+    if (!footer.foundFooter) {
+        vector<contactRecord> v;
         return v;
-    }
-
-    vector<double> c1Norm;
-    vector<double> c2Norm;
-
-    if (norm != "NONE") {
-        char *buffer3;
-        if (hiCFile.isHttp) {
-            buffer3 = getData(hiCFile.curl, c1NormEntry.position, c1NormEntry.size);
-        } else {
-            buffer3 = new char[c1NormEntry.size];
-            hiCFile.fin.seekg(c1NormEntry.position, ios::beg);
-            hiCFile.fin.read(buffer3, c1NormEntry.size);
-        }
-        membuf sbuf3(buffer3, buffer3 + c1NormEntry.size);
-        istream bufferin(&sbuf3);
-        c1Norm = readNormalizationVector(bufferin);
-
-        char *buffer4;
-        if (hiCFile.isHttp) {
-            buffer4 = getData(hiCFile.curl, c2NormEntry.position, c2NormEntry.size);
-        } else {
-            buffer4 = new char[c2NormEntry.size];
-            hiCFile.fin.seekg(c2NormEntry.position, ios::beg);
-            hiCFile.fin.read(buffer4, c2NormEntry.size);
-        }
-        membuf sbuf4(buffer4, buffer4 + c2NormEntry.size);
-        istream bufferin2(&sbuf4);
-        c2Norm = readNormalizationVector(bufferin2);
-        delete buffer3;
-        delete buffer4;
     }
 
     float sumCounts;
     int blockBinCount, blockColumnCount;
     map<int, indexEntry> blockMap;
 
-    if (hiCFile.isHttp) {
+    if (hiCFile->isHttp) {
         // readMatrix will assign blockBinCount and blockColumnCount
-        blockMap = readMatrixHttp(hiCFile.curl, myFilePos, unit, binsize, sumCounts, blockBinCount, blockColumnCount);
+        blockMap = readMatrixHttp(hiCFile->curl, footer.myFilePos, unit, binsize, sumCounts, blockBinCount,
+                                  blockColumnCount);
     } else {
         // readMatrix will assign blockBinCount and blockColumnCount
-        blockMap = readMatrix(hiCFile.fin, myFilePos, unit, binsize, sumCounts, blockBinCount, blockColumnCount);
+        blockMap = readMatrix(hiCFile->fin, footer.myFilePos, unit, binsize, sumCounts, blockBinCount,
+                              blockColumnCount);
     }
     double avgCount;
     if (c1 != c2) {
-        long nBins1 = hiCFile.chromosomeMap[chr1].length / binsize;
-        long nBins2 = hiCFile.chromosomeMap[chr2].length / binsize;
+        long nBins1 = hiCFile->chromosomeMap[chr1].length / binsize;
+        long nBins2 = hiCFile->chromosomeMap[chr2].length / binsize;
         avgCount = (sumCounts / nBins1) / nBins2;   // <= trying to avoid overflows
     }
 
@@ -1018,7 +1032,7 @@ straw(string matrix, string norm, string fname, string chr1loc, string chr2loc, 
     vector<contactRecord> tmp_records;
     for (set<int>::iterator it = blockNumbers.begin(); it != blockNumbers.end(); ++it) {
         // get contacts in this block
-        tmp_records = readBlock(hiCFile.fin, hiCFile.curl, hiCFile.isHttp, blockMap[*it]);
+        tmp_records = readBlock(hiCFile->fin, hiCFile->curl, hiCFile->isHttp, blockMap[*it]);
         for (vector<contactRecord>::iterator it2 = tmp_records.begin(); it2 != tmp_records.end(); ++it2) {
             contactRecord rec = *it2;
 
@@ -1026,11 +1040,12 @@ straw(string matrix, string norm, string fname, string chr1loc, string chr2loc, 
             long y = rec.binY * binsize;
             float c = rec.counts;
             if (norm != "NONE") {
-                c = c / (c1Norm[rec.binX] * c2Norm[rec.binY]);
+                c = c / (footer.c1Norm[rec.binX] * footer.c2Norm[rec.binY]);
             }
             if (matrix == "oe") {
                 if (c1 == c2) {
-                    c = c / expectedValues[min(expectedValues.size() - 1, (size_t)floor(abs(y - x) / binsize))];
+                    c = c / footer.expectedValues[min(footer.expectedValues.size() - 1,
+                                                      (size_t) floor(abs(y - x) / binsize))];
                 }
                 else {
                     c = c / avgCount;
