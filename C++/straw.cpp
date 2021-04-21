@@ -891,7 +891,6 @@ public:
     indexEntry c1NormEntry, c2NormEntry;
     long myFilePos;
     vector<double> expectedValues;
-    long bytes_to_read;
     bool foundFooter = false;
     vector<double> c1Norm;
     vector<double> c2Norm;
@@ -924,10 +923,10 @@ public:
         this->norm = norm;
         this->unit = unit;
         this->resolution = resolution;
-        bytes_to_read = total_bytes - hiCFile->master;
 
         if (hiCFile->isHttp) {
             char *buffer2;
+            long bytes_to_read = total_bytes - hiCFile->master;
             buffer2 = getData(hiCFile->curl, hiCFile->master, bytes_to_read);
             membuf sbuf2(buffer2, buffer2 + bytes_to_read);
             istream bufin2(&sbuf2);
