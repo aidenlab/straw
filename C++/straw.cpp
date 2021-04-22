@@ -1068,6 +1068,22 @@ public:
     }
 };
 
+vector<contactRecord> getBlockRecords(HiCFile *hiCFile, HiCFile::MatrixZoomData *mzd, long origRegionIndices[4]) {
+    if (!mzd->foundFooter) {
+        vector<contactRecord> v;
+        return v;
+    }
+
+    long regionIndices[4]; // used to find the blocks we need to access
+    regionIndices[0] = origRegionIndices[0] / mzd->resolution;
+    regionIndices[1] = origRegionIndices[1] / mzd->resolution;
+    regionIndices[2] = origRegionIndices[2] / mzd->resolution;
+    regionIndices[3] = origRegionIndices[3] / mzd->resolution;
+
+    BlocksRecords *blocksRecords = new BlocksRecords(hiCFile, mzd, regionIndices, origRegionIndices);
+    return blocksRecords->records;
+}
+
 vector<contactRecord>
 straw(string matrixType, string norm, string fname, string chr1loc, string chr2loc, string unit, int binsize) {
     if (!(unit == "BP" || unit == "FRAG")) {
@@ -1080,11 +1096,8 @@ straw(string matrixType, string norm, string fname, string chr1loc, string chr2l
 
     HiCFile *hiCFile = new HiCFile(fname);
 
-    // parse chromosome positions
-
     string chr1, chr2;
     long c1pos1 = -100, c1pos2 = -100, c2pos1 = -100, c2pos2 = -100;
-
     parsePositions(chr1loc, chr1, c1pos1, c1pos2, hiCFile->chromosomeMap);
     parsePositions(chr2loc, chr2, c2pos1, c2pos2, hiCFile->chromosomeMap);
 
@@ -1103,19 +1116,8 @@ straw(string matrixType, string norm, string fname, string chr1loc, string chr2l
         origRegionIndices[2] = c2pos1;
         origRegionIndices[3] = c2pos2;
     }
-    long regionIndices[4]; // used to find the blocks we need to access
-    regionIndices[0] = origRegionIndices[0] / binsize;
-    regionIndices[1] = origRegionIndices[1] / binsize;
-    regionIndices[2] = origRegionIndices[2] / binsize;
-    regionIndices[3] = origRegionIndices[3] / binsize;
 
     HiCFile::MatrixZoomData *mzd = hiCFile->getMatrixZoomData(chr1, chr2, matrixType, norm, unit, binsize);
 
-    if (!mzd->foundFooter) {
-        vector<contactRecord> v;
-        return v;
-    }
-
-    BlocksRecords *blocksRecords = new BlocksRecords(hiCFile, mzd, regionIndices, origRegionIndices);
-    return blocksRecords->records;
+    return getBlockRecords(hiCFile, mzd, origRegionIndices);
 }
