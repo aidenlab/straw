@@ -798,8 +798,6 @@ vector<double> readNormalizationVector(istream &bufferin, int version) {
     return values;
 }
 
-static long totalFileSize;
-
 class HiCFile {
 public:
     string prefix = "http"; // HTTP code
@@ -811,6 +809,7 @@ public:
     string genomeID;
     int numChromosomes;
     int version;
+    static long totalFileSize;
 
     static size_t hdf(char *b, size_t size, size_t nitems, void *userdata) {
         size_t numbytes = size * nitems;
@@ -966,6 +965,8 @@ public:
         return new MatrixZoomData(this, chrom1, chrom2, matrixType, norm, unit, resolution);
     }
 };
+
+long HiCFile::totalFileSize = 0L;
 
 void parsePositions(string chrLoc, string &chrom, long &pos1, long &pos2, map<string, chromosome> map) {
     string x, y;
