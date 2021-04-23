@@ -142,7 +142,7 @@ double readDoubleFromFile(istream &fin) {
 
 // reads the header, storing the positions of the normalization vectors and returning the masterIndexPosition pointer
 map<string, chromosome> readHeader(istream &fin, long &masterIndexPosition, string &genomeID, int &numChromosomes,
-                                   int &version) {
+                                   int &version, long &nviPosition, long &nviLength) {
     map<string, chromosome> chromosomeMap;
     if (!readMagicString(fin)) {
         cerr << "Hi-C magic string is missing, does not appear to be a hic file" << endl;
@@ -160,8 +160,8 @@ map<string, chromosome> readHeader(istream &fin, long &masterIndexPosition, stri
     getline(fin, genomeID, '\0');
 
     if (version > 8) {
-        long nviPosition = readLongFromFile(fin);
-        long nviLength = readLongFromFile(fin);
+        nviPosition = readLongFromFile(fin);
+        nviLength = readLongFromFile(fin);
     }
 
     int nattributes = readIntFromFile(fin);
@@ -809,6 +809,8 @@ public:
     string genomeID;
     int numChromosomes;
     int version;
+    long nviPosition = 0;
+    long nviLength = 0;
     static long totalFileSize;
 
     static size_t hdf(char *b, size_t size, size_t nitems, void *userdata) {
@@ -856,7 +858,8 @@ public:
             }
             membuf sbuf(buffer, buffer + 100000);
             istream bufin(&sbuf);
-            chromosomeMap = readHeader(bufin, master, genomeID, numChromosomes, version);
+            chromosomeMap = readHeader(bufin, master, genomeID, numChromosomes,
+                                       version, nviPosition, nviLength);
             delete buffer;
         } else {
             fin.open(fname, fstream::in);
@@ -864,7 +867,8 @@ public:
                 cerr << "File " << fname << " cannot be opened for reading" << endl;
                 exit(2);
             }
-            chromosomeMap = readHeader(fin, master, genomeID, numChromosomes, version);
+            chromosomeMap = readHeader(fin, master, genomeID, numChromosomes,
+                                       version, nviPosition, nviLength);
         }
     }
 
