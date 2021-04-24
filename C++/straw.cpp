@@ -586,10 +586,18 @@ set<int> getBlockNumbersForRegionFromBinPositionV9Intra(long *regionIndices, int
     return blocksSet;
 }
 
+void appendRecord(vector<contactRecord> &vector, int index, int binX, int binY, float counts) {
+    contactRecord record;
+    record.binX = binX;
+    record.binY = binY;
+    record.counts = counts;
+    vector[index] = record;
+}
+
 // this is the meat of reading the data.  takes in the block number and returns the set of contact records corresponding to
 // that block.  the block data is compressed and must be decompressed using the zlib library functions
 vector<contactRecord> readBlock(istream &fin, CURL *curl, bool isHttp, indexEntry idx, int version) {
-    if (idx.size == 0) {
+    if (idx.size <= 0) {
         vector<contactRecord> v;
         return v;
     }
@@ -660,12 +668,7 @@ vector<contactRecord> readBlock(istream &fin, CURL *curl, bool isHttp, indexEntr
                         } else {
                             bufferin.read((char *) &counts, sizeof(float));
                         }
-                        contactRecord record;
-                        record.binX = binX;
-                        record.binY = binY;
-                        record.counts = counts;
-                        v[index] = record;
-                        index++;
+                        appendRecord(v, index++, binX, binY, counts);
                     }
                 }
             } else if (useShortBinX && !useShortBinY) {
@@ -681,12 +684,7 @@ vector<contactRecord> readBlock(istream &fin, CURL *curl, bool isHttp, indexEntr
                         } else {
                             bufferin.read((char *) &counts, sizeof(float));
                         }
-                        contactRecord record;
-                        record.binX = binX;
-                        record.binY = binY;
-                        record.counts = counts;
-                        v[index] = record;
-                        index++;
+                        appendRecord(v, index++, binX, binY, counts);
                     }
                 }
             } else if (!useShortBinX && useShortBinY) {
@@ -702,12 +700,7 @@ vector<contactRecord> readBlock(istream &fin, CURL *curl, bool isHttp, indexEntr
                         } else {
                             bufferin.read((char *) &counts, sizeof(float));
                         }
-                        contactRecord record;
-                        record.binX = binX;
-                        record.binY = binY;
-                        record.counts = counts;
-                        v[index] = record;
-                        index++;
+                        appendRecord(v, index++, binX, binY, counts);
                     }
                 }
             } else {
@@ -723,12 +716,7 @@ vector<contactRecord> readBlock(istream &fin, CURL *curl, bool isHttp, indexEntr
                         } else {
                             bufferin.read((char *) &counts, sizeof(float));
                         }
-                        contactRecord record;
-                        record.binX = binX;
-                        record.binY = binY;
-                        record.counts = counts;
-                        v[index] = record;
-                        index++;
+                        appendRecord(v, index++, binX, binY, counts);
                     }
                 }
             }
@@ -1034,7 +1022,10 @@ public:
         vector<contactRecord> tmp_records;
         for (set<int>::iterator it = blockNumbers.begin(); it != blockNumbers.end(); ++it) {
             // get contacts in this block
+            //cout << "iter " << *it << endl;
+            //cout << "size " << blockMap[*it].size << "   position " << blockMap[*it].position << endl;
             tmp_records = readBlock(hiCFile->fin, hiCFile->curl, hiCFile->isHttp, blockMap[*it], hiCFile->version);
+            //cout << "sizzze = " << tmp_records.size() << endl;
             for (vector<contactRecord>::iterator it2 = tmp_records.begin(); it2 != tmp_records.end(); ++it2) {
                 contactRecord rec = *it2;
 
