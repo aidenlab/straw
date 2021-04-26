@@ -250,7 +250,7 @@ bool readFooter(istream &fin, long master, int version, int c1, int c2, const st
 
         if (version > 8) {
             for (long j = 0; j < nValues; j++) {
-                double v = (double) readFloatFromFile(fin);
+                double v = readFloatFromFile(fin);
                 if (store) {
                     expectedValues.push_back(v);
                 }
@@ -306,7 +306,7 @@ bool readFooter(istream &fin, long master, int version, int c1, int c2, const st
 
         if (version > 8) {
             for (long j = 0; j < nValues; j++) {
-                double v = (double) readFloatFromFile(fin);
+                double v = readFloatFromFile(fin);
                 if (store) {
                     expectedValues.push_back(v);
                 }
@@ -413,7 +413,7 @@ map<int, indexEntry> readMatrixZoomData(istream &fin, const string &myunit, int 
         int blockNumber = readIntFromFile(fin);
         long filePosition = readLongFromFile(fin);
         int blockSizeInBytes = readIntFromFile(fin);
-        indexEntry entry;
+        indexEntry entry = indexEntry();
         entry.size = (long) blockSizeInBytes;
         entry.position = filePosition;
         if (found) blockMap[blockNumber] = entry;
@@ -473,7 +473,7 @@ map<int, indexEntry> readMatrixZoomDataHttp(CURL *curl, long &myFilePosition, co
             int blockNumber = readIntFromFile(fin2);
             long filePosition = readLongFromFile(fin2);
             int blockSizeInBytes = readIntFromFile(fin2);
-            indexEntry entry;
+            indexEntry entry = indexEntry();
             entry.size = (long) blockSizeInBytes;
             entry.position = filePosition;
             blockMap[blockNumber] = entry;
@@ -596,7 +596,7 @@ set<int> getBlockNumbersForRegionFromBinPositionV9Intra(long *regionIndices, int
 }
 
 void appendRecord(vector<contactRecord> &vector, int index, int binX, int binY, float counts) {
-    contactRecord record;
+    contactRecord record = contactRecord();
     record.binX = binX;
     record.binY = binY;
     record.counts = counts;
@@ -638,7 +638,7 @@ vector<contactRecord> readBlock(istream &fin, CURL *curl, bool isHttp, indexEntr
     // create stream from buffer for ease of use
     membuf sbuf(uncompressedBytes, uncompressedBytes + uncompressedSize);
     istream bufferin(&sbuf);
-    int nRecords = readIntFromFile(bufferin);
+    unsigned long nRecords = static_cast<unsigned long>(readIntFromFile(bufferin));
     vector<contactRecord> v(nRecords);
     // different versions have different specific formats
     if (version < 7) {
@@ -791,11 +791,11 @@ public:
     bool isHttp = false;
     ifstream fin;
     CURL *curl;
-    long master;
+    long master = 0L;
     map<string, chromosome> chromosomeMap;
     string genomeID;
-    int numChromosomes;
-    int version;
+    int numChromosomes = 0;
+    int version = 0;
     long nviPosition = 0;
     long nviLength = 0;
     static long totalFileSize;
@@ -809,7 +809,7 @@ public:
             int found2 = static_cast<int>(s.find("/"));
             //Content-Range: bytes 0-100000/891471462
             if (found2 != string::npos) {
-                string total = s.substr(static_cast<unsigned long>(found2 + 1));
+                string total = s.substr(found2 + 1);
                 totalFileSize = stol(total);
             }
         }
@@ -878,19 +878,19 @@ public:
     class MatrixZoomData {
     public:
         indexEntry c1NormEntry, c2NormEntry;
-        long myFilePos;
+        long myFilePos = 0L;
         vector<double> expectedValues;
         bool foundFooter = false;
         vector<double> c1Norm;
         vector<double> c2Norm;
-        int c1;
-        int c2;
+        int c1 = 0;
+        int c2 = 0;
         string matrixType;
         string norm;
         string unit;
-        int resolution;
-        int numBins1;
-        int numBins2;
+        int resolution = 0;
+        int numBins1 = 0;
+        int numBins2 = 0;
 
         MatrixZoomData(HiCFile *hiCFile, const chromosome &chrom1, const chromosome &chrom2, const string &matrixType,
                        const string &norm, const string &unit, int resolution) {
@@ -1050,7 +1050,7 @@ public:
                         }
                     }
 
-                    contactRecord record;
+                    contactRecord record = contactRecord();
                     record.binX = static_cast<int>(x);
                     record.binY = static_cast<int>(y);
                     record.counts = c;
