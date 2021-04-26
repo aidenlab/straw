@@ -634,11 +634,10 @@ vector<contactRecord> readBlock(istream &fin, CURL *curl, bool isHttp, indexEntr
     // different versions have different specific formats
     if (version < 7) {
         for (int i = 0; i < nRecords; i++) {
-            contactRecord record;
-            record.binX = readIntFromFile(bufferin);
-            record.binY = readIntFromFile(bufferin);
-            record.counts = readFloatFromFile(bufferin);
-            v[i] = record;
+            int binX = readIntFromFile(bufferin);
+            int binY = readIntFromFile(bufferin);
+            float counts = readFloatFromFile(bufferin);
+            appendRecord(v, i, binX, binY, counts);
         }
     } else {
         int binXOffset = readIntFromFile(bufferin);
@@ -735,22 +734,12 @@ vector<contactRecord> readBlock(istream &fin, CURL *curl, bool isHttp, indexEntr
                 if (useShort == 0) { // yes this is opposite of the usual
                     short c = readShortFromFile(bufferin);
                     if (c != -32768) {
-                        contactRecord record;
-                        record.binX = bin1;
-                        record.binY = bin2;
-                        record.counts = c;
-                        v[index] = record;
-                        index++;
+                        appendRecord(v, index++, bin1, bin2, c);
                     }
                 } else {
                     bufferin.read((char *) &counts, sizeof(float));
                     if (!isnan(counts)) {
-                        contactRecord record;
-                        record.binX = bin1;
-                        record.binY = bin2;
-                        record.counts = counts;
-                        v[index] = record;
-                        index++;
+                        appendRecord(v, index++, bin1, bin2, counts);
                     }
                 }
             }
@@ -1008,7 +997,6 @@ public:
         }
 
         set<int> blockNumbers;
-
         if (hiCFile->version > 8 && isIntra) {
             blockNumbers = getBlockNumbersForRegionFromBinPositionV9Intra(regionIndices, blockBinCount,
                                                                           blockColumnCount);
@@ -1017,15 +1005,12 @@ public:
                                                                    isIntra);
         }
 
-        // getBlockIndices
-
         vector<contactRecord> tmp_records;
         for (set<int>::iterator it = blockNumbers.begin(); it != blockNumbers.end(); ++it) {
             // get contacts in this block
-            //cout << "iter " << *it << endl;
-            //cout << "size " << blockMap[*it].size << "   position " << blockMap[*it].position << endl;
+            //cout << *it << " -- " << blockMap.size() << endl;
+            //cout << blockMap[*it].size << " " <<  blockMap[*it].position << endl;
             tmp_records = readBlock(hiCFile->fin, hiCFile->curl, hiCFile->isHttp, blockMap[*it], hiCFile->version);
-            //cout << "sizzze = " << tmp_records.size() << endl;
             for (vector<contactRecord>::iterator it2 = tmp_records.begin(); it2 != tmp_records.end(); ++it2) {
                 contactRecord rec = *it2;
 
@@ -1050,7 +1035,6 @@ public:
                             c = c / avgCount;
                         }
                     }
-
 
                     contactRecord record;
                     record.binX = x;
