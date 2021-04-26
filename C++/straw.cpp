@@ -740,7 +740,7 @@ vector<contactRecord> readBlock(istream &fin, CURL *curl, bool isHttp, indexEntr
                 int bin2 = binYOffset + row;
 
                 float counts;
-                if (useShort == 0) { // yes this is opposite of the usual
+                if (useShort) {
                     short c = readShortFromFile(bufferin);
                     if (c != -32768) {
                         appendRecord(v, index++, bin1, bin2, c);
@@ -973,7 +973,7 @@ void parsePositions(const string &chrLoc, string &chrom, long &pos1, long &pos2,
         pos1 = stol(x);
         pos2 = stol(y);
     } else {
-        pos1 = 0;
+        pos1 = 0L;
         pos2 = map[chrom].length;
     }
 }
