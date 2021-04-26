@@ -972,11 +972,10 @@ public:
     float sumCounts;
     int blockBinCount, blockColumnCount;
     map<int, indexEntry> blockMap;
-    vector<contactRecord> records;
     double avgCount;
     bool isIntra;
 
-    BlocksRecords(HiCFile *hiCFile, HiCFile::MatrixZoomData *footer, long regionIndices[4], long origRegionIndices[4]) {
+    BlocksRecords(HiCFile *hiCFile, HiCFile::MatrixZoomData *footer) {
 
         isIntra = footer->c1 == footer->c2;
 
@@ -995,7 +994,10 @@ public:
         if (!isIntra) {
             avgCount = (sumCounts / footer->numBins1) / footer->numBins2;   // <= trying to avoid overflows
         }
+    }
 
+    vector<contactRecord>
+    getRecords(HiCFile *hiCFile, HiCFile::MatrixZoomData *footer, long regionIndices[4], long origRegionIndices[4]) {
         set<int> blockNumbers;
         if (hiCFile->version > 8 && isIntra) {
             blockNumbers = getBlockNumbersForRegionFromBinPositionV9Intra(regionIndices, blockBinCount,
@@ -1005,12 +1007,13 @@ public:
                                                                    isIntra);
         }
 
-        vector<contactRecord> tmp_records;
+        vector<contactRecord> records;
         for (set<int>::iterator it = blockNumbers.begin(); it != blockNumbers.end(); ++it) {
             // get contacts in this block
             //cout << *it << " -- " << blockMap.size() << endl;
             //cout << blockMap[*it].size << " " <<  blockMap[*it].position << endl;
-            tmp_records = readBlock(hiCFile->fin, hiCFile->curl, hiCFile->isHttp, blockMap[*it], hiCFile->version);
+            vector<contactRecord> tmp_records = readBlock(hiCFile->fin, hiCFile->curl, hiCFile->isHttp, blockMap[*it],
+                                                          hiCFile->version);
             for (vector<contactRecord>::iterator it2 = tmp_records.begin(); it2 != tmp_records.end(); ++it2) {
                 contactRecord rec = *it2;
 
@@ -1044,6 +1047,7 @@ public:
                 }
             }
         }
+        return records;
     }
 };
 
@@ -1059,8 +1063,8 @@ vector<contactRecord> getBlockRecords(HiCFile *hiCFile, HiCFile::MatrixZoomData 
     regionIndices[2] = origRegionIndices[2] / mzd->resolution;
     regionIndices[3] = origRegionIndices[3] / mzd->resolution;
 
-    BlocksRecords *blocksRecords = new BlocksRecords(hiCFile, mzd, regionIndices, origRegionIndices);
-    return blocksRecords->records;
+    BlocksRecords *blocksRecords = new BlocksRecords(hiCFile, mzd);
+    return blocksRecords->getRecords(hiCFile, mzd, regionIndices, origRegionIndices);
 }
 
 vector<contactRecord>
