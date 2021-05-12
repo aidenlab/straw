@@ -346,7 +346,7 @@ void readMatrix(ifstream& fin, long myFilePosition, string unit, int resolution,
     i++;
   }
   if (!found) {
-    stop("Can't find block data.");
+    stop("Error finding block data.");
     // exit(1);
   }
 }
