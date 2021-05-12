@@ -4,10 +4,10 @@ Version: 0.0.3
 Authors@R: person("First", "Last", email = "first.last@example.com", role = c("aut", "cre"))
 Description: API for fast data extraction for .hic files that provides programmatic access to the matrices. It doesn't store the pointer data for all the matrices, only the one queried, and currently we are only supporting matrices (not vectors).
 Depends: R (>= 3.4.0)
-License: MIT
+License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 Imports: Rcpp
 LinkingTo: Rcpp
 NeedsCompilation: yes
-RoxygenNote: 6.1.1
+RoxygenNote: 7.1.1

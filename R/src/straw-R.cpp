@@ -79,15 +79,13 @@ bool readMagicString(ifstream& fin) {
 // reads the header, storing the positions of the normalization vectors and returning the master pointer
 long readHeader(ifstream& fin, string chr1, string chr2, int &c1pos1, int &c1pos2, int &c2pos1, int &c2pos2, int &chr1ind, int &chr2ind, int &chr1len, int &chr2len) {
   if (!readMagicString(fin)) {
-    cerr << "Hi-C magic string is missing, does not appear to be a hic file" << endl;
-    stop("\n");
+    stop("Hi-C magic string is missing, does not appear to be a hic file.");
     // exit(1);
   }
 
   fin.read((char*)&version, sizeof(int));
   if (version < 6) {
-    cerr << "Version " << version << " no longer supported" << endl;
-    stop("\n");
+    stop("Version %d no longer supported.", version);
     // exit(1);
   }
   long master;
@@ -132,8 +130,7 @@ long readHeader(ifstream& fin, string chr1, string chr2, int &c1pos1, int &c1pos
     }
   }
   if (!found1 || !found2) {
-    cerr << "One of the chromosomes wasn't found in the file. Check that the chromosome name matches the genome." << endl;
-    stop("\n");
+    stop("One of the chromosomes wasn't found in the file. Check that the chromosome name matches the genome.");
     // exit(1);
   }
   return master;
@@ -167,8 +164,7 @@ void readFooter(ifstream& fin, long master, int c1, int c2, string matrix, strin
     }
   }
   if (!found) {
-    cerr << "File doesn't have the given chr_chr map" << endl;
-    stop("\n");
+    stop("File doesn't have the given chr_chr map.");
     // exit(1);
   }
 
@@ -211,8 +207,7 @@ void readFooter(ifstream& fin, long master, int c1, int c2, string matrix, strin
   }
   if (c1 == c2 && matrix == "oe" && norm == "NONE") {
     if (expectedValues.size() == 0) {
-      cerr << "File did not contain expected values vectors at " << resolution << " " << unit << endl;
-      stop("\n");
+      stop("File did not contain expected values vectors at %d %s.", resolution, unit);
       // exit(1);
     }
     return;
@@ -252,8 +247,7 @@ void readFooter(ifstream& fin, long master, int c1, int c2, string matrix, strin
   }
   if (c1 == c2 && matrix == "oe" && norm != "NONE") {
     if (expectedValues.size() == 0) {
-      cerr << "File did not contain normalized expected values vectors at " << resolution << " " << unit << endl;
-      stop("\n");
+      stop("File did not contain normalized expected values vectors at %d %s.", resolution, unit);
       // exit(1);
     }
   }
@@ -286,8 +280,7 @@ void readFooter(ifstream& fin, long master, int c1, int c2, string matrix, strin
     }
   }
   if (!found1 || !found2) {
-    cerr << "File did not contain " << norm << " normalization vectors for one or both chromosomes at " << resolution << " " << unit << endl;
-    stop("\n");
+    stop("File did not contain %s normalization vectors for one or both chromosomes at %d %s.", norm, resolution, unit);
     // exit(1);
   }
 }
@@ -353,8 +346,7 @@ void readMatrix(ifstream& fin, long myFilePosition, string unit, int resolution,
     i++;
   }
   if (!found) {
-    cerr << "Error finding block data" << endl;
-    stop("\n");
+    stop("Can't find block data.");
     // exit(1);
   }
 }
@@ -556,8 +548,6 @@ vector<double> readNormalizationVector(ifstream& fin, indexEntry entry) {
 //'
 //' Usage: straw <observed/oe> <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>
 //'
-//' @param matrix Type of matrix to output. Must be one of observed/oe.
-//'     observed is observed counts, oe is observed/expected counts.
 //' @param norm Normalization to apply. Must be one of NONE/VC/VC_SQRT/KR.
 //'     VC is vanilla coverage, VC_SQRT is square root of vanilla coverage, and KR is Knight-Ruiz or
 //'     Balanced normalization.
@@ -568,22 +558,21 @@ vector<double> readNormalizationVector(ifstream& fin, indexEntry entry) {
 //' @param binsize The bin size. By default, for BP, this is one of <2500000, 1000000, 500000,
 //'     250000, 100000, 50000, 25000, 10000, 5000> and for FRAG this is one of <500, 200,
 //'     100, 50, 20, 5, 2, 1>.
+//' @param matrix Type of matrix to output. Must be one of observed/oe.
+//'     observed is observed counts, oe is observed/expected counts.
 //' @return Data.frame of a sparse matrix of data from hic file. x,y,counts
 //' @export
 // [[Rcpp::export]]
-Rcpp::DataFrame straw(std::string matrix, std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, std::string unit, int binsize)
+Rcpp::DataFrame straw(std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, std::string unit, int binsize, std::string matrix = "observed")
 {
   blockMap.clear();
   if (!(unit=="BP"||unit=="FRAG")) {
-    cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl;
-    cerr << "Usage: juicebox-quick-dump <observed/oe> <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
-    stop("\n");
+    stop("Norm specified incorrectly, must be one of <BP/FRAG>.\nUsage: juicebox-quick-dump <observed/oe> <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>");
   }
 
   ifstream fin(fname, fstream::in);
   if (!fin) {
-    cerr << "File " << fname << " cannot be opened for reading" << endl;
-    stop("\n");
+    stop("File %s cannot be opened for reading.", fname);
   }
   stringstream ss(chr1loc);
   string chr1, chr2, x, y;
