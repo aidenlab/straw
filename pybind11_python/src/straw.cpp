@@ -737,7 +737,7 @@ vector<contactRecord> readBlock(istream &fin, CURL *curl, bool isHttp, indexEntr
                 int bin2 = binYOffset + row;
 
                 float counts;
-                if (useShort) { // yes this is opposite of the usual
+                if (useShort) {
                     short c = readShortFromFile(bufferin);
                     if (c != -32768) {
                         contactRecord record;
