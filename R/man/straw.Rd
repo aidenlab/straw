@@ -4,10 +4,9 @@
 \alias{straw}
 \title{Straw Quick Dump}
 \usage{
-straw(matrix, norm, fname, chr1loc, chr2loc, unit, binsize)
+straw(norm, fname, chr1loc, chr2loc, unit, binsize, matrix = "observed")
 }
 \arguments{
-\item{matrix}{Type of matrix to output. Must be one of observed/oe. observed is observed counts, oe is observed/expected counts.}
 \item{norm}{Normalization to apply. Must be one of NONE/VC/VC_SQRT/KR.
 VC is vanilla coverage, VC_SQRT is square root of vanilla coverage, and KR is Knight-Ruiz or
 Balanced normalization.}
@@ -23,6 +22,9 @@ Balanced normalization.}
 \item{binsize}{The bin size. By default, for BP, this is one of <2500000, 1000000, 500000,
 250000, 100000, 50000, 25000, 10000, 5000> and for FRAG this is one of <500, 200,
 100, 50, 20, 5, 2, 1>.}
+
+\item{matrix}{Type of matrix to output. Must be one of observed/oe.
+observed is observed counts, oe is observed/expected counts.}
 }
 \value{
 Data.frame of a sparse matrix of data from hic file. x,y,counts
