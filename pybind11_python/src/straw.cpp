@@ -1224,6 +1224,17 @@ straw(string matrixType, string norm, string fname, string chr1loc, string chr2l
                                             footer.c1Norm, footer.c2Norm, footer.expectedValues);
 }
 
+vector<chromosome> getChromosomes(string fname){
+    HiCFile *hiCFile = new HiCFile(std::move(fname));
+    vector<chromosome> chromosomes;
+    std::map<std::string, chromosome>::iterator iter = hiCFile->chromosomeMap.begin();
+    while (iter != hiCFile->chromosomeMap.end()) {
+        chromosomes.push_back(static_cast<chromosome>(iter->second));
+        iter++;
+    }
+    return chromosomes;
+}
+
 int main(int argc, char *argv[]) {
     if (argc != 7 && argc != 8) {
         cerr << "Incorrect arguments" << endl;
@@ -1262,6 +1273,7 @@ m.doc() = "Fast hybrid tool for reading .hic files; see https://github.com/aiden
 
 m.def("straw", &straw, "get contact records");
 m.def("getRecords", &getBlockRecordsWithNormalization, "get contact records using normalization info");
+m.def("getChromosomes", &getChromosomes, "get chromosomes in hic file");
 m.def("getNormExpVectors", &getNormalizationInfoForRegion, "get normalization or expected vectors");
 
 py::class_<contactRecord>(m, "contactRecord")
@@ -1269,6 +1281,13 @@ py::class_<contactRecord>(m, "contactRecord")
 .def_readwrite("binX", &contactRecord::binX)
 .def_readwrite("binY", &contactRecord::binY)
 .def_readwrite("counts", &contactRecord::counts)
+;
+
+py::class_<chromosome>(m, "chromosome")
+.def(py::init<>())
+.def_readwrite("name", &chromosome::name)
+.def_readwrite("index", &chromosome::index)
+.def_readwrite("length", &chromosome::length)
 ;
 
 py::class_<footerInfo>(m, "footerInfo")
