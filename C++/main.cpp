@@ -23,6 +23,7 @@
 */
 #include <cstring>
 #include <iostream>
+#include <string>
 #include "straw.h"
 using namespace std;
 

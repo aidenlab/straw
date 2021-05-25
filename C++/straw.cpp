@@ -304,9 +304,9 @@ bool readFooter(istream& fin, long master, int c1, int c2, string matrix, string
             int chrIdx = readIntFromFile(fin);
             double v;
             if (version > 8) {
-                readFloatFromFile(fin);
+                v = readFloatFromFile(fin);
             } else {
-                readDoubleFromFile(fin);
+                v = readDoubleFromFile(fin);
             }
             if (store && chrIdx == c1) {
                 for (vector<double>::iterator it=expectedValues.begin(); it!=expectedValues.end(); ++it) {
@@ -887,7 +887,7 @@ vector<contactRecord> straw(string matrix, string norm, string fname, string chr
     ifstream fin;
 
     // read header into buffer; 100K should be sufficient
-    CURL *curl;
+    CURL *curl = NULL;
 
     long master;
     map <string, chromosome> chromosomeMap;
@@ -1116,7 +1116,7 @@ int getSize(string matrix, string norm, string fname, string chr1loc, string chr
     ifstream fin;
 
     // read header into buffer; 100K should be sufficient
-    CURL *curl;
+    CURL *curl = NULL;
 
     long master;
     map <string, chromosome> chromosomeMap;
