@@ -45,7 +45,7 @@ using namespace std;
 // pointer structure for reading blocks or matrices, holds the size and position
 struct indexEntry {
   int size;
-  long position;
+  long long position;
 };
 
 // sparse matrix entry
@@ -77,7 +77,7 @@ bool readMagicString(ifstream& fin) {
 }
 
 // reads the header, storing the positions of the normalization vectors and returning the master pointer
-long readHeader(ifstream& fin, string chr1, string chr2, int &c1pos1, int &c1pos2, int &c2pos1, int &c2pos2, int &chr1ind, int &chr2ind, int &chr1len, int &chr2len) {
+long long readHeader(ifstream& fin, string chr1, string chr2, int &c1pos1, int &c1pos2, int &c2pos1, int &c2pos2, int &chr1ind, int &chr2ind, int &chr1len, int &chr2len) {
   if (!readMagicString(fin)) {
     stop("Hi-C magic string is missing, does not appear to be a hic file.");
     // exit(1);
@@ -85,11 +85,11 @@ long readHeader(ifstream& fin, string chr1, string chr2, int &c1pos1, int &c1pos
 
   fin.read((char*)&version, sizeof(int));
   if (version < 6) {
-    stop("Version %d no longer supported.", version);
+    stop("Version %d no long longer supported.", version);
     // exit(1);
   }
-  long master;
-  fin.read((char*)&master, sizeof(long));
+  long long master;
+  fin.read((char*)&master, sizeof(long long));
   string genome;
   getline(fin, genome, '\0' );
   int nattributes;
@@ -139,7 +139,7 @@ long readHeader(ifstream& fin, string chr1, string chr2, int &c1pos1, int &c1pos
 // reads the footer from the master pointer location. takes in the chromosomes, norm, unit (BP or FRAG) and resolution or
 // binsize, and sets the file position of the matrix and the normalization vectors for those chromosomes at the given
 // normalization and resolution
-void readFooter(ifstream& fin, long master, int c1, int c2, string matrix, string norm, string unit, int resolution, long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry, vector<double> &expectedValues) {
+void readFooter(ifstream& fin, long long master, int c1, int c2, string matrix, string norm, string unit, int resolution, long long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry, vector<double> &expectedValues) {
   fin.seekg(master, ios::beg);
   int nBytes;
   fin.read((char*)&nBytes, sizeof(int));
@@ -154,8 +154,8 @@ void readFooter(ifstream& fin, long master, int c1, int c2, string matrix, strin
   for (int i=0; i<nEntries; i++) {
     string str;
     getline(fin, str, '\0');
-    long fpos;
-    fin.read((char*)&fpos, sizeof(long));
+    long long fpos;
+    fin.read((char*)&fpos, sizeof(long long));
     int sizeinbytes;
     fin.read((char*)&sizeinbytes, sizeof(int));
     if (str == key) {
@@ -264,8 +264,8 @@ void readFooter(ifstream& fin, long master, int c1, int c2, string matrix, strin
     getline(fin, unit1, '\0'); //unit
     int resolution1;
     fin.read((char*)&resolution1, sizeof(int));
-    long filePosition;
-    fin.read((char*)&filePosition, sizeof(long));
+    long long filePosition;
+    fin.read((char*)&filePosition, sizeof(long long));
     int sizeInBytes;
     fin.read((char*)&sizeInBytes, sizeof(int));
     if (chrIdx == c1 && normtype == norm && unit1 == unit && resolution1 == resolution) {
@@ -318,8 +318,8 @@ bool readMatrixZoomData(ifstream& fin, string myunit, int mybinsize, float &mySu
   for (int b = 0; b < nBlocks; b++) {
     int blockNumber;
     fin.read((char*)&blockNumber, sizeof(int));
-    long filePosition;
-    fin.read((char*)&filePosition, sizeof(long));
+    long long filePosition;
+    fin.read((char*)&filePosition, sizeof(long long));
     int blockSizeInBytes;
     fin.read((char*)&blockSizeInBytes, sizeof(int));
     indexEntry entry;
@@ -332,7 +332,7 @@ bool readMatrixZoomData(ifstream& fin, string myunit, int mybinsize, float &mySu
 
 // goes to the specified file pointer and finds the raw contact matrix at specified resolution, calling readMatrixZoomData.
 // sets blockbincount and blockcolumncount
-void readMatrix(ifstream& fin, long myFilePosition, string unit, int resolution, float &mySumCounts, int &myBlockBinCount, int &myBlockColumnCount) {
+void readMatrix(ifstream& fin, long long myFilePosition, string unit, int resolution, float &mySumCounts, int &myBlockBinCount, int &myBlockColumnCount) {
   fin.seekg(myFilePosition, ios::beg);
   int c1,c2;
   fin.read((char*)&c1, sizeof(int)); //chr1
@@ -570,7 +570,7 @@ Rcpp::DataFrame straw(std::string norm, std::string fname, std::string chr1loc, 
     stop("Norm specified incorrectly, must be one of <BP/FRAG>.\nUsage: juicebox-quick-dump <observed/oe> <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>");
   }
 
-  ifstream fin(fname, fstream::in);
+  ifstream fin(fname, fstream::in | fstream::binary);
   if (!fin) {
     stop("File %s cannot be opened for reading.", fname);
   }
@@ -590,7 +590,7 @@ Rcpp::DataFrame straw(std::string norm, std::string fname, std::string chr1loc, 
     c2pos2 = stoi(y);
   }
   int chr1ind, chr2ind;
-  long master = readHeader(fin, chr1, chr2, c1pos1, c1pos2, c2pos1, c2pos2, chr1ind, chr2ind, chr1len, chr2len);
+  long long master = readHeader(fin, chr1, chr2, c1pos1, c1pos2, c2pos1, c2pos2, chr1ind, chr2ind, chr1len, chr2len);
 
   int c1=min(chr1ind,chr2ind);
   int c2=max(chr1ind,chr2ind);
@@ -619,7 +619,7 @@ Rcpp::DataFrame straw(std::string norm, std::string fname, std::string chr1loc, 
   }
 
   indexEntry c1NormEntry, c2NormEntry;
-  long myFilePos;
+  long long myFilePos;
   vector<double> expectedValues;
 
   // readFooter will assign the above variables
@@ -638,8 +638,8 @@ Rcpp::DataFrame straw(std::string norm, std::string fname, std::string chr1loc, 
   readMatrix(fin, myFilePos, unit, binsize, sumCounts, blockBinCount, blockColumnCount);
   double avgCount;
   if (c1 != c2) {
-    long nBins1 = chr1len / binsize;
-    long nBins2 = chr2len / binsize;
+    long long nBins1 = chr1len / binsize;
+    long long nBins2 = chr2len / binsize;
     avgCount = (sumCounts / nBins1) / nBins2;   // <= trying to avoid overflows
   }
 
