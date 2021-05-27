@@ -85,7 +85,7 @@ long long readHeader(ifstream& fin, string chr1, string chr2, int &c1pos1, int &
 
   fin.read((char*)&version, sizeof(int));
   if (version < 6) {
-    stop("Version %d no long longer supported.", version);
+    stop("Version %d no longer supported.", version);
     // exit(1);
   }
   long long master;
