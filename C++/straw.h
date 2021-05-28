@@ -31,8 +31,8 @@
 
 // pointer structure for reading blocks or matrices, holds the size and position
 struct indexEntry {
-    long size;
-    long position;
+    long long size;
+    long long position;
 };
 
 // sparse matrixType entry
@@ -50,7 +50,7 @@ struct footerInfo {
     int c2;
     int numBins1;
     int numBins2;
-    long myFilePos;
+    long long myFilePos;
     std::string unit;
     std::string norm;
     std::string matrixType;
@@ -63,16 +63,16 @@ struct footerInfo {
 struct chromosome {
     std::string name;
     int index;
-    long length;
+    long long length;
 };
 
 
 bool readMagicString(std::ifstream &fin);
 
-std::map<std::string, chromosome> readHeader(std::istream &fin, long &masterIndexPosition);
+std::map<std::string, chromosome> readHeader(std::istream &fin, long long &masterIndexPosition);
 
-bool readFooter(std::istream &fin, long master, int c1, int c2, std::string matrix, std::string norm, std::string unit,
-                int resolution, long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry,
+bool readFooter(std::istream &fin, long long master, int c1, int c2, std::string matrix, std::string norm, std::string unit,
+                int resolution, long long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry,
                 std::vector<double> &expectedValues);
 
 std::map<int, indexEntry>
