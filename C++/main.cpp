@@ -21,8 +21,8 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
 */
-#include <cstring>
 #include <iostream>
+#include <string>
 #include "straw.h"
 using namespace std;
 
