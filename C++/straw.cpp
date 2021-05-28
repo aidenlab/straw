@@ -92,7 +92,7 @@ char *getData(CURL *curl, long long position, long long chunksize) {
         fprintf(stderr, "curl_easy_perform() failed: %s\n",
                 curl_easy_strerror(res));
     }
-    //  printf("%lu bytes retrieved\n", (long)chunk.size);
+    //  printf("%lu bytes retrieved\n", (long long)chunk.size);
 
     return chunk.memory;
 }
@@ -123,9 +123,9 @@ int readIntFromFile(istream &fin) {
 }
 
 long long readLongLongFromFile(istream &fin) {
-    long long tempLong;
-    fin.read((char *) &tempLong, sizeof(long));
-    return tempLong;
+    long long tempLongLong;
+    fin.read((char *) &tempLongLong, sizeof(long long));
+    return tempLongLong;
 }
 
 float readFloatFromFile(istream &fin) {
@@ -156,7 +156,7 @@ map<string, chromosome> readHeader(istream &fin, long long &masterIndexPosition,
         masterIndexPosition = -1;
         return chromosomeMap;
     }
-    fin.read((char *) &masterIndexPosition, sizeof(long));
+    fin.read((char *) &masterIndexPosition, sizeof(long long));
     getline(fin, genomeID, '\0');
 
     if (version > 8) {
@@ -180,9 +180,9 @@ map<string, chromosome> readHeader(istream &fin, long long &masterIndexPosition,
         long long length;
         getline(fin, name, '\0');
         if (version > 8) {
-            fin.read((char *) &length, sizeof(long));
+            fin.read((char *) &length, sizeof(long long));
         } else {
-            length = (long) readIntFromFile(fin);
+            length = (long long) readIntFromFile(fin);
         }
 
         chromosome chr;
@@ -241,9 +241,9 @@ bool readFooter(istream &fin, long long master, int version, int c1, int c2, con
 
         long long nValues;
         if (version > 8) {
-            fin.read((char *) &nValues, sizeof(long));
+            fin.read((char *) &nValues, sizeof(long long));
         } else {
-            nValues = (long) readIntFromFile(fin);
+            nValues = (long long) readIntFromFile(fin);
         }
 
         bool store = c1 == c2 && matrixType == "oe" && norm == "NONE" && unit0 == unit && binSize == resolution;
@@ -298,9 +298,9 @@ bool readFooter(istream &fin, long long master, int version, int c1, int c2, con
 
         long long nValues;
         if (version > 8) {
-            fin.read((char *) &nValues, sizeof(long));
+            fin.read((char *) &nValues, sizeof(long long));
         } else {
-            nValues = (long) readIntFromFile(fin);
+            nValues = (long long) readIntFromFile(fin);
         }
         bool store = c1 == c2 && matrixType == "oe" && type == norm && unit0 == unit && binSize == resolution;
 
@@ -359,9 +359,9 @@ bool readFooter(istream &fin, long long master, int version, int c1, int c2, con
         long long filePosition = readLongLongFromFile(fin);
         long long sizeInBytes;
         if (version > 8) {
-            fin.read((char *) &sizeInBytes, sizeof(long));
+            fin.read((char *) &sizeInBytes, sizeof(long long));
         } else {
-            sizeInBytes = (long) readIntFromFile(fin);
+            sizeInBytes = (long long) readIntFromFile(fin);
         }
 
         if (chrIdx == c1 && normtype == norm && unit1 == unit && resolution1 == resolution) {
@@ -413,7 +413,7 @@ map<int, indexEntry> readMatrixZoomData(istream &fin, const string &myunit, int 
         long long filePosition = readLongLongFromFile(fin);
         int blockSizeInBytes = readIntFromFile(fin);
         indexEntry entry = indexEntry();
-        entry.size = (long) blockSizeInBytes;
+        entry.size = (long long) blockSizeInBytes;
         entry.position = filePosition;
         if (found) blockMap[blockNumber] = entry;
     }
@@ -464,7 +464,7 @@ map<int, indexEntry> readMatrixZoomDataHttp(CURL *curl, long long &myFilePositio
     int nBlocks = readIntFromFile(fin);
 
     if (found) {
-        int chunkSize = nBlocks * (sizeof(int) + sizeof(long) + sizeof(int));
+        int chunkSize = nBlocks * (sizeof(int) + sizeof(long long) + sizeof(int));
         buffer = getData(curl, myFilePosition + header_size, chunkSize);
         membuf sbuf2(buffer, buffer + chunkSize);
         istream fin2(&sbuf2);
@@ -473,12 +473,12 @@ map<int, indexEntry> readMatrixZoomDataHttp(CURL *curl, long long &myFilePositio
             long long filePosition = readLongLongFromFile(fin2);
             int blockSizeInBytes = readIntFromFile(fin2);
             indexEntry entry = indexEntry();
-            entry.size = (long) blockSizeInBytes;
+            entry.size = (long long) blockSizeInBytes;
             entry.position = filePosition;
             blockMap[blockNumber] = entry;
         }
     } else {
-        myFilePosition = myFilePosition + header_size + (nBlocks * (sizeof(int) + sizeof(long) + sizeof(int)));
+        myFilePosition = myFilePosition + header_size + (nBlocks * (sizeof(int) + sizeof(long long) + sizeof(int)));
     }
     delete buffer;
     return blockMap;
@@ -762,9 +762,9 @@ vector<contactRecord> readBlock(istream &fin, CURL *curl, bool isHttp, indexEntr
 vector<double> readNormalizationVector(istream &bufferin, int version) {
     long long nValues;
     if (version > 8) {
-        bufferin.read((char *) &nValues, sizeof(long));
+        bufferin.read((char *) &nValues, sizeof(long long));
     } else {
-        nValues = (long) readIntFromFile(bufferin);
+        nValues = (long long) readIntFromFile(bufferin);
     }
 
     unsigned long long numValues = static_cast<unsigned long long>(nValues);
