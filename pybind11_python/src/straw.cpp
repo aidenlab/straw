@@ -821,6 +821,14 @@ public:
             }
         }
     }
+
+    void close(){
+        if(isHttp){
+            curl_easy_cleanup(curl);
+        } else {
+            fin.close();
+        }
+    }
 };
 
 class HiCFile {
@@ -893,6 +901,14 @@ public:
             }
             chromosomeMap = readHeader(fin, master, genomeID, numChromosomes,
                                        version, nviPosition, nviLength);
+        }
+    }
+
+    void close(){
+        if(isHttp){
+            curl_easy_cleanup(curl);
+        } else {
+            fin.close();
         }
     }
 
@@ -1145,6 +1161,7 @@ footerInfo getNormalizationInfoForRegion(string fname, string chr1, string chr2,
     footer.c1Norm = mzd->c1Norm;
     footer.c2Norm = mzd->c2Norm;
     footer.expectedValues = mzd->expectedValues;
+    hiCFile->close();
     return footer;
 }
 
@@ -1177,7 +1194,9 @@ getBlockRecordsWithNormalization(string fname,
     footer.c1Norm = c1Norm;
     footer.c2Norm = c2Norm;
     footer.expectedValues = expectedValues;
-    return getBlockRecords(fileReader, origRegionIndices, footer);
+    vector<contactRecord> v = getBlockRecords(fileReader, origRegionIndices, footer);
+    fileReader->close();
+    return v;
 }
 
 vector<contactRecord>
@@ -1212,6 +1231,7 @@ straw(string matrixType, string norm, string fname, string chr1loc, string chr2l
         origRegionIndices[2] = c2pos1;
         origRegionIndices[3] = c2pos2;
     }
+    hiCFile->close();
 
     footerInfo footer = getNormalizationInfoForRegion(fname, chr1, chr2, matrixType, norm, unit, binsize);
 
@@ -1232,6 +1252,7 @@ vector<chromosome> getChromosomes(string fname){
         chromosomes.push_back(static_cast<chromosome>(iter->second));
         iter++;
     }
+    hiCFile->close();
     return chromosomes;
 }
 
