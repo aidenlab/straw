@@ -9,10 +9,10 @@
  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  copies of the Software, and to permit persons to whom the Software is
  furnished to do so, subject to the following conditions:
- 
+
  The above copyright notice and this permission notice shall be included in
  all copies or substantial portions of the Software.
- 
+
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -29,7 +29,7 @@
 #include <vector>
 #include <map>
 
-// pointer structure for reading blocks or matrices, holds the size and position 
+// pointer structure for reading blocks or matrices, holds the size and position
 struct indexEntry {
     long size;
     long position;
@@ -40,6 +40,23 @@ struct contactRecord {
   int binX;
   int binY;
   float counts;
+};
+
+struct footerInfo {
+    int resolution;
+    bool foundFooter;
+    int version;
+    int c1;
+    int c2;
+    int numBins1;
+    int numBins2;
+    long myFilePos;
+    std::string unit;
+    std::string norm;
+    std::string matrixType;
+    std::vector<double> c1Norm;
+    std::vector<double> c2Norm;
+    std::vector<double> expectedValues;
 };
 
 // chromosome
@@ -53,16 +70,18 @@ bool readMagicString(std::ifstream &fin);
 
 std::map<std::string, chromosome> readHeader(std::istream &fin, long &masterIndexPosition);
 
-bool readFooter(std::istream &fin, long master, int c1, int c2, std::string norm, std::string unit, int resolution,
-                long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry);
+bool readFooter(std::istream &fin, long master, int c1, int c2, std::string matrix, std::string norm, std::string unit,
+                int resolution, long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry,
+                std::vector<double> &expectedValues);
 
 std::map<int, indexEntry>
-readMatrixZoomData(std::istream &fin, std::string myunit, int mybinsize, int &myBlockBinCount, int &myBlockColumnCount,
-                   bool &found);
+readMatrixZoomData(std::istream &fin, const std::string &myunit, int mybinsize, float &mySumCounts,
+                   int &myBlockBinCount,
+                   int &myBlockColumnCount, bool &found);
 
 std::map<int, indexEntry>
-readMatrix(std::istream &fin, int myFilePosition, std::string unit, int resolution, int &myBlockBinCount,
-           int &myBlockColumnCount);
+readMatrix(std::istream &fin, int myFilePosition, std::string unit, int resolution, float &mySumCounts,
+           int &myBlockBinCount, int &myBlockColumnCount);
 
 std::set<int>
 getBlockNumbersForRegionFromBinPosition(int *regionIndices, int blockBinCount, int blockColumnCount, bool intra);
@@ -72,9 +91,7 @@ std::vector<contactRecord> readBlock(std::istream &fin, int blockNumber);
 std::vector<double> readNormalizationVector(std::istream &fin, indexEntry entry);
 
 std::vector<contactRecord>
-straw(std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, std::string unit, int binsize);
-
-int
-getSize(std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, std::string unit, int binsize);
+straw(std::string matrixType, std::string norm, std::string fname, std::string chr1loc, std::string chr2loc,
+      const std::string &unit, int binsize);
 
 #endif

@@ -35,10 +35,10 @@ int main(int argc, char *argv[])
         exit(1);
     }
     int offset = 0;
-    string matrix = "observed";
+    string matrixType = "observed";
     if(argc == 8){
         offset = 1;
-        matrix = argv[1];
+        matrixType = argv[1];
     }
     string norm = argv[1 + offset];
     string fname = argv[2 + offset];
@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
     string size = argv[6 + offset];
     int binsize = stoi(size);
     vector<contactRecord> records;
-    records = straw(matrix, norm, fname, chr1loc, chr2loc, unit, binsize);
+    records = straw(matrixType, norm, fname, chr1loc, chr2loc, unit, binsize);
     long length = records.size();
     for (long i = 0; i < length; i++) {
         printf("%d\t%d\t%.14g\n", records[i].binX, records[i].binY, records[i].counts);

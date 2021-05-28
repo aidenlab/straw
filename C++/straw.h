@@ -35,11 +35,28 @@ struct indexEntry {
     long position;
 };
 
-// sparse matrix entry
+// sparse matrixType entry
 struct contactRecord {
   int binX;
   int binY;
     float counts;
+};
+
+struct footerInfo {
+    int resolution;
+    bool foundFooter;
+    int version;
+    int c1;
+    int c2;
+    int numBins1;
+    int numBins2;
+    long myFilePos;
+    std::string unit;
+    std::string norm;
+    std::string matrixType;
+    std::vector<double> c1Norm;
+    std::vector<double> c2Norm;
+    std::vector<double> expectedValues;
 };
 
 // chromosome
@@ -59,7 +76,8 @@ bool readFooter(std::istream &fin, long master, int c1, int c2, std::string matr
                 std::vector<double> &expectedValues);
 
 std::map<int, indexEntry>
-readMatrixZoomData(std::istream &fin, std::string myunit, int mybinsize, float &mySumCounts, int &myBlockBinCount,
+readMatrixZoomData(std::istream &fin, const std::string &myunit, int mybinsize, float &mySumCounts,
+                   int &myBlockBinCount,
                    int &myBlockColumnCount, bool &found);
 
 std::map<int, indexEntry>
@@ -74,11 +92,7 @@ std::vector<contactRecord> readBlock(std::istream &fin, int blockNumber);
 std::vector<double> readNormalizationVector(std::istream &fin, indexEntry entry);
 
 std::vector<contactRecord>
-straw(std::string matrix, std::string norm, std::string fname, std::string chr1loc, std::string chr2loc,
-      std::string unit, int binsize);
-
-int
-getSize(std::string matrix, std::string norm, std::string fname, std::string chr1loc, std::string chr2loc,
-        std::string unit, int binsize);
+straw(std::string matrixType, std::string norm, std::string fname, std::string chr1loc, std::string chr2loc,
+      const std::string &unit, int binsize);
 
 #endif
