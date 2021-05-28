@@ -637,7 +637,7 @@ vector<contactRecord> readBlock(istream &fin, CURL *curl, bool isHttp, indexEntr
     // create stream from buffer for ease of use
     membuf sbuf(uncompressedBytes, uncompressedBytes + uncompressedSize);
     istream bufferin(&sbuf);
-    unsigned long long nRecords = static_cast<unsigned long>(readIntFromFile(bufferin));
+    unsigned long long nRecords = static_cast<unsigned long long>(readIntFromFile(bufferin));
     vector<contactRecord> v(nRecords);
     // different versions have different specific formats
     if (version < 7) {
@@ -767,7 +767,7 @@ vector<double> readNormalizationVector(istream &bufferin, int version) {
         nValues = (long) readIntFromFile(bufferin);
     }
 
-    unsigned long long numValues = static_cast<unsigned long>(nValues);
+    unsigned long long numValues = static_cast<unsigned long long>(nValues);
     vector<double> values(numValues);
 
     if (version > 8) {
@@ -835,7 +835,7 @@ public:
     bool isHttp = false;
     ifstream fin;
     CURL *curl;
-    long long master = 0L;
+    long long master = 0LL;
     map<string, chromosome> chromosomeMap;
     string genomeID;
     int numChromosomes = 0;
@@ -927,12 +927,12 @@ public:
     }
 };
 
-long long HiCFile::totalFileSize = 0L;
+long long HiCFile::totalFileSize = 0LL;
 
 class MatrixZoomData {
 public:
     indexEntry c1NormEntry, c2NormEntry;
-    long long myFilePos = 0L;
+    long long myFilePos = 0LL;
     vector<double> expectedValues;
     bool foundFooter = false;
     vector<double> c1Norm;
@@ -1025,7 +1025,7 @@ void parsePositions(const string &chrLoc, string &chrom, long long &pos1, long l
         pos1 = stol(x);
         pos2 = stol(y);
     } else {
-        pos1 = 0L;
+        pos1 = 0LL;
         pos2 = map[chrom].length;
     }
 }
