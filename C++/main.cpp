@@ -46,11 +46,11 @@ int main(int argc, char *argv[])
     string chr2loc = argv[4 + offset];
     string unit = argv[5 + offset];
     string size = argv[6 + offset];
-    int binsize = stoi(size);
+    int32_t binsize = stoi(size);
     vector<contactRecord> records;
     records = straw(matrixType, norm, fname, chr1loc, chr2loc, unit, binsize);
-    long length = records.size();
-    for (long i = 0; i < length; i++) {
+    size_t length = records.size();
+    for (int i = 0; i < length; i++) {
         printf("%d\t%d\t%.14g\n", records[i].binX, records[i].binY, records[i].counts);
     }
 }
