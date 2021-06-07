@@ -1292,7 +1292,7 @@ namespace py = pybind11;
 PYBIND11_MODULE(strawC, m) {
 m.doc() = "Fast hybrid tool for reading .hic files; see https://github.com/aidenlab/straw for documentation";
 
-m.def("straw", &straw, "get contact records");
+m.def("strawC", &straw, "get contact records");
 m.def("getRecords", &getBlockRecordsWithNormalization, "get contact records using normalization info");
 m.def("getChromosomes", &getChromosomes, "get chromosomes in hic file");
 m.def("getNormExpVectors", &getNormalizationInfoForRegion, "get normalization or expected vectors");
