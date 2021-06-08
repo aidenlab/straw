@@ -691,3 +691,115 @@ Rcpp::DataFrame straw(std::string norm, std::string fname, std::string chr1loc, 
   }
   return Rcpp::DataFrame::create(Rcpp::Named("x") = xActual_vec, Rcpp::Named("y") = yActual_vec, Rcpp::Named("counts") = counts_vec);
 }
+
+//' Function for reading basepair resolutions from .hic file
+//'
+//' @param fname path to .hic file
+//' @return Vector of basepair resolutions
+//' @export
+// [[Rcpp::export]]
+NumericVector readHicBpResolutions(std::string fname)
+{
+  ifstream fin(fname, ios::in | ios::binary);
+  if (!fin) {
+    stop("File %s cannot be opened for reading.", fname);
+  }
+
+  if (!readMagicString(fin)) {
+    fin.close();
+    stop("Hi-C magic string is missing, does not appear to be a hic file.");
+  }
+
+  int version;
+  fin.read((char*)&version, sizeof(int));
+  if (version < 6) {
+    fin.close();
+    stop("Version %d no longer supported.", version);
+  }
+  long master;
+  fin.read((char*)&master, sizeof(long));
+  string genome;
+  getline(fin, genome, '\0' );
+  int nattributes;
+  fin.read((char*)&nattributes, sizeof(int));
+  // reading and ignoring attribute-value dictionary
+  for (int i=0; i<nattributes; i++) {
+    string key, value;
+    getline(fin, key, '\0');
+    getline(fin, value, '\0');
+  }
+  int nChrs;
+  fin.read((char*)&nChrs, sizeof(int));
+  // chromosome map for finding matrix
+  for (int i=0; i<nChrs; i++) {
+    string name;
+    int length;
+    getline(fin, name, '\0');
+    fin.read((char*)&length, sizeof(int));
+  }
+  int nBpResolutions;
+  fin.read((char*)&nBpResolutions, sizeof(int));
+  NumericVector bpResolutions(nBpResolutions);
+  for (int i=0; i<nBpResolutions; i++) {
+    int resBP;
+    fin.read((char*)&resBP, sizeof(int));
+    bpResolutions[i] = resBP;
+  }
+
+  fin.close();
+
+  return bpResolutions;
+}
+
+//' Function for reading chromosomes from .hic file
+//'
+//' @param fname path to .hic file
+//' @return Data frame of chromosome names and lengths
+//' @export
+// [[Rcpp::export]]
+DataFrame readHicChroms(std::string fname)
+{
+  ifstream fin(fname, ios::in | ios::binary);
+  if (!fin) {
+    stop("File %s cannot be opened for reading.", fname);
+  }
+
+  if (!readMagicString(fin)) {
+    fin.close();
+    stop("Hi-C magic string is missing, does not appear to be a hic file.");
+  }
+
+  int version;
+  fin.read((char*)&version, sizeof(int));
+  if (version < 6) {
+    fin.close();
+    stop("Version %d no longer supported.", version);
+  }
+  long master;
+  fin.read((char*)&master, sizeof(long));
+  string genome;
+  getline(fin, genome, '\0' );
+  int nattributes;
+  fin.read((char*)&nattributes, sizeof(int));
+  // reading and ignoring attribute-value dictionary
+  for (int i=0; i<nattributes; i++) {
+    string key, value;
+    getline(fin, key, '\0');
+    getline(fin, value, '\0');
+  }
+  int nChrs;
+  fin.read((char*)&nChrs, sizeof(int));
+  StringVector chrom_names(nChrs);
+  NumericVector chrom_lengths(nChrs);
+  for (int i=0; i<nChrs; i++) {
+    string name;
+    int length;
+    getline(fin, name, '\0');
+    fin.read((char*)&length, sizeof(int));
+    chrom_names[i] = name;
+    chrom_lengths[i] = length;
+  }
+  fin.close();
+
+  return DataFrame::create(Named("name") = chrom_names , Named("length") = chrom_lengths);
+}

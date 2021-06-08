@@ -28,3 +28,21 @@ straw <- function(norm, fname, chr1loc, chr2loc, unit, binsize, matrix = "observ
     .Call('_strawr_straw', PACKAGE = 'strawr', norm, fname, chr1loc, chr2loc, unit, binsize, matrix)
 }
 
+#' Function for reading basepair resolutions from .hic file
+#'
+#' @param fname path to .hic file
+#' @return Vector of basepair resolutions
+#' @export
+readHicBpResolutions <- function(fname) {
+    .Call('_strawr_readHicBpResolutions', PACKAGE = 'strawr', fname)
+}
+
+#' Function for reading chromosomes from .hic file
+#'
+#' @param fname path to .hic file
+#' @return Data frame of chromosome names and lengths
+#' @export
+readHicChroms <- function(fname) {
+    .Call('_strawr_readHicChroms', PACKAGE = 'strawr', fname)
+}
+
