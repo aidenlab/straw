@@ -31,26 +31,26 @@
 
 // pointer structure for reading blocks or matrices, holds the size and position
 struct indexEntry {
-    long long size;
-    long long position;
+    int64_t size;
+    int64_t position;
 };
 
 // sparse matrixType entry
 struct contactRecord {
-  int binX;
-  int binY;
-    float counts;
+  int32_t binX;
+  int32_t binY;
+  float counts;
 };
 
 struct footerInfo {
-    int resolution;
+    int32_t resolution;
     bool foundFooter;
-    int version;
-    int c1;
-    int c2;
-    int numBins1;
-    int numBins2;
-    long long myFilePos;
+    int32_t version;
+    int32_t c1;
+    int32_t c2;
+    int32_t numBins1;
+    int32_t numBins2;
+    int64_t myFilePos;
     std::string unit;
     std::string norm;
     std::string matrixType;
@@ -62,37 +62,37 @@ struct footerInfo {
 // chromosome
 struct chromosome {
     std::string name;
-    int index;
-    long long length;
+    int32_t index;
+    int64_t length;
 };
 
 
 bool readMagicString(std::ifstream &fin);
 
-std::map<std::string, chromosome> readHeader(std::istream &fin, long long &masterIndexPosition);
+std::map<std::string, chromosome> readHeader(std::istream &fin, int64_t &masterIndexPosition);
 
-bool readFooter(std::istream &fin, long long master, int c1, int c2, std::string matrix, std::string norm, std::string unit,
-                int resolution, long long &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry,
+bool readFooter(std::istream &fin, int64_t master, int32_t c1, int32_t c2, std::string matrix, std::string norm, std::string unit,
+                int32_t resolution, int64_t &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry,
                 std::vector<double> &expectedValues);
 
-std::map<int, indexEntry>
-readMatrixZoomData(std::istream &fin, const std::string &myunit, int mybinsize, float &mySumCounts,
-                   int &myBlockBinCount,
-                   int &myBlockColumnCount, bool &found);
+std::map<int32_t, indexEntry>
+readMatrixZoomData(std::istream &fin, const std::string &myunit, int32_t mybinsize, float &mySumCounts,
+                   int32_t &myBlockBinCount,
+                   int32_t &myBlockColumnCount, bool &found);
 
-std::map<int, indexEntry>
-readMatrix(std::istream &fin, int myFilePosition, std::string unit, int resolution, float &mySumCounts,
-           int &myBlockBinCount, int &myBlockColumnCount);
+std::map<int32_t, indexEntry>
+readMatrix(std::istream &fin, int32_t myFilePosition, std::string unit, int32_t resolution, float &mySumCounts,
+           int32_t &myBlockBinCount, int32_t &myBlockColumnCount);
 
-std::set<int>
-getBlockNumbersForRegionFromBinPosition(int *regionIndices, int blockBinCount, int blockColumnCount, bool intra);
+std::set<int32_t>
+getBlockNumbersForRegionFromBinPosition(int32_t *regionIndices, int32_t blockBinCount, int32_t blockColumnCount, bool intra);
 
-std::vector<contactRecord> readBlock(std::istream &fin, int blockNumber);
+std::vector<contactRecord> readBlock(std::istream &fin, int32_t blockNumber);
 
 std::vector<double> readNormalizationVector(std::istream &fin, indexEntry entry);
 
 std::vector<contactRecord>
 straw(std::string matrixType, std::string norm, std::string fname, std::string chr1loc, std::string chr2loc,
-      const std::string &unit, int binsize);
+      const std::string &unit, int32_t binsize);
 
 #endif
