@@ -23,8 +23,8 @@ Balanced normalization.}
 250000, 100000, 50000, 25000, 10000, 5000> and for FRAG this is one of <500, 200,
 100, 50, 20, 5, 2, 1>.}
 
-\item{matrix}{Type of matrix to output. Must be one of observed/oe.
-observed is observed counts, oe is observed/expected counts.}
+\item{matrix}{Type of matrix to output. Must be one of observed/oe/expected.
+observed is observed counts, oe is observed/expected counts, expected is expected counts.}
 }
 \value{
 Data.frame of a sparse matrix of data from hic file. x,y,counts

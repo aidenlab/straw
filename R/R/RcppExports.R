@@ -20,8 +20,8 @@
 #' @param binsize The bin size. By default, for BP, this is one of <2500000, 1000000, 500000,
 #'     250000, 100000, 50000, 25000, 10000, 5000> and for FRAG this is one of <500, 200,
 #'     100, 50, 20, 5, 2, 1>.
-#' @param matrix Type of matrix to output. Must be one of observed/oe.
-#'     observed is observed counts, oe is observed/expected counts.
+#' @param matrix Type of matrix to output. Must be one of observed/oe/expected.
+#'     observed is observed counts, oe is observed/expected counts, expected is expected counts.
 #' @return Data.frame of a sparse matrix of data from hic file. x,y,counts
 #' @export
 straw <- function(norm, fname, chr1loc, chr2loc, unit, binsize, matrix = "observed") {

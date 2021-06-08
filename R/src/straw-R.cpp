@@ -168,7 +168,7 @@ void readFooter(ifstream& fin, int64_t master, int32_t c1, int32_t c2, string ma
     // exit(1);
   }
 
-  if ((matrix=="observed" && norm=="NONE") || (matrix=="oe" && norm=="NONE" && c1!=c2)) return; // no need to read norm vector index
+  if ((matrix=="observed" && norm=="NONE") || ((matrix=="oe" || matrix=="expected") && norm=="NONE" && c1!=c2)) return; // no need to read norm vector index
 
   // read in and ignore expected value maps; don't store; reading these to
   // get to norm vector index
@@ -558,8 +558,8 @@ vector<double> readNormalizationVector(ifstream& fin, indexEntry entry) {
 //' @param binsize The bin size. By default, for BP, this is one of <2500000, 1000000, 500000,
 //'     250000, 100000, 50000, 25000, 10000, 5000> and for FRAG this is one of <500, 200,
 //'     100, 50, 20, 5, 2, 1>.
-//' @param matrix Type of matrix to output. Must be one of observed/oe.
-//'     observed is observed counts, oe is observed/expected counts.
+//' @param matrix Type of matrix to output. Must be one of observed/oe/expected.
+//'     observed is observed counts, oe is observed/expected counts, expected is expected counts.
 //' @return Data.frame of a sparse matrix of data from hic file. x,y,counts
 //' @export
 // [[Rcpp::export]]
@@ -667,6 +667,14 @@ Rcpp::DataFrame straw(std::string norm, std::string fname, std::string chr1loc, 
         }
         else {
           counts = counts / avgCount;
+        }
+      }
+      else if (matrix == "expected") {
+        if (c1 == c2) {
+          counts = expectedValues[min(expectedValues.size() - 1, (size_t)floor(abs(yActual - xActual) / binsize))];
+        }
+        else {
+          counts = avgCount;
         }
       }
 //      cout << xActual << " " << yActual << " " << counts << endl;
