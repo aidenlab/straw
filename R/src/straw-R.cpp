@@ -182,7 +182,7 @@ void readFooter(ifstream& fin, int64_t master, int32_t c1, int32_t c2, string ma
 
     int32_t nValues;
     fin.read((char*)&nValues, sizeof(int32_t));
-    bool store = c1 == c2 && matrix == "oe" && norm == "NONE" && unit0 == unit && binSize == resolution;
+    bool store = c1 == c2 && (matrix=="oe" || matrix=="expected") && norm == "NONE" && unit0 == unit && binSize == resolution;
     for (int j=0; j<nValues; j++) {
       double v;
       fin.read((char*)&v, sizeof(double));
@@ -205,7 +205,7 @@ void readFooter(ifstream& fin, int64_t master, int32_t c1, int32_t c2, string ma
       }
     }
   }
-  if (c1 == c2 && matrix == "oe" && norm == "NONE") {
+  if (c1 == c2 && (matrix=="oe" || matrix=="expected") && norm == "NONE") {
     if (expectedValues.size() == 0) {
       stop("File did not contain expected values vectors at %d %s.", resolution, unit);
       // exit(1);
@@ -223,7 +223,7 @@ void readFooter(ifstream& fin, int64_t master, int32_t c1, int32_t c2, string ma
 
     int32_t nValues;
     fin.read((char*)&nValues, sizeof(int32_t));
-    bool store = c1 == c2 && matrix == "oe" && type == norm && unit0 == unit && binSize == resolution;
+    bool store = c1 == c2 && (matrix=="oe" || matrix=="expected") && type == norm && unit0 == unit && binSize == resolution;
     for (int j=0; j<nValues; j++) {
       double v;
       fin.read((char*)&v, sizeof(double));
@@ -245,7 +245,7 @@ void readFooter(ifstream& fin, int64_t master, int32_t c1, int32_t c2, string ma
       }
     }
   }
-  if (c1 == c2 && matrix == "oe" && norm != "NONE") {
+  if (c1 == c2 && (matrix=="oe" || matrix=="expected") && norm != "NONE") {
     if (expectedValues.size() == 0) {
       stop("File did not contain normalized expected values vectors at %d %s.", resolution, unit);
       // exit(1);
