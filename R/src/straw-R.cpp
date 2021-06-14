@@ -561,6 +561,8 @@ vector<double> readNormalizationVector(ifstream& fin, indexEntry entry) {
 //' @param matrix Type of matrix to output. Must be one of observed/oe/expected.
 //'     observed is observed counts, oe is observed/expected counts, expected is expected counts.
 //' @return Data.frame of a sparse matrix of data from hic file. x,y,counts
+//' @examples
+//' straw("NONE", system.file("extdata", "test.hic", package = "strawr"), "1", "1", "BP", 2500000)
 //' @export
 // [[Rcpp::export]]
 Rcpp::DataFrame straw(std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, std::string unit, int32_t binsize, std::string matrix = "observed")
@@ -696,6 +698,8 @@ Rcpp::DataFrame straw(std::string norm, std::string fname, std::string chr1loc, 
 //'
 //' @param fname path to .hic file
 //' @return Vector of basepair resolutions
+//' @examples
+//' readHicBpResolutions(system.file("extdata", "test.hic", package = "strawr"))
 //' @export
 // [[Rcpp::export]]
 NumericVector readHicBpResolutions(std::string fname)
@@ -755,6 +759,8 @@ NumericVector readHicBpResolutions(std::string fname)
 //'
 //' @param fname path to .hic file
 //' @return Data frame of chromosome names and lengths
+//' @examples
+//' readHicChroms(system.file("extdata", "test.hic", package = "strawr"))
 //' @export
 // [[Rcpp::export]]
 DataFrame readHicChroms(std::string fname)

@@ -23,6 +23,8 @@
 #' @param matrix Type of matrix to output. Must be one of observed/oe/expected.
 #'     observed is observed counts, oe is observed/expected counts, expected is expected counts.
 #' @return Data.frame of a sparse matrix of data from hic file. x,y,counts
+#' @examples
+#' straw("NONE", system.file("extdata", "test.hic", package = "strawr"), "1", "1", "BP", 2500000)
 #' @export
 straw <- function(norm, fname, chr1loc, chr2loc, unit, binsize, matrix = "observed") {
     .Call('_strawr_straw', PACKAGE = 'strawr', norm, fname, chr1loc, chr2loc, unit, binsize, matrix)
@@ -32,6 +34,8 @@ straw <- function(norm, fname, chr1loc, chr2loc, unit, binsize, matrix = "observ
 #'
 #' @param fname path to .hic file
 #' @return Vector of basepair resolutions
+#' @examples
+#' readHicBpResolutions(system.file("extdata", "test.hic", package = "strawr"))
 #' @export
 readHicBpResolutions <- function(fname) {
     .Call('_strawr_readHicBpResolutions', PACKAGE = 'strawr', fname)
@@ -41,6 +45,8 @@ readHicBpResolutions <- function(fname) {
 #'
 #' @param fname path to .hic file
 #' @return Data frame of chromosome names and lengths
+#' @examples
+#' readHicChroms(system.file("extdata", "test.hic", package = "strawr"))
 #' @export
 readHicChroms <- function(fname) {
     .Call('_strawr_readHicChroms', PACKAGE = 'strawr', fname)

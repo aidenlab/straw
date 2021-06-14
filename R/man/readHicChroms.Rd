@@ -15,3 +15,6 @@ Data frame of chromosome names and lengths
 \description{
 Function for reading chromosomes from .hic file
 }
+\examples{
+readHicChroms(system.file("extdata", "test.hic", package = "strawr"))
+}

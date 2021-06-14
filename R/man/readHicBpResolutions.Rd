@@ -15,3 +15,6 @@ Vector of basepair resolutions
 \description{
 Function for reading basepair resolutions from .hic file
 }
+\examples{
+readHicBpResolutions(system.file("extdata", "test.hic", package = "strawr"))
+}
