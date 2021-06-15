@@ -388,7 +388,7 @@ vector<contactRecord> readBlock(ifstream& fin, int32_t blockNumber) {
     vector<contactRecord> v;
     return v;
   }
-  char compressedBytes[idx.size];
+  char* compressedBytes = new char[idx.size];
   char* uncompressedBytes = new char[idx.size*10]; //biggest seen so far is 3
   fin.seekg(idx.position, ios::beg);
   fin.read(compressedBytes, idx.size);
@@ -511,13 +511,14 @@ vector<contactRecord> readBlock(ifstream& fin, int32_t blockNumber) {
       }
     }
   }
+  delete[] compressedBytes; // don't forget to delete your heap arrays in C++!
   delete[] uncompressedBytes; // don't forget to delete your heap arrays in C++!
   return v;
 }
 
 // reads the normalization vector from the file at the specified location
 vector<double> readNormalizationVector(ifstream& fin, indexEntry entry) {
-  char buffer[entry.size];
+  char* buffer = new char[entry.size];
   fin.seekg(entry.position, ios::beg);
   fin.read(buffer, entry.size);
   membuf sbuf(buffer, buffer + entry.size);
@@ -536,6 +537,7 @@ vector<double> readNormalizationVector(ifstream& fin, indexEntry entry) {
       }*/
   }
   //  if (allNaN) return null;
+  delete[] buffer; // don't forget to delete your heap arrays in C++!
   return values;
 }
 
