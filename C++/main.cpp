@@ -31,7 +31,7 @@ int main(int argc, char *argv[])
     if (argc != 7 && argc != 8) {
         cerr << "Incorrect arguments" << endl;
         cerr << "Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
-        cerr << "Usage: straw <oe> <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
+        cerr << "Usage: straw <oe/expected> <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
         exit(1);
     }
     int offset = 0;

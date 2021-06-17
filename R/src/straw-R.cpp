@@ -168,7 +168,7 @@ void readFooter(ifstream& fin, int64_t master, int32_t c1, int32_t c2, string ma
     // exit(1);
   }
 
-  if ((matrix=="observed" && norm=="NONE") || (matrix=="oe" && norm=="NONE" && c1!=c2)) return; // no need to read norm vector index
+  if ((matrix=="observed" && norm=="NONE") || ((matrix=="oe" || matrix=="expected") && norm=="NONE" && c1!=c2)) return; // no need to read norm vector index
 
   // read in and ignore expected value maps; don't store; reading these to
   // get to norm vector index
@@ -182,7 +182,7 @@ void readFooter(ifstream& fin, int64_t master, int32_t c1, int32_t c2, string ma
 
     int32_t nValues;
     fin.read((char*)&nValues, sizeof(int32_t));
-    bool store = c1 == c2 && matrix == "oe" && norm == "NONE" && unit0 == unit && binSize == resolution;
+    bool store = c1 == c2 && (matrix=="oe" || matrix=="expected") && norm == "NONE" && unit0 == unit && binSize == resolution;
     for (int j=0; j<nValues; j++) {
       double v;
       fin.read((char*)&v, sizeof(double));
@@ -205,7 +205,7 @@ void readFooter(ifstream& fin, int64_t master, int32_t c1, int32_t c2, string ma
       }
     }
   }
-  if (c1 == c2 && matrix == "oe" && norm == "NONE") {
+  if (c1 == c2 && (matrix=="oe" || matrix=="expected") && norm == "NONE") {
     if (expectedValues.size() == 0) {
       stop("File did not contain expected values vectors at %d %s.", resolution, unit);
       // exit(1);
@@ -223,7 +223,7 @@ void readFooter(ifstream& fin, int64_t master, int32_t c1, int32_t c2, string ma
 
     int32_t nValues;
     fin.read((char*)&nValues, sizeof(int32_t));
-    bool store = c1 == c2 && matrix == "oe" && type == norm && unit0 == unit && binSize == resolution;
+    bool store = c1 == c2 && (matrix=="oe" || matrix=="expected") && type == norm && unit0 == unit && binSize == resolution;
     for (int j=0; j<nValues; j++) {
       double v;
       fin.read((char*)&v, sizeof(double));
@@ -245,7 +245,7 @@ void readFooter(ifstream& fin, int64_t master, int32_t c1, int32_t c2, string ma
       }
     }
   }
-  if (c1 == c2 && matrix == "oe" && norm != "NONE") {
+  if (c1 == c2 && (matrix=="oe" || matrix=="expected") && norm != "NONE") {
     if (expectedValues.size() == 0) {
       stop("File did not contain normalized expected values vectors at %d %s.", resolution, unit);
       // exit(1);
@@ -388,7 +388,7 @@ vector<contactRecord> readBlock(ifstream& fin, int32_t blockNumber) {
     vector<contactRecord> v;
     return v;
   }
-  char compressedBytes[idx.size];
+  char* compressedBytes = new char[idx.size];
   char* uncompressedBytes = new char[idx.size*10]; //biggest seen so far is 3
   fin.seekg(idx.position, ios::beg);
   fin.read(compressedBytes, idx.size);
@@ -511,13 +511,14 @@ vector<contactRecord> readBlock(ifstream& fin, int32_t blockNumber) {
       }
     }
   }
+  delete[] compressedBytes; // don't forget to delete your heap arrays in C++!
   delete[] uncompressedBytes; // don't forget to delete your heap arrays in C++!
   return v;
 }
 
 // reads the normalization vector from the file at the specified location
 vector<double> readNormalizationVector(ifstream& fin, indexEntry entry) {
-  char buffer[entry.size];
+  char* buffer = new char[entry.size];
   fin.seekg(entry.position, ios::beg);
   fin.read(buffer, entry.size);
   membuf sbuf(buffer, buffer + entry.size);
@@ -536,6 +537,7 @@ vector<double> readNormalizationVector(ifstream& fin, indexEntry entry) {
       }*/
   }
   //  if (allNaN) return null;
+  delete[] buffer; // don't forget to delete your heap arrays in C++!
   return values;
 }
 
@@ -558,9 +560,11 @@ vector<double> readNormalizationVector(ifstream& fin, indexEntry entry) {
 //' @param binsize The bin size. By default, for BP, this is one of <2500000, 1000000, 500000,
 //'     250000, 100000, 50000, 25000, 10000, 5000> and for FRAG this is one of <500, 200,
 //'     100, 50, 20, 5, 2, 1>.
-//' @param matrix Type of matrix to output. Must be one of observed/oe.
-//'     observed is observed counts, oe is observed/expected counts.
+//' @param matrix Type of matrix to output. Must be one of observed/oe/expected.
+//'     observed is observed counts, oe is observed/expected counts, expected is expected counts.
 //' @return Data.frame of a sparse matrix of data from hic file. x,y,counts
+//' @examples
+//' straw("NONE", system.file("extdata", "test.hic", package = "strawr"), "1", "1", "BP", 2500000)
 //' @export
 // [[Rcpp::export]]
 Rcpp::DataFrame straw(std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, std::string unit, int32_t binsize, std::string matrix = "observed")
@@ -669,6 +673,14 @@ Rcpp::DataFrame straw(std::string norm, std::string fname, std::string chr1loc, 
           counts = counts / avgCount;
         }
       }
+      else if (matrix == "expected") {
+        if (c1 == c2) {
+          counts = expectedValues[min(expectedValues.size() - 1, (size_t)floor(abs(yActual - xActual) / binsize))];
+        }
+        else {
+          counts = avgCount;
+        }
+      }
 //      cout << xActual << " " << yActual << " " << counts << endl;
       if ((xActual >= origRegionIndices[0] && xActual <= origRegionIndices[1] &&
 	   yActual >= origRegionIndices[2] && yActual <= origRegionIndices[3]) ||
@@ -682,4 +694,120 @@ Rcpp::DataFrame straw(std::string norm, std::string fname, std::string chr1loc, 
     }
   }
   return Rcpp::DataFrame::create(Rcpp::Named("x") = xActual_vec, Rcpp::Named("y") = yActual_vec, Rcpp::Named("counts") = counts_vec);
+}
+
+//' Function for reading basepair resolutions from .hic file
+//'
+//' @param fname path to .hic file
+//' @return Vector of basepair resolutions
+//' @examples
+//' readHicBpResolutions(system.file("extdata", "test.hic", package = "strawr"))
+//' @export
+// [[Rcpp::export]]
+NumericVector readHicBpResolutions(std::string fname)
+{
+  ifstream fin(fname, ios::in | ios::binary);
+  if (!fin) {
+    stop("File %s cannot be opened for reading.", fname);
+  }
+
+  if (!readMagicString(fin)) {
+    fin.close();
+    stop("Hi-C magic string is missing, does not appear to be a hic file.");
+  }
+
+  int version;
+  fin.read((char*)&version, sizeof(int));
+  if (version < 6) {
+    fin.close();
+    stop("Version %d no longer supported.", version);
+  }
+  long master;
+  fin.read((char*)&master, sizeof(long));
+  string genome;
+  getline(fin, genome, '\0' );
+  int nattributes;
+  fin.read((char*)&nattributes, sizeof(int));
+  // reading and ignoring attribute-value dictionary
+  for (int i=0; i<nattributes; i++) {
+    string key, value;
+    getline(fin, key, '\0');
+    getline(fin, value, '\0');
+  }
+  int nChrs;
+  fin.read((char*)&nChrs, sizeof(int));
+  // chromosome map for finding matrix
+  for (int i=0; i<nChrs; i++) {
+    string name;
+    int length;
+    getline(fin, name, '\0');
+    fin.read((char*)&length, sizeof(int));
+  }
+  int nBpResolutions;
+  fin.read((char*)&nBpResolutions, sizeof(int));
+  NumericVector bpResolutions(nBpResolutions);
+  for (int i=0; i<nBpResolutions; i++) {
+    int resBP;
+    fin.read((char*)&resBP, sizeof(int));
+    bpResolutions[i] = resBP;
+  }
+
+  fin.close();
+
+  return bpResolutions;
+}
+
+//' Function for reading chromosomes from .hic file
+//'
+//' @param fname path to .hic file
+//' @return Data frame of chromosome names and lengths
+//' @examples
+//' readHicChroms(system.file("extdata", "test.hic", package = "strawr"))
+//' @export
+// [[Rcpp::export]]
+DataFrame readHicChroms(std::string fname)
+{
+  ifstream fin(fname, ios::in | ios::binary);
+  if (!fin) {
+    stop("File %s cannot be opened for reading.", fname);
+  }
+
+  if (!readMagicString(fin)) {
+    fin.close();
+    stop("Hi-C magic string is missing, does not appear to be a hic file.");
+  }
+
+  int version;
+  fin.read((char*)&version, sizeof(int));
+  if (version < 6) {
+    fin.close();
+    stop("Version %d no longer supported.", version);
+  }
+  long master;
+  fin.read((char*)&master, sizeof(long));
+  string genome;
+  getline(fin, genome, '\0' );
+  int nattributes;
+  fin.read((char*)&nattributes, sizeof(int));
+  // reading and ignoring attribute-value dictionary
+  for (int i=0; i<nattributes; i++) {
+    string key, value;
+    getline(fin, key, '\0');
+    getline(fin, value, '\0');
+  }
+  int nChrs;
+  fin.read((char*)&nChrs, sizeof(int));
+  StringVector chrom_names(nChrs);
+  NumericVector chrom_lengths(nChrs);
+  for (int i=0; i<nChrs; i++) {
+    string name;
+    int length;
+    getline(fin, name, '\0');
+    fin.read((char*)&length, sizeof(int));
+    chrom_names[i] = name;
+    chrom_lengths[i] = length;
+  }
+  fin.close();
+
+  return DataFrame::create(Named("name") = chrom_names , Named("length") = chrom_lengths);
 }

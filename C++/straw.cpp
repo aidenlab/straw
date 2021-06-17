@@ -228,7 +228,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
         return false;
     }
 
-    if ((matrixType == "observed" && norm == "NONE") || (matrixType == "oe" && norm == "NONE" && c1 != c2))
+    if ((matrixType == "observed" && norm == "NONE") || ((matrixType == "oe" || matrixType == "expected") && norm == "NONE" && c1 != c2))
         return true; // no need to read norm vector index
 
     // read in and ignore expected value maps; don't store; reading these to
@@ -246,7 +246,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
             nValues = (int64_t) readInt32FromFile(fin);
         }
 
-        bool store = c1 == c2 && matrixType == "oe" && norm == "NONE" && unit0 == unit && binSize == resolution;
+        bool store = c1 == c2 && (matrixType == "oe" || matrixType == "expected") && norm == "NONE" && unit0 == unit && binSize == resolution;
 
         if (version > 8) {
             for (int j = 0; j < nValues; j++) {
@@ -281,7 +281,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
         }
     }
 
-    if (c1 == c2 && matrixType == "oe" && norm == "NONE") {
+    if (c1 == c2 && (matrixType == "oe" || matrixType == "expected") && norm == "NONE") {
         if (expectedValues.empty()) {
             cerr << "File did not contain expected values vectors at " << resolution << " " << unit << endl;
             return false;
@@ -302,7 +302,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
         } else {
             nValues = (int64_t) readInt32FromFile(fin);
         }
-        bool store = c1 == c2 && matrixType == "oe" && type == norm && unit0 == unit && binSize == resolution;
+        bool store = c1 == c2 && (matrixType == "oe" || matrixType == "expected") && type == norm && unit0 == unit && binSize == resolution;
 
         if (version > 8) {
             for (int j = 0; j < nValues; j++) {
@@ -338,7 +338,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
         }
     }
 
-    if (c1 == c2 && matrixType == "oe" && norm != "NONE") {
+    if (c1 == c2 && (matrixType == "oe" || matrixType == "expected") && norm != "NONE") {
         if (expectedValues.empty()) {
             cerr << "File did not contain normalized expected values vectors at " << resolution << " " << unit << endl;
             return false;
@@ -1106,6 +1106,14 @@ public:
                                                                                                 footer.resolution))]);
                         } else {
                             c = static_cast<float>(c / avgCount);
+                        }
+                    } else if (footer.matrixType == "expected") {
+                        if (isIntra) {
+                            c = static_cast<float>(footer.expectedValues[min(footer.expectedValues.size() - 1,
+                                                                                 (size_t) floor(abs(y - x) /
+                                                                                                footer.resolution))]);
+                        } else {
+                            c = static_cast<float>(avgCount);
                         }
                     }
 
