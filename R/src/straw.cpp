@@ -22,7 +22,6 @@
  THE SOFTWARE.
 */
 #include <cstring>
-#include <iostream>
 #include <fstream>
 #include <sstream>
 #include <map>
@@ -31,6 +30,7 @@
 #include <vector>
 #include <streambuf>
 #include <curl/curl.h>
+#include <Rcpp.h>
 #include "zlib.h"
 #include "straw.h"
 using namespace std;
@@ -66,7 +66,7 @@ WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
     mem->memory = static_cast<char *>(realloc(mem->memory, mem->size + realsize + 1));
     if (mem->memory == nullptr) {
         /* out of memory! */
-        printf("not enough memory (realloc returned NULL)\n");
+        Rcpp::stop("Not enough memory (realloc returned NULL).");
         return 0;
     }
 
@@ -89,7 +89,7 @@ char *getData(CURL *curl, int64_t position, int64_t chunksize) {
     curl_easy_setopt(curl, CURLOPT_RANGE, oss.str().c_str());
     CURLcode res = curl_easy_perform(curl);
     if (res != CURLE_OK) {
-        fprintf(stderr, "curl_easy_perform() failed: %s\n",
+        Rcpp::stop("curl_easy_perform() failed: %s.",
                 curl_easy_strerror(res));
     }
     //  printf("%lu bytes retrieved\n", (int64_t)chunk.size);
@@ -145,16 +145,12 @@ map<string, chromosome> readHeader(istream &fin, int64_t &masterIndexPosition, s
                                    int32_t &version, int64_t &nviPosition, int64_t &nviLength) {
     map<string, chromosome> chromosomeMap;
     if (!readMagicString(fin)) {
-        cerr << "Hi-C magic string is missing, does not appear to be a hic file" << endl;
-        masterIndexPosition = -1;
-        return chromosomeMap;
+        Rcpp::stop("Hi-C magic string is missing, does not appear to be a hic file.");
     }
 
     version = readInt32FromFile(fin);
     if (version < 6) {
-        cerr << "Version " << version << " no longer supported" << endl;
-        masterIndexPosition = -1;
-        return chromosomeMap;
+        Rcpp::stop("Version %d no longer supported.", version);
     }
     masterIndexPosition = readInt64FromFile(fin);
     getline(fin, genomeID, '\0');
@@ -224,8 +220,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
         }
     }
     if (!found) {
-        cerr << "File doesn't have the given chr_chr map " << key << endl;
-        return false;
+        Rcpp::stop("File doesn't have the given chr_chr map %s.", key);
     }
 
     if ((matrixType == "observed" && norm == "NONE") || ((matrixType == "oe" || matrixType == "expected") && norm == "NONE" && c1 != c2))
@@ -283,8 +278,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
 
     if (c1 == c2 && (matrixType == "oe" || matrixType == "expected") && norm == "NONE") {
         if (expectedValues.empty()) {
-            cerr << "File did not contain expected values vectors at " << resolution << " " << unit << endl;
-            return false;
+            Rcpp::stop("File did not contain expected values vectors at %d %s.", resolution, unit);
         }
         return true;
     }
@@ -340,8 +334,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
 
     if (c1 == c2 && (matrixType == "oe" || matrixType == "expected") && norm != "NONE") {
         if (expectedValues.empty()) {
-            cerr << "File did not contain normalized expected values vectors at " << resolution << " " << unit << endl;
-            return false;
+            Rcpp::stop("File did not contain normalized expected values vectors at %d %s.", resolution, unit);
         }
     }
 
@@ -376,8 +369,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
         }
     }
     if (!found1 || !found2) {
-        cerr << "File did not contain " << norm << " normalization vectors for one or both chromosomes at "
-             << resolution << " " << unit << endl;
+        Rcpp::stop("File did not contain %s normalization vectors for one or both chromosomes at %d %s.", norm, resolution, unit);
     }
     return true;
 }
@@ -435,8 +427,7 @@ map<int32_t, indexEntry> readMatrixZoomDataHttp(CURL *curl, int64_t &myFilePosit
     } else if (first[0] == 'F') {
         header_size += 5;
     } else {
-        cerr << "Unit not understood" << endl;
-        return blockMap;
+        Rcpp::stop("Unit not understood.");
     }
     buffer = getData(curl, myFilePosition, header_size);
     membuf sbuf(buffer, buffer + header_size);
@@ -510,7 +501,7 @@ map<int32_t, indexEntry> readMatrixHttp(CURL *curl, int64_t myFilePosition, cons
         i++;
     }
     if (!found) {
-        cerr << "Error finding block data" << endl;
+        Rcpp::stop("Error finding block data.");
     }
     return blockMap;
 }
@@ -532,7 +523,7 @@ map<int32_t, indexEntry> readMatrix(istream &fin, int64_t myFilePosition, const 
         i++;
     }
     if (!found) {
-        cerr << "Error finding block data" << endl;
+        Rcpp::stop("Error finding block data.");
     }
     return blockMap;
 }
@@ -808,14 +799,12 @@ public:
             isHttp = true;
             curl = initCURL(fname.c_str());
             if (!curl) {
-                cerr << "URL " << fname << " cannot be opened for reading" << endl;
-                exit(1);
+                Rcpp::stop("URL %s cannot be opened for reading.", fname);
             }
         } else {
             fin.open(fname, fstream::in | fstream::binary);
             if (!fin) {
-                cerr << "File " << fname << " cannot be opened for reading" << endl;
-                exit(2);
+                Rcpp::stop("File %s cannot be opened for reading.", fname);
             }
         }
     }
@@ -883,8 +872,7 @@ public:
             if (curl) {
                 buffer = getData(curl, 0, 100000);
             } else {
-                cerr << "URL " << fname << " cannot be opened for reading" << endl;
-                exit(1);
+                Rcpp::stop("URL %s cannot be opened for reading.", fname);
             }
             membuf sbuf(buffer, buffer + 100000);
             istream bufin(&sbuf);
@@ -894,8 +882,7 @@ public:
         } else {
             fin.open(fname, fstream::in | fstream::binary);
             if (!fin) {
-                cerr << "File " << fname << " cannot be opened for reading" << endl;
-                exit(2);
+                Rcpp::stop("File %s cannot be opened for reading.", fname);
             }
             chromosomeMap = readHeader(fin, master, genomeID, numChromosomes,
                                        version, nviPosition, nviLength);
@@ -1017,8 +1004,7 @@ void parsePositions(const string &chrLoc, string &chrom, int64_t &pos1, int64_t 
     stringstream ss(chrLoc);
     getline(ss, chrom, ':');
     if (map.count(chrom) == 0) {
-        cerr << chrom << " not found in the file." << endl;
-        exit(6);
+        Rcpp::stop("%s not found in the file.", chrom);
     }
 
     if (getline(ss, x, ':') && getline(ss, y, ':')) {
@@ -1205,14 +1191,36 @@ getBlockRecordsWithNormalization(string fname,
     return v;
 }
 
-vector<contactRecord>
-straw(string matrixType, string norm, string fname, string chr1loc, string chr2loc, const string &unit, int32_t binsize) {
+//' Straw Quick Dump
+//'
+//' fast C++ implementation of dump. Not as fully featured as the
+//' Java version. Reads the .hic file, finds the appropriate matrix and slice
+//' of data, and outputs as data.frame in sparse upper triangular format.
+//' Currently only supporting matrices.
+//'
+//' Usage: straw [observed/oe/expected] <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>
+//'
+//' @param matrixType Type of matrix to output. Must be one of observed/oe/expected.
+//'     observed is observed counts, oe is observed/expected counts, expected is expected counts.
+//' @param norm Normalization to apply. Must be one of NONE/VC/VC_SQRT/KR.
+//'     VC is vanilla coverage, VC_SQRT is square root of vanilla coverage, and KR is Knight-Ruiz or
+//'     Balanced normalization.
+//' @param fname path to .hic file
+//' @param chr1loc first chromosome location
+//' @param chr2loc second chromosome location
+//' @param unit BP (BasePair) or FRAG (FRAGment)
+//' @param binsize The bin size. By default, for BP, this is one of <2500000, 1000000, 500000,
+//'     250000, 100000, 50000, 25000, 10000, 5000> and for FRAG this is one of <500, 200,
+//'     100, 50, 20, 5, 2, 1>.
+//' @return Data.frame of a sparse matrix of data from hic file. x,y,counts
+//' @examples
+//' straw("NONE", system.file("extdata", "test.hic", package = "strawr"), "1", "1", "BP", 2500000)
+//' @export
+// [[Rcpp::export]]
+Rcpp::DataFrame
+straw(std::string matrixType, std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, const std::string &unit, int32_t binsize) {
     if (!(unit == "BP" || unit == "FRAG")) {
-        cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl;
-        cerr << "Usage: straw <observed/oe/expected> <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>"
-             << endl;
-        vector<contactRecord> v;
-        return v;
+        Rcpp::stop("Norm specified incorrectly, must be one of <BP/FRAG>.\nUsage: straw [observed/oe/expected] <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>.");
     }
 
     HiCFile *hiCFile = new HiCFile(std::move(fname));
@@ -1241,13 +1249,21 @@ straw(string matrixType, string norm, string fname, string chr1loc, string chr2l
 
     footerInfo footer = getNormalizationInfoForRegion(fname, chr1, chr2, matrixType, norm, unit, binsize);
 
-    return getBlockRecordsWithNormalization(fname,
+    vector<contactRecord> records = getBlockRecordsWithNormalization(fname,
                                             origRegionIndices[0], origRegionIndices[1],
                                             origRegionIndices[2], origRegionIndices[3],
                                             footer.resolution, footer.foundFooter, footer.version,
                                             footer.c1, footer.c2, footer.numBins1, footer.numBins2,
                                             footer.myFilePos, footer.unit, footer.norm, footer.matrixType,
                                             footer.c1Norm, footer.c2Norm, footer.expectedValues);
+    vector<int32_t> xActual_vec, yActual_vec;
+    vector<float> counts_vec;
+    for (vector<contactRecord>::iterator it=records.begin(); it!=records.end(); ++it) {
+      xActual_vec.push_back(it->binX);
+      yActual_vec.push_back(it->binY);
+      counts_vec.push_back(it->counts);
+    }
+    return Rcpp::DataFrame::create(Rcpp::Named("x") = xActual_vec, Rcpp::Named("y") = yActual_vec, Rcpp::Named("counts") = counts_vec);
 }
 
 vector<chromosome> getChromosomes(string fname){
@@ -1260,4 +1276,120 @@ vector<chromosome> getChromosomes(string fname){
     }
     hiCFile->close();
     return chromosomes;
+}
+
+//' Function for reading basepair resolutions from .hic file
+//'
+//' @param fname path to .hic file
+//' @return Vector of basepair resolutions
+//' @examples
+//' readHicBpResolutions(system.file("extdata", "test.hic", package = "strawr"))
+//' @export
+// [[Rcpp::export]]
+Rcpp::NumericVector readHicBpResolutions(std::string fname)
+{
+  ifstream fin(fname, ios::in | ios::binary);
+  if (!fin) {
+    Rcpp::stop("File %s cannot be opened for reading.", fname);
+  }
+
+  if (!readMagicString(fin)) {
+    fin.close();
+    Rcpp::stop("Hi-C magic string is missing, does not appear to be a hic file.");
+  }
+
+  int version;
+  fin.read((char*)&version, sizeof(int));
+  if (version < 6) {
+    fin.close();
+    Rcpp::stop("Version %d no longer supported.", version);
+  }
+  long master;
+  fin.read((char*)&master, sizeof(long));
+  string genome;
+  getline(fin, genome, '\0' );
+  int nattributes;
+  fin.read((char*)&nattributes, sizeof(int));
+  // reading and ignoring attribute-value dictionary
+  for (int i=0; i<nattributes; i++) {
+    string key, value;
+    getline(fin, key, '\0');
+    getline(fin, value, '\0');
+  }
+  int nChrs;
+  fin.read((char*)&nChrs, sizeof(int));
+  // chromosome map for finding matrix
+  for (int i=0; i<nChrs; i++) {
+    string name;
+    int length;
+    getline(fin, name, '\0');
+    fin.read((char*)&length, sizeof(int));
+  }
+  int nBpResolutions;
+  fin.read((char*)&nBpResolutions, sizeof(int));
+  Rcpp::NumericVector bpResolutions(nBpResolutions);
+  for (int i=0; i<nBpResolutions; i++) {
+    int resBP;
+    fin.read((char*)&resBP, sizeof(int));
+    bpResolutions[i] = resBP;
+  }
+
+  fin.close();
+
+  return bpResolutions;
+}
+
+//' Function for reading chromosomes from .hic file
+//'
+//' @param fname path to .hic file
+//' @return Data frame of chromosome names and lengths
+//' @examples
+//' readHicChroms(system.file("extdata", "test.hic", package = "strawr"))
+//' @export
+// [[Rcpp::export]]
+Rcpp::DataFrame readHicChroms(std::string fname)
+{
+  ifstream fin(fname, ios::in | ios::binary);
+  if (!fin) {
+    Rcpp::stop("File %s cannot be opened for reading.", fname);
+  }
+
+  if (!readMagicString(fin)) {
+    fin.close();
+    Rcpp::stop("Hi-C magic string is missing, does not appear to be a hic file.");
+  }
+
+  int version;
+  fin.read((char*)&version, sizeof(int));
+  if (version < 6) {
+    fin.close();
+    Rcpp::stop("Version %d no longer supported.", version);
+  }
+  long master;
+  fin.read((char*)&master, sizeof(long));
+  string genome;
+  getline(fin, genome, '\0' );
+  int nattributes;
+  fin.read((char*)&nattributes, sizeof(int));
+  // reading and ignoring attribute-value dictionary
+  for (int i=0; i<nattributes; i++) {
+    string key, value;
+    getline(fin, key, '\0');
+    getline(fin, value, '\0');
+  }
+  int nChrs;
+  fin.read((char*)&nChrs, sizeof(int));
+  Rcpp::StringVector chrom_names(nChrs);
+  Rcpp::NumericVector chrom_lengths(nChrs);
+  for (int i=0; i<nChrs; i++) {
+    string name;
+    int length;
+    getline(fin, name, '\0');
+    fin.read((char*)&length, sizeof(int));
+    chrom_names[i] = name;
+    chrom_lengths[i] = length;
+  }
+  fin.close();
+
+  return Rcpp::DataFrame::create(Rcpp::Named("name") = chrom_names, Rcpp::Named("length") = chrom_lengths);
 }
