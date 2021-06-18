@@ -44,7 +44,7 @@ using namespace std;
 
   Currently only supporting matrices.
 
-  Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>
+  Usage: straw [observed/oe/expected] <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>
  */
 // this is for creating a stream from a byte array for ease of use
 struct membuf : std::streambuf {
@@ -204,9 +204,9 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
                 const string &unit, int32_t resolution, int64_t &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry,
                 vector<double> &expectedValues) {
     if (version > 8) {
-        int64_t nBytes = readInt64FromFile(fin);
+        readInt64FromFile(fin);
     } else {
-        int32_t nBytes = readInt32FromFile(fin);
+        readInt32FromFile(fin);
     }
 
     stringstream ss;
@@ -219,7 +219,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
         string str;
         getline(fin, str, '\0');
         int64_t fpos = readInt64FromFile(fin);
-        int32_t sizeinbytes = readInt32FromFile(fin);
+        readInt32FromFile(fin);
         if (str == key) {
             myFilePos = fpos;
             found = true;
@@ -230,7 +230,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
         return false;
     }
 
-    if ((matrixType == "observed" && norm == "NONE") || (matrixType == "oe" && norm == "NONE" && c1 != c2))
+    if ((matrixType == "observed" && norm == "NONE") || ((matrixType == "oe" || matrixType == "expected") && norm == "NONE" && c1 != c2))
         return true; // no need to read norm vector index
 
     // read in and ignore expected value maps; don't store; reading these to
@@ -248,7 +248,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
             nValues = (int64_t) readInt32FromFile(fin);
         }
 
-        bool store = c1 == c2 && matrixType == "oe" && norm == "NONE" && unit0 == unit && binSize == resolution;
+        bool store = c1 == c2 && (matrixType == "oe" || matrixType == "expected") && norm == "NONE" && unit0 == unit && binSize == resolution;
 
         if (version > 8) {
             for (int j = 0; j < nValues; j++) {
@@ -283,7 +283,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
         }
     }
 
-    if (c1 == c2 && matrixType == "oe" && norm == "NONE") {
+    if (c1 == c2 && (matrixType == "oe" || matrixType == "expected") && norm == "NONE") {
         if (expectedValues.empty()) {
             cerr << "File did not contain expected values vectors at " << resolution << " " << unit << endl;
             return false;
@@ -304,7 +304,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
         } else {
             nValues = (int64_t) readInt32FromFile(fin);
         }
-        bool store = c1 == c2 && matrixType == "oe" && type == norm && unit0 == unit && binSize == resolution;
+        bool store = c1 == c2 && (matrixType == "oe" || matrixType == "expected") && type == norm && unit0 == unit && binSize == resolution;
 
         if (version > 8) {
             for (int j = 0; j < nValues; j++) {
@@ -340,7 +340,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
         }
     }
 
-    if (c1 == c2 && matrixType == "oe" && norm != "NONE") {
+    if (c1 == c2 && (matrixType == "oe" || matrixType == "expected") && norm != "NONE") {
         if (expectedValues.empty()) {
             cerr << "File did not contain normalized expected values vectors at " << resolution << " " << unit << endl;
             return false;
@@ -496,8 +496,8 @@ map<int32_t, indexEntry> readMatrixHttp(CURL *curl, int64_t myFilePosition, cons
     membuf sbuf(buffer, buffer + size);
     istream bufin(&sbuf);
 
-    int32_t c1 = readInt32FromFile(bufin);
-    int32_t c2 = readInt32FromFile(bufin);
+    readInt32FromFile(bufin);
+    readInt32FromFile(bufin);
     int32_t nRes = readInt32FromFile(bufin);
     int32_t i = 0;
     bool found = false;
@@ -524,8 +524,8 @@ map<int32_t, indexEntry> readMatrix(istream &fin, int64_t myFilePosition, const 
     map<int32_t, indexEntry> blockMap;
 
     fin.seekg(myFilePosition, ios::beg);
-    int32_t c1 = readInt32FromFile(fin);
-    int32_t c2 = readInt32FromFile(fin);
+    readInt32FromFile(fin);
+    readInt32FromFile(fin);
     int32_t nRes = readInt32FromFile(fin);
     int32_t i = 0;
     bool found = false;
@@ -643,7 +643,7 @@ vector<contactRecord> readBlock(istream &fin, CURL *curl, bool isHttp, indexEntr
     vector<contactRecord> v(nRecords);
     // different versions have different specific formats
     if (version < 7) {
-        for (int i = 0; i < nRecords; i++) {
+        for (uInt i = 0; i < nRecords; i++) {
             int32_t binX = readInt32FromFile(bufferin);
             int32_t binY = readInt32FromFile(bufferin);
             float counts = readFloatFromFile(bufferin);
@@ -851,10 +851,10 @@ public:
         b[numbytes + 1] = '\0';
         string s(b);
         int32_t found = static_cast<int32_t>(s.find("Content-Range"));
-        if (found != string::npos) {
+        if ((size_t)found != string::npos) {
             int32_t found2 = static_cast<int32_t>(s.find("/"));
             //Content-Range: bytes 0-100000/891471462
-            if (found2 != string::npos) {
+            if ((size_t)found2 != string::npos) {
                 string total = s.substr(found2 + 1);
                 totalFileSize = stol(total);
             }
@@ -1109,6 +1109,14 @@ public:
                         } else {
                             c = static_cast<float>(c / avgCount);
                         }
+                    } else if (footer.matrixType == "expected") {
+                        if (isIntra) {
+                            c = static_cast<float>(footer.expectedValues[min(footer.expectedValues.size() - 1,
+                                                                                 (size_t) floor(abs(y - x) /
+                                                                                                footer.resolution))]);
+                        } else {
+                            c = static_cast<float>(avgCount);
+                        }
                     }
 
                     contactRecord record = contactRecord();
@@ -1203,7 +1211,7 @@ vector<contactRecord>
 straw(string matrixType, string norm, string fname, string chr1loc, string chr2loc, const string &unit, int32_t binsize) {
     if (!(unit == "BP" || unit == "FRAG")) {
         cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl;
-        cerr << "Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>"
+        cerr << "Usage: straw [observed/oe/expected] <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>"
              << endl;
         vector<contactRecord> v;
         return v;
@@ -1259,9 +1267,7 @@ vector<chromosome> getChromosomes(string fname){
 int32_t main(int32_t argc, char *argv[]) {
     if (argc != 7 && argc != 8) {
         cerr << "Incorrect arguments" << endl;
-        cerr << "Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>"
-             << endl;
-        cerr << "Usage: straw <oe> <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>"
+        cerr << "Usage: straw [observed/oe/expected] <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>"
              << endl;
         exit(1);
     }
