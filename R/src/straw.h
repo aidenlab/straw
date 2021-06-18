@@ -21,35 +21,49 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
 */
-#include <iostream>
-#include <string>
-#include "straw.h"
-using namespace std;
+#ifndef STRAW_H
+#define STRAW_H
 
-int main(int argc, char *argv[])
-{
-    if (argc != 7 && argc != 8) {
-        cerr << "Incorrect arguments" << endl;
-        cerr << "Usage: straw [observed/oe/expected] <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>" << endl;
-        exit(1);
-    }
-    int offset = 0;
-    string matrixType = "observed";
-    if(argc == 8){
-        offset = 1;
-        matrixType = argv[1];
-    }
-    string norm = argv[1 + offset];
-    string fname = argv[2 + offset];
-    string chr1loc = argv[3 + offset];
-    string chr2loc = argv[4 + offset];
-    string unit = argv[5 + offset];
-    string size = argv[6 + offset];
-    int32_t binsize = stoi(size);
-    vector<contactRecord> records;
-    records = straw(matrixType, norm, fname, chr1loc, chr2loc, unit, binsize);
-    size_t length = records.size();
-    for (int i = 0; i < length; i++) {
-        printf("%d\t%d\t%.14g\n", records[i].binX, records[i].binY, records[i].counts);
-    }
-}
+#include <fstream>
+#include <set>
+#include <vector>
+#include <map>
+
+// pointer structure for reading blocks or matrices, holds the size and position
+struct indexEntry {
+    int64_t size;
+    int64_t position;
+};
+
+// sparse matrixType entry
+struct contactRecord {
+  int32_t binX;
+  int32_t binY;
+  float counts;
+};
+
+struct footerInfo {
+    int32_t resolution;
+    bool foundFooter;
+    int32_t version;
+    int32_t c1;
+    int32_t c2;
+    int32_t numBins1;
+    int32_t numBins2;
+    int64_t myFilePos;
+    std::string unit;
+    std::string norm;
+    std::string matrixType;
+    std::vector<double> c1Norm;
+    std::vector<double> c2Norm;
+    std::vector<double> expectedValues;
+};
+
+// chromosome
+struct chromosome {
+    std::string name;
+    int32_t index;
+    int64_t length;
+};
+
+#endif
