@@ -8,7 +8,7 @@
 #' of data, and outputs as data.frame in sparse upper triangular format.
 #' Currently only supporting matrices.
 #'
-#' Usage: straw [observed/oe/expected] <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>
+#' Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize> [observed/oe/expected]
 #'
 #' @param norm Normalization to apply. Must be one of NONE/VC/VC_SQRT/KR.
 #'     VC is vanilla coverage, VC_SQRT is square root of vanilla coverage, and KR is Knight-Ruiz or
@@ -27,7 +27,7 @@
 #' straw("NONE", system.file("extdata", "test.hic", package = "strawr"), "1", "1", "BP", 2500000)
 #' @export
 straw <- function(norm, fname, chr1loc, chr2loc, unit, binsize, matrix = "observed") {
-    .Call('_strawr_straw', PACKAGE = 'strawr', matrix, norm, fname, chr1loc, chr2loc, unit, binsize)
+    .Call('_strawr_straw', PACKAGE = 'strawr', norm, fname, chr1loc, chr2loc, unit, binsize, matrix)
 }
 
 #' Function for reading basepair resolutions from .hic file
@@ -51,3 +51,4 @@ readHicBpResolutions <- function(fname) {
 readHicChroms <- function(fname) {
     .Call('_strawr_readHicChroms', PACKAGE = 'strawr', fname)
 }
+
