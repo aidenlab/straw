@@ -6,24 +6,24 @@
 using namespace Rcpp;
 
 // straw
-Rcpp::DataFrame straw(std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, std::string unit, int32_t binsize, std::string matrix);
-RcppExport SEXP _strawr_straw(SEXP normSEXP, SEXP fnameSEXP, SEXP chr1locSEXP, SEXP chr2locSEXP, SEXP unitSEXP, SEXP binsizeSEXP, SEXP matrixSEXP) {
+Rcpp::DataFrame straw(std::string matrixType, std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, const std::string& unit, int32_t binsize);
+RcppExport SEXP _strawr_straw(SEXP matrixTypeSEXP, SEXP normSEXP, SEXP fnameSEXP, SEXP chr1locSEXP, SEXP chr2locSEXP, SEXP unitSEXP, SEXP binsizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< std::string >::type matrixType(matrixTypeSEXP);
     Rcpp::traits::input_parameter< std::string >::type norm(normSEXP);
     Rcpp::traits::input_parameter< std::string >::type fname(fnameSEXP);
     Rcpp::traits::input_parameter< std::string >::type chr1loc(chr1locSEXP);
     Rcpp::traits::input_parameter< std::string >::type chr2loc(chr2locSEXP);
-    Rcpp::traits::input_parameter< std::string >::type unit(unitSEXP);
+    Rcpp::traits::input_parameter< const std::string& >::type unit(unitSEXP);
     Rcpp::traits::input_parameter< int32_t >::type binsize(binsizeSEXP);
-    Rcpp::traits::input_parameter< std::string >::type matrix(matrixSEXP);
-    rcpp_result_gen = Rcpp::wrap(straw(norm, fname, chr1loc, chr2loc, unit, binsize, matrix));
+    rcpp_result_gen = Rcpp::wrap(straw(matrixType, norm, fname, chr1loc, chr2loc, unit, binsize));
     return rcpp_result_gen;
 END_RCPP
 }
 // readHicBpResolutions
-NumericVector readHicBpResolutions(std::string fname);
+Rcpp::NumericVector readHicBpResolutions(std::string fname);
 RcppExport SEXP _strawr_readHicBpResolutions(SEXP fnameSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -34,7 +34,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // readHicChroms
-DataFrame readHicChroms(std::string fname);
+Rcpp::DataFrame readHicChroms(std::string fname);
 RcppExport SEXP _strawr_readHicChroms(SEXP fnameSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;

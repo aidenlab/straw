@@ -42,7 +42,7 @@ using namespace std;
 
   Currently only supporting matrices.
 
-  Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>
+  Usage: straw [observed/oe/expected] <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>
  */
 // this is for creating a stream from a byte array for ease of use
 struct membuf : std::streambuf {
@@ -641,7 +641,7 @@ vector<contactRecord> readBlock(istream &fin, CURL *curl, bool isHttp, indexEntr
     vector<contactRecord> v(nRecords);
     // different versions have different specific formats
     if (version < 7) {
-        for (int i = 0; i < nRecords; i++) {
+        for (uInt i = 0; i < nRecords; i++) {
             int32_t binX = readInt32FromFile(bufferin);
             int32_t binY = readInt32FromFile(bufferin);
             float counts = readFloatFromFile(bufferin);
@@ -849,10 +849,10 @@ public:
         b[numbytes + 1] = '\0';
         string s(b);
         int32_t found = static_cast<int32_t>(s.find("Content-Range"));
-        if (found != string::npos) {
+        if ((size_t)found != string::npos) {
             int32_t found2 = static_cast<int32_t>(s.find("/"));
             //Content-Range: bytes 0-100000/891471462
-            if (found2 != string::npos) {
+            if ((size_t)found2 != string::npos) {
                 string total = s.substr(found2 + 1);
                 totalFileSize = stol(total);
             }
@@ -1209,7 +1209,7 @@ vector<contactRecord>
 straw(string matrixType, string norm, string fname, string chr1loc, string chr2loc, const string &unit, int32_t binsize) {
     if (!(unit == "BP" || unit == "FRAG")) {
         cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl;
-        cerr << "Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>"
+        cerr << "Usage: straw [observed/oe/expected] <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>"
              << endl;
         vector<contactRecord> v;
         return v;
