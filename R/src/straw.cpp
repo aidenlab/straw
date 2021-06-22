@@ -198,9 +198,9 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
                 const string &unit, int32_t resolution, int64_t &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry,
                 vector<double> &expectedValues) {
     if (version > 8) {
-        readInt64FromFile(fin);
+        /* int64_t nBytes = */ readInt64FromFile(fin);
     } else {
-        readInt32FromFile(fin);
+        /* int32_t nBytes = */ readInt32FromFile(fin);
     }
 
     stringstream ss;
@@ -213,7 +213,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
         string str;
         getline(fin, str, '\0');
         int64_t fpos = readInt64FromFile(fin);
-        readInt32FromFile(fin);
+        /* int32_t sizeinbytes = */ readInt32FromFile(fin);
         if (str == key) {
             myFilePos = fpos;
             found = true;
@@ -485,8 +485,8 @@ map<int32_t, indexEntry> readMatrixHttp(CURL *curl, int64_t myFilePosition, cons
     membuf sbuf(buffer, buffer + size);
     istream bufin(&sbuf);
 
-    readInt32FromFile(bufin);
-    readInt32FromFile(bufin);
+    /* int32_t c1 = */ readInt32FromFile(bufin);
+    /* int32_t c2 = */ readInt32FromFile(bufin);
     int32_t nRes = readInt32FromFile(bufin);
     int32_t i = 0;
     bool found = false;
@@ -513,8 +513,8 @@ map<int32_t, indexEntry> readMatrix(istream &fin, int64_t myFilePosition, const 
     map<int32_t, indexEntry> blockMap;
 
     fin.seekg(myFilePosition, ios::beg);
-    readInt32FromFile(fin);
-    readInt32FromFile(fin);
+    /* int32_t c1 = */ readInt32FromFile(fin);
+    /* int32_t c2 = */ readInt32FromFile(fin);
     int32_t nRes = readInt32FromFile(fin);
     int32_t i = 0;
     bool found = false;
