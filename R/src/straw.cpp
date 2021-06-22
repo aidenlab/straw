@@ -1198,10 +1198,8 @@ getBlockRecordsWithNormalization(string fname,
 //' of data, and outputs as data.frame in sparse upper triangular format.
 //' Currently only supporting matrices.
 //'
-//' Usage: straw [observed/oe/expected] <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>
+//' Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize> [observed/oe/expected]
 //'
-//' @param matrixType Type of matrix to output. Must be one of observed/oe/expected.
-//'     observed is observed counts, oe is observed/expected counts, expected is expected counts.
 //' @param norm Normalization to apply. Must be one of NONE/VC/VC_SQRT/KR.
 //'     VC is vanilla coverage, VC_SQRT is square root of vanilla coverage, and KR is Knight-Ruiz or
 //'     Balanced normalization.
@@ -1212,15 +1210,17 @@ getBlockRecordsWithNormalization(string fname,
 //' @param binsize The bin size. By default, for BP, this is one of <2500000, 1000000, 500000,
 //'     250000, 100000, 50000, 25000, 10000, 5000> and for FRAG this is one of <500, 200,
 //'     100, 50, 20, 5, 2, 1>.
+//' @param matrix Type of matrix to output. Must be one of observed/oe/expected.
+//'     observed is observed counts, oe is observed/expected counts, expected is expected counts.
 //' @return Data.frame of a sparse matrix of data from hic file. x,y,counts
 //' @examples
 //' straw("NONE", system.file("extdata", "test.hic", package = "strawr"), "1", "1", "BP", 2500000)
 //' @export
 // [[Rcpp::export]]
 Rcpp::DataFrame
-straw(std::string matrixType, std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, const std::string &unit, int32_t binsize) {
+straw(std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, const std::string &unit, int32_t binsize, std::string matrix = "observed") {
     if (!(unit == "BP" || unit == "FRAG")) {
-        Rcpp::stop("Norm specified incorrectly, must be one of <BP/FRAG>.\nUsage: straw [observed/oe/expected] <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>.");
+        Rcpp::stop("Norm specified incorrectly, must be one of <BP/FRAG>.\nUsage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize> [observed/oe/expected].");
     }
 
     HiCFile *hiCFile = new HiCFile(std::move(fname));
@@ -1247,7 +1247,7 @@ straw(std::string matrixType, std::string norm, std::string fname, std::string c
     }
     hiCFile->close();
 
-    footerInfo footer = getNormalizationInfoForRegion(fname, chr1, chr2, matrixType, norm, unit, binsize);
+    footerInfo footer = getNormalizationInfoForRegion(fname, chr1, chr2, matrix, norm, unit, binsize);
 
     vector<contactRecord> records = getBlockRecordsWithNormalization(fname,
                                             origRegionIndices[0], origRegionIndices[1],
@@ -1298,39 +1298,39 @@ Rcpp::NumericVector readHicBpResolutions(std::string fname)
     Rcpp::stop("Hi-C magic string is missing, does not appear to be a hic file.");
   }
 
-  int version;
-  fin.read((char*)&version, sizeof(int));
+  int32_t version;
+  fin.read((char*)&version, sizeof(int32_t));
   if (version < 6) {
     fin.close();
     Rcpp::stop("Version %d no longer supported.", version);
   }
-  long master;
-  fin.read((char*)&master, sizeof(long));
+  int64_t master;
+  fin.read((char*)&master, sizeof(int64_t));
   string genome;
   getline(fin, genome, '\0' );
-  int nattributes;
-  fin.read((char*)&nattributes, sizeof(int));
+  int32_t nattributes;
+  fin.read((char*)&nattributes, sizeof(int32_t));
   // reading and ignoring attribute-value dictionary
   for (int i=0; i<nattributes; i++) {
     string key, value;
     getline(fin, key, '\0');
     getline(fin, value, '\0');
   }
-  int nChrs;
-  fin.read((char*)&nChrs, sizeof(int));
+  int32_t nChrs;
+  fin.read((char*)&nChrs, sizeof(int32_t));
   // chromosome map for finding matrix
   for (int i=0; i<nChrs; i++) {
     string name;
-    int length;
+    int32_t length;
     getline(fin, name, '\0');
-    fin.read((char*)&length, sizeof(int));
+    fin.read((char*)&length, sizeof(int32_t));
   }
-  int nBpResolutions;
-  fin.read((char*)&nBpResolutions, sizeof(int));
+  int32_t nBpResolutions;
+  fin.read((char*)&nBpResolutions, sizeof(int32_t));
   Rcpp::NumericVector bpResolutions(nBpResolutions);
   for (int i=0; i<nBpResolutions; i++) {
-    int resBP;
-    fin.read((char*)&resBP, sizeof(int));
+    int32_t resBP;
+    fin.read((char*)&resBP, sizeof(int32_t));
     bpResolutions[i] = resBP;
   }
 
@@ -1359,33 +1359,33 @@ Rcpp::DataFrame readHicChroms(std::string fname)
     Rcpp::stop("Hi-C magic string is missing, does not appear to be a hic file.");
   }
 
-  int version;
-  fin.read((char*)&version, sizeof(int));
+  int32_t version;
+  fin.read((char*)&version, sizeof(int32_t));
   if (version < 6) {
     fin.close();
     Rcpp::stop("Version %d no longer supported.", version);
   }
-  long master;
-  fin.read((char*)&master, sizeof(long));
+  int64_t master;
+  fin.read((char*)&master, sizeof(int64_t));
   string genome;
   getline(fin, genome, '\0' );
-  int nattributes;
-  fin.read((char*)&nattributes, sizeof(int));
+  int32_t nattributes;
+  fin.read((char*)&nattributes, sizeof(int32_t));
   // reading and ignoring attribute-value dictionary
   for (int i=0; i<nattributes; i++) {
     string key, value;
     getline(fin, key, '\0');
     getline(fin, value, '\0');
   }
-  int nChrs;
-  fin.read((char*)&nChrs, sizeof(int));
+  int32_t nChrs;
+  fin.read((char*)&nChrs, sizeof(int32_t));
   Rcpp::StringVector chrom_names(nChrs);
   Rcpp::NumericVector chrom_lengths(nChrs);
   for (int i=0; i<nChrs; i++) {
     string name;
-    int length;
+    int32_t length;
     getline(fin, name, '\0');
-    fin.read((char*)&length, sizeof(int));
+    fin.read((char*)&length, sizeof(int32_t));
     chrom_names[i] = name;
     chrom_lengths[i] = length;
   }
