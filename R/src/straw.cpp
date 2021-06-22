@@ -1298,39 +1298,39 @@ Rcpp::NumericVector readHicBpResolutions(std::string fname)
     Rcpp::stop("Hi-C magic string is missing, does not appear to be a hic file.");
   }
 
-  int version;
-  fin.read((char*)&version, sizeof(int));
+  int32_t version;
+  fin.read((char*)&version, sizeof(int32_t));
   if (version < 6) {
     fin.close();
     Rcpp::stop("Version %d no longer supported.", version);
   }
-  long master;
-  fin.read((char*)&master, sizeof(long));
+  int64_t master;
+  fin.read((char*)&master, sizeof(int64_t));
   string genome;
   getline(fin, genome, '\0' );
-  int nattributes;
-  fin.read((char*)&nattributes, sizeof(int));
+  int32_t nattributes;
+  fin.read((char*)&nattributes, sizeof(int32_t));
   // reading and ignoring attribute-value dictionary
   for (int i=0; i<nattributes; i++) {
     string key, value;
     getline(fin, key, '\0');
     getline(fin, value, '\0');
   }
-  int nChrs;
-  fin.read((char*)&nChrs, sizeof(int));
+  int32_t nChrs;
+  fin.read((char*)&nChrs, sizeof(int32_t));
   // chromosome map for finding matrix
   for (int i=0; i<nChrs; i++) {
     string name;
-    int length;
+    int32_t length;
     getline(fin, name, '\0');
-    fin.read((char*)&length, sizeof(int));
+    fin.read((char*)&length, sizeof(int32_t));
   }
-  int nBpResolutions;
-  fin.read((char*)&nBpResolutions, sizeof(int));
+  int32_t nBpResolutions;
+  fin.read((char*)&nBpResolutions, sizeof(int32_t));
   Rcpp::NumericVector bpResolutions(nBpResolutions);
   for (int i=0; i<nBpResolutions; i++) {
-    int resBP;
-    fin.read((char*)&resBP, sizeof(int));
+    int32_t resBP;
+    fin.read((char*)&resBP, sizeof(int32_t));
     bpResolutions[i] = resBP;
   }
 
@@ -1359,33 +1359,33 @@ Rcpp::DataFrame readHicChroms(std::string fname)
     Rcpp::stop("Hi-C magic string is missing, does not appear to be a hic file.");
   }
 
-  int version;
-  fin.read((char*)&version, sizeof(int));
+  int32_t version;
+  fin.read((char*)&version, sizeof(int32_t));
   if (version < 6) {
     fin.close();
     Rcpp::stop("Version %d no longer supported.", version);
   }
-  long master;
-  fin.read((char*)&master, sizeof(long));
+  int64_t master;
+  fin.read((char*)&master, sizeof(int64_t));
   string genome;
   getline(fin, genome, '\0' );
-  int nattributes;
-  fin.read((char*)&nattributes, sizeof(int));
+  int32_t nattributes;
+  fin.read((char*)&nattributes, sizeof(int32_t));
   // reading and ignoring attribute-value dictionary
   for (int i=0; i<nattributes; i++) {
     string key, value;
     getline(fin, key, '\0');
     getline(fin, value, '\0');
   }
-  int nChrs;
-  fin.read((char*)&nChrs, sizeof(int));
+  int32_t nChrs;
+  fin.read((char*)&nChrs, sizeof(int32_t));
   Rcpp::StringVector chrom_names(nChrs);
   Rcpp::NumericVector chrom_lengths(nChrs);
   for (int i=0; i<nChrs; i++) {
     string name;
-    int length;
+    int32_t length;
     getline(fin, name, '\0');
-    fin.read((char*)&length, sizeof(int));
+    fin.read((char*)&length, sizeof(int32_t));
     chrom_names[i] = name;
     chrom_lengths[i] = length;
   }
