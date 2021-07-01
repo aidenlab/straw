@@ -1,12 +1,15 @@
 Package: strawr
-Title: Straw is a fast implementation of reading/dump for .hic files
+Title: Fast Implementation of Reading/Dump for .hic Files
 Version: 0.0.8
-Authors@R: person("First", "Last", email = "first.last@example.com", role = c("aut", "cre"))
+Authors@R:
+  c(person("Neva", c("Cherniavsky", "Durand"), email = "neva@broadinstitute.org", role = c("aut", "cre")),
+    person(c("Muhammad", "Saad"), "Shamim", email = "sa501428@gmail.com", role = "aut"),
+    person("Aiden Lab", role = "cph"))
 Description: API for fast data extraction for .hic files that provides programmatic access to the matrices. It doesn't store the pointer data for all the matrices, only the one queried, and currently we are only supporting matrices (not vectors).
 Depends: R (>= 3.4.0)
 License: MIT + file LICENSE
+URL: https://github.com/aidenlab/straw/tree/master/R
 Encoding: UTF-8
-LazyData: true
 Imports: Rcpp
 LinkingTo: Rcpp
 NeedsCompilation: yes

@@ -8,7 +8,7 @@
 #' of data, and outputs as data.frame in sparse upper triangular format.
 #' Currently only supporting matrices.
 #'
-#' Usage: straw <observed/oe> <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>
+#' Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize> [observed/oe/expected]
 #'
 #' @param norm Normalization to apply. Must be one of NONE/VC/VC_SQRT/KR.
 #'     VC is vanilla coverage, VC_SQRT is square root of vanilla coverage, and KR is Knight-Ruiz or
@@ -20,11 +20,35 @@
 #' @param binsize The bin size. By default, for BP, this is one of <2500000, 1000000, 500000,
 #'     250000, 100000, 50000, 25000, 10000, 5000> and for FRAG this is one of <500, 200,
 #'     100, 50, 20, 5, 2, 1>.
-#' @param matrix Type of matrix to output. Must be one of observed/oe.
-#'     observed is observed counts, oe is observed/expected counts.
+#' @param matrix Type of matrix to output. Must be one of observed/oe/expected.
+#'     observed is observed counts, oe is observed/expected counts, expected is expected counts.
 #' @return Data.frame of a sparse matrix of data from hic file. x,y,counts
+#' @examples
+#' straw("NONE", system.file("extdata", "test.hic", package = "strawr"), "1", "1", "BP", 2500000)
 #' @export
 straw <- function(norm, fname, chr1loc, chr2loc, unit, binsize, matrix = "observed") {
     .Call('_strawr_straw', PACKAGE = 'strawr', norm, fname, chr1loc, chr2loc, unit, binsize, matrix)
+}
+
+#' Function for reading basepair resolutions from .hic file
+#'
+#' @param fname path to .hic file
+#' @return Vector of basepair resolutions
+#' @examples
+#' readHicBpResolutions(system.file("extdata", "test.hic", package = "strawr"))
+#' @export
+readHicBpResolutions <- function(fname) {
+    .Call('_strawr_readHicBpResolutions', PACKAGE = 'strawr', fname)
+}
+
+#' Function for reading chromosomes from .hic file
+#'
+#' @param fname path to .hic file
+#' @return Data frame of chromosome names and lengths
+#' @examples
+#' readHicChroms(system.file("extdata", "test.hic", package = "strawr"))
+#' @export
+readHicChroms <- function(fname) {
+    .Call('_strawr_readHicChroms', PACKAGE = 'strawr', fname)
 }
 
