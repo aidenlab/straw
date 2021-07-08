@@ -9,6 +9,7 @@ Description: API for fast data extraction for .hic files that provides programma
 Depends: R (>= 3.4.0)
 License: MIT + file LICENSE
 URL: https://github.com/aidenlab/straw/tree/master/R
+SystemRequirements: libcurl: libcurl-devel (rpm) or libcurl4-openssl-dev (deb)
 Encoding: UTF-8
 Imports: Rcpp
 LinkingTo: Rcpp
