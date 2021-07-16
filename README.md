@@ -1,7 +1,12 @@
-# straw: Extract data quickly from Juicebox via straw
-Straw is a fast implementation of reading/dump for .hic files. Available in C++, R, and Python.
+# Straw: rapidly stream data from .hic files
+Straw is library which allows rapid streaming of contact data from .hic files. 
+This repository contains source code for the C++, R, Python, and MATLAB versions of Straw.
 
-There are two Python versions - a pure Python one and a version where the C++ code is bound with pybind11. The latter is much faster.
+For the Java version of Straw, see: https://github.com/aidenlab/java-straw/
+
+For the Javascript version of Straw, see: https://github.com/igvteam/hic-straw/
+
+There are two Python versions - a pure Python one and a version where the C++ code is bound with pybind11. The former version is deprecated in favor of using the pybind11 version, which is much faster.
 
 A Jupyter notebook example can be found here: https://aidenlab.gitbook.io/juicebox/accessing-raw-data
 
@@ -23,14 +28,6 @@ Then run via `import strawC` and `strawC.strawC`
     ...   print("{0}\t{1}\t{2}".format(result[i].binX, result[i].binY, result[i].counts))
 ```
 
-For the pure Python version:
-```
-pip install ./python
-```
-Then run via `import straw` and `straw.straw`
-
-Some more information on running: https://github.com/aidenlab/straw/tree/master/python
-
 ## Compile on Linux
 
          g++ -std=c++0x -o straw main.cpp straw.cpp -lcurl -lz
@@ -40,7 +37,7 @@ Please see [the wiki](https://github.com/theaidenlab/straw/wiki) for more docume
 For questions, please use
 [the Google Group](https://groups.google.com/forum/#!forum/3d-genomics).
 
-Ongoing development work is carried out by <a href="http://mshamim.com">Muhammad S Shamim</a>, <a href="https://github.com/cwenger">Craig Wenger</a>, and <a href="http://www.cherniavsky.net/neva/">Neva C. Durand</a>.
+Ongoing development work is carried out by <a href="http://mshamim.com">Muhammad S. Shamim</a>, <a href="https://github.com/cwenger">Craig Wenger</a>, and <a href="http://www.cherniavsky.net/neva/">Neva C. Durand</a>.
 
 If you use this tool in your work, please cite 
 
