@@ -61,15 +61,13 @@ class ChromDotSizes:
         try:
             return int(self.data[chrom][1])
         except:
-            print(str(chrom) + " not in chrom.sizes. Check that the chromosome name matches the genome.\n")
-            return None
+            raise ValueError(str(chrom) + " not in chrom.sizes. Check that the chromosome name matches the genome.\n")
 
     def getIndex(self, chrom):
         try:
             return int(self.data[chrom][0])
         except:
-            print(str(chrom) + " not in chrom.sizes. Check that the chromosome name matches the genome.\n")
-            return None
+            raise ValueError(str(chrom) + " not in chrom.sizes. Check that the chromosome name matches the genome.\n")
 
     def figureOutEndpoints(self, chrAndPositions):
         chrAndPositionsArray = chrAndPositions.split(":")
@@ -205,12 +203,10 @@ def readHeader(infile, is_synapse):
     magic_string = struct.unpack('<3s', req.read(3))[0]
     req.read(1)
     if magic_string != b"HIC":
-        print('This does not appear to be a HiC file magic string is incorrect')
-        return -1
+        raise ValueError('This does not appear to be a HiC file magic string is incorrect')
     version = struct.unpack('<i',req.read(4))[0]
     if version < 6:
-        print("Version {0} no longer supported".format(str(version)))
-        return -1
+        raise ValueError("Version {0} no longer supported".format(str(version)))
     print('HiC version:' + '  {0}'.format(str(version)))
     master = struct.unpack('<q',req.read(8))[0]
     genome = b""
@@ -644,14 +640,12 @@ class straw:
     def getNormalizedMatrix(self, chr1, chr2, norm, unit, binsize):
 
         if not (unit == "BP" or unit == "FRAG"):
-            print(
-                "Unit specified incorrectly, must be one of <BP/FRAG>\nUsage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>\n")
-            return None
+            raise ValueError("Unit specified incorrectly, must be one of <BP/FRAG>\n"
+                             "Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>\n")
 
         for chrom in [chr1, chr2]:
             if chrom not in self.chromDotSizes.data:
-                print(str(chrom) + " wasn't found in the file. Check that the chromosome name matches the genome.\n")
-                return None
+                raise ValueError(str(chrom) + " wasn't found in the file. Check that the chromosome name matches the genome.\n")
 
         chrIndex1 = self.chromDotSizes.getIndex(chr1)
         chrIndex2 = self.chromDotSizes.getIndex(chr2)
@@ -668,17 +662,15 @@ class straw:
             try:
                 c1NormEntry = self.normMap[norm][chrIndex1][unit][binsize]
             except:
-                print(
+                raise ValueError(
                     "File did not contain {0} norm vectors for chr {1} at {2} {3}\n".format(norm, chr1, binsize, unit))
-                return None
 
             if not isIntra:
                 try:
                     c2NormEntry = self.normMap[norm][chrIndex2][unit][binsize]
                 except:
-                    print("File did not contain {0} norm vectors for chr {1} at {2} {3}\n".format(norm, chr2, binsize,
-                                                                                                  unit))
-                    return None
+                    raise ValueError("File did not contain {0} norm vectors for chr {1} at {2} {3}\n".format(norm, chr2,
+                                                                                                             binsize, unit))
             if self.isHttpFile:
                 futureNorm1 = executor.submit(readHttpNorm, self.infile, c1NormEntry, self.is_synapse)
                 if not isIntra:
@@ -691,8 +683,7 @@ class straw:
         blockMap = dict()
         key = str(chrIndex1) + "_" + str(chrIndex2)
         if key not in self.myFilePositions:
-            print("File doesn't have the given {0} map\n".format(key))
-            return None
+            raise ValueError("File doesn't have the given {0} map\n".format(key))
         myFilePos = self.myFilePositions[key][0]
         if self.isHttpFile:
             headers = getHttpHeader('bytes={0}-'.format(myFilePos), self.is_synapse)
