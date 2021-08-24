@@ -194,6 +194,16 @@ map<string, chromosome> readHeader(istream &fin, int64_t &masterIndexPosition, s
     return chromosomeMap;
 }
 
+vector<int32_t> readResolutionsFromHeader(istream &fin) {
+    int numBpResolutions = readInt32FromFile(fin);
+    vector<int32_t> resolutions;
+    for (int i = 0; i < numBpResolutions; i++) {
+        int32_t res = readInt32FromFile(fin);
+        resolutions.push_back(res);
+    }
+    return resolutions;
+}
+
 // reads the footer from the master pointer location. takes in the chromosomes,
 // norm, unit (BP or FRAG) and resolution or binsize, and sets the file
 // position of the matrix and the normalization vectors for those chromosomes
@@ -842,6 +852,7 @@ public:
     int32_t version = 0;
     int64_t nviPosition = 0LL;
     int64_t nviLength = 0LL;
+    vector<int32_t> resolutions;
     static int64_t totalFileSize;
 
     static size_t hdf(char *b, size_t size, size_t nitems, void *userdata) {
@@ -890,6 +901,7 @@ public:
             istream bufin(&sbuf);
             chromosomeMap = readHeader(bufin, master, genomeID, numChromosomes,
                                        version, nviPosition, nviLength);
+            resolutions = readResolutionsFromHeader(bufin);
             delete buffer;
         } else {
             fin.open(fname, fstream::in | fstream::binary);
@@ -899,6 +911,7 @@ public:
             }
             chromosomeMap = readHeader(fin, master, genomeID, numChromosomes,
                                        version, nviPosition, nviLength);
+            resolutions = readResolutionsFromHeader(fin);
         }
     }
 
@@ -1260,4 +1273,11 @@ vector<chromosome> getChromosomes(string fname){
     }
     hiCFile->close();
     return chromosomes;
+}
+
+vector<int32_t> getResolutions(string fname){
+    HiCFile *hiCFile = new HiCFile(std::move(fname));
+    vector<int32_t> resolutions = hiCFile->resolutions;
+    hiCFile->close();
+    return resolutions;
 }
