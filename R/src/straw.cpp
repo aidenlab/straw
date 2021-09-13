@@ -142,7 +142,7 @@ double readDoubleFromFile(istream &fin) {
 
 // reads the header, storing the positions of the normalization vectors and returning the masterIndexPosition pointer
 map<string, chromosome> readHeader(istream &fin, int64_t &masterIndexPosition, string &genomeID, int32_t &numChromosomes,
-                                   int32_t &version, int64_t &nviPosition, int64_t &nviLength) {
+                                   int32_t &version, int64_t &nviPosition, int64_t &nviLength, vector<int32_t> &bpResolutions) {
     map<string, chromosome> chromosomeMap;
     if (!readMagicString(fin)) {
         Rcpp::stop("Hi-C magic string is missing, does not appear to be a hic file.");
@@ -187,6 +187,12 @@ map<string, chromosome> readHeader(istream &fin, int64_t &masterIndexPosition, s
         chr.length = length;
         chromosomeMap[name] = chr;
     }
+
+    int32_t nBpResolutions = readInt32FromFile(fin);
+    for (int i=0; i<nBpResolutions; i++) {
+      bpResolutions.push_back(readInt32FromFile(fin));
+    }
+
     return chromosomeMap;
 }
 
@@ -826,6 +832,7 @@ public:
     CURL *curl;
     int64_t master = 0LL;
     map<string, chromosome> chromosomeMap;
+    vector<int32_t> bpResolutions;
     string genomeID;
     int32_t numChromosomes = 0;
     int32_t version = 0;
@@ -880,7 +887,7 @@ public:
             membuf sbuf(buffer, buffer + 100000);
             istream bufin(&sbuf);
             chromosomeMap = readHeader(bufin, master, genomeID, numChromosomes,
-                                       version, nviPosition, nviLength);
+                                       version, nviPosition, nviLength, bpResolutions);
             delete buffer;
         } else {
             fin.open(fname, fstream::in | fstream::binary);
@@ -888,7 +895,7 @@ public:
                 Rcpp::stop("File %s cannot be opened for reading.", fname);
             }
             chromosomeMap = readHeader(fin, master, genomeID, numChromosomes,
-                                       version, nviPosition, nviLength);
+                                       version, nviPosition, nviLength, bpResolutions);
         }
     }
 
@@ -1281,67 +1288,6 @@ vector<chromosome> getChromosomes(string fname){
     return chromosomes;
 }
 
-//' Function for reading basepair resolutions from .hic file
-//'
-//' @param fname path to .hic file
-//' @return Vector of basepair resolutions
-//' @examples
-//' readHicBpResolutions(system.file("extdata", "test.hic", package = "strawr"))
-//' @export
-// [[Rcpp::export]]
-Rcpp::NumericVector readHicBpResolutions(std::string fname)
-{
-  ifstream fin(fname, ios::in | ios::binary);
-  if (!fin) {
-    Rcpp::stop("File %s cannot be opened for reading.", fname);
-  }
-
-  if (!readMagicString(fin)) {
-    fin.close();
-    Rcpp::stop("Hi-C magic string is missing, does not appear to be a hic file.");
-  }
-
-  int32_t version;
-  fin.read((char*)&version, sizeof(int32_t));
-  if (version < 6) {
-    fin.close();
-    Rcpp::stop("Version %d no longer supported.", version);
-  }
-  int64_t master;
-  fin.read((char*)&master, sizeof(int64_t));
-  string genome;
-  getline(fin, genome, '\0' );
-  int32_t nattributes;
-  fin.read((char*)&nattributes, sizeof(int32_t));
-  // reading and ignoring attribute-value dictionary
-  for (int i=0; i<nattributes; i++) {
-    string key, value;
-    getline(fin, key, '\0');
-    getline(fin, value, '\0');
-  }
-  int32_t nChrs;
-  fin.read((char*)&nChrs, sizeof(int32_t));
-  // chromosome map for finding matrix
-  for (int i=0; i<nChrs; i++) {
-    string name;
-    int32_t length;
-    getline(fin, name, '\0');
-    fin.read((char*)&length, sizeof(int32_t));
-  }
-  int32_t nBpResolutions;
-  fin.read((char*)&nBpResolutions, sizeof(int32_t));
-  Rcpp::NumericVector bpResolutions(nBpResolutions);
-  for (int i=0; i<nBpResolutions; i++) {
-    int32_t resBP;
-    fin.read((char*)&resBP, sizeof(int32_t));
-    bpResolutions[i] = resBP;
-  }
-
-  fin.close();
-
-  return bpResolutions;
-}
-
 //' Function for reading chromosomes from .hic file
 //'
 //' @param fname path to .hic file
@@ -1352,47 +1298,31 @@ Rcpp::NumericVector readHicBpResolutions(std::string fname)
 // [[Rcpp::export]]
 Rcpp::DataFrame readHicChroms(std::string fname)
 {
-  ifstream fin(fname, ios::in | ios::binary);
-  if (!fin) {
-    Rcpp::stop("File %s cannot be opened for reading.", fname);
+  vector<chromosome> chroms = getChromosomes(std::move(fname));
+  Rcpp::StringVector names;
+  Rcpp::NumericVector lengths;
+  for (std::vector<chromosome>::iterator it = chroms.begin(); it != chroms.end(); ++it) {
+    names.push_back(it->name);
+    lengths.push_back(it->length);
   }
+  return Rcpp::DataFrame::create(Rcpp::Named("name") = names, Rcpp::Named("length") = lengths);
+}
 
-  if (!readMagicString(fin)) {
-    fin.close();
-    Rcpp::stop("Hi-C magic string is missing, does not appear to be a hic file.");
+//' Function for reading basepair resolutions from .hic file
+//'
+//' @param fname path to .hic file
+//' @return Vector of basepair resolutions
+//' @examples
+//' readHicBpResolutions(system.file("extdata", "test.hic", package = "strawr"))
+//' @export
+// [[Rcpp::export]]
+Rcpp::NumericVector readHicBpResolutions(std::string fname)
+{
+  HiCFile *hiCFile = new HiCFile(std::move(fname));
+  Rcpp::NumericVector bpResolutions;
+  for (std::vector<int32_t>::iterator it = hiCFile->bpResolutions.begin(); it != hiCFile->bpResolutions.end(); ++it) {
+    bpResolutions.push_back(*it);
   }
-
-  int32_t version;
-  fin.read((char*)&version, sizeof(int32_t));
-  if (version < 6) {
-    fin.close();
-    Rcpp::stop("Version %d no longer supported.", version);
-  }
-  int64_t master;
-  fin.read((char*)&master, sizeof(int64_t));
-  string genome;
-  getline(fin, genome, '\0' );
-  int32_t nattributes;
-  fin.read((char*)&nattributes, sizeof(int32_t));
-  // reading and ignoring attribute-value dictionary
-  for (int i=0; i<nattributes; i++) {
-    string key, value;
-    getline(fin, key, '\0');
-    getline(fin, value, '\0');
-  }
-  int32_t nChrs;
-  fin.read((char*)&nChrs, sizeof(int32_t));
-  Rcpp::StringVector chrom_names(nChrs);
-  Rcpp::NumericVector chrom_lengths(nChrs);
-  for (int i=0; i<nChrs; i++) {
-    string name;
-    int32_t length;
-    getline(fin, name, '\0');
-    fin.read((char*)&length, sizeof(int32_t));
-    chrom_names[i] = name;
-    chrom_lengths[i] = length;
-  }
-  fin.close();
-
-  return Rcpp::DataFrame::create(Rcpp::Named("name") = chrom_names, Rcpp::Named("length") = chrom_lengths);
+  hiCFile->close();
+  return bpResolutions;
 }
