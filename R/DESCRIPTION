@@ -1,6 +1,6 @@
 Package: strawr
 Title: Fast Implementation of Reading/Dump for .hic Files
-Version: 0.0.8
+Version: 0.0.9
 Authors@R:
   c(person("Neva", c("Cherniavsky", "Durand"), email = "neva@broadinstitute.org", role = c("aut", "cre")),
     person(c("Muhammad", "Saad"), "Shamim", email = "sa501428@gmail.com", role = "aut"),
