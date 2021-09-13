@@ -861,10 +861,13 @@ public:
         size_t numbytes = size * nitems;
         b[numbytes + 1] = '\0';
         string s(b);
-        int32_t found = static_cast<int32_t>(s.find("Content-Range"));
+        int32_t found = static_cast<int32_t>(s.find("content-range"));
+        if ((size_t)found == string::npos) {
+          found = static_cast<int32_t>(s.find("Content-Range"));
+        }
         if ((size_t)found != string::npos) {
             int32_t found2 = static_cast<int32_t>(s.find("/"));
-            //Content-Range: bytes 0-100000/891471462
+            //content-range: bytes 0-100000/891471462
             if ((size_t)found2 != string::npos) {
                 string total = s.substr(found2 + 1);
                 totalFileSize = stol(total);
