@@ -861,13 +861,10 @@ public:
         size_t numbytes = size * nitems;
         b[numbytes + 1] = '\0';
         string s(b);
-        int32_t found = static_cast<int32_t>(s.find("content-range"));
-        if ((size_t)found == string::npos) {
-          found = static_cast<int32_t>(s.find("Content-Range"));
-        }
+        int32_t found = static_cast<int32_t>(s.find("Content-Range"));
         if ((size_t)found != string::npos) {
             int32_t found2 = static_cast<int32_t>(s.find("/"));
-            //content-range: bytes 0-100000/891471462
+            //Content-Range: bytes 0-100000/891471462
             if ((size_t)found2 != string::npos) {
                 string total = s.substr(found2 + 1);
                 totalFileSize = stol(total);
@@ -1319,9 +1316,10 @@ int32_t main(int32_t argc, char *argv[]) {
 
 namespace py = pybind11;
 
-PYBIND11_MODULE(strawC, m) {
+PYBIND11_MODULE(straw, m) {
 m.doc() = "Fast hybrid tool for reading .hic files; see https://github.com/aidenlab/straw for documentation";
 
+m.def("straw", &straw, "get contact records");
 m.def("strawC", &straw, "get contact records");
 m.def("getRecords", &getBlockRecordsWithNormalization, "get contact records using normalization info");
 m.def("getChromosomes", &getChromosomes, "get chromosomes in hic file");

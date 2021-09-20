@@ -3,7 +3,7 @@ from setuptools.command.build_ext import build_ext
 import sys
 import setuptools
 
-__version__ = '0.0.9'
+__version__ = '1.0.0.1'
 
 
 class get_pybind_include(object):
@@ -23,12 +23,13 @@ class get_pybind_include(object):
 
 ext_modules = [
     Extension(
-        'strawC',
-        ['src/straw.cpp'],
+        'straw',
+        sources =['src/straw.cpp'],
         include_dirs=[
             # Path to pybind11 headers
             get_pybind_include(),
-            get_pybind_include(user=True)
+            get_pybind_include(user=True),
+            'src'
         ],
         language='c++'
     ),
@@ -97,19 +98,25 @@ class BuildExt(build_ext):
             ext.extra_link_args = link_opts
         build_ext.build_extensions(self)
 
+
+with open("README.md", "r", encoding="utf-8") as fh:
+    long_description = fh.read()
+
 setup(
-    name='strawC',
+    name='hic-straw',
     version=__version__,
     author='Neva C. Durand',
     author_email='neva@broadinstitute.org',
     url='https://github.com/aidenlab/straw',
     description='Straw bound with pybind11',
-    long_description='',
+    long_description = long_description,
+    long_description_content_type = 'text/markdown',
     ext_modules=ext_modules,
     install_requires=['pybind11>=2.4'],
     setup_requires=['pybind11>=2.4'],
     python_requires='>3.3',
     cmdclass={'build_ext': BuildExt},
+    headers=['src/straw.h'],
     zip_safe=False,
 )
 
