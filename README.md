@@ -14,24 +14,25 @@ A Jupyter notebook example can be found here: https://aidenlab.gitbook.io/juiceb
 
 For the fastest version, you must have pybind11 installed.
 
-Clone the library and cd into the `straw/` directory.
+Clone the library and `cd` into the `straw/` directory.
 ```
 pip install ./pybind11_python
 ```
-Then run via `import strawC` and `strawC.strawC` 
+Then run your code via `import strawC` and `strawC.strawC`, for example:
 
-```
-    Example:
-    >>>import strawC
-    >>>result = strawC.strawC('NONE', 'HIC001.hic', 'X', 'X', 'BP', 1000000)
-    >>>for i in range(len(result)):
-    ...   print("{0}\t{1}\t{2}".format(result[i].binX, result[i].binY, result[i].counts))
+```python
+import strawC
+result = strawC.strawC('NONE', 'HIC001.hic', 'X', 'X', 'BP', 1000000)
+for i in range(len(result)):
+    print("{0}\t{1}\t{2}".format(result[i].binX, result[i].binY, result[i].counts))
 ```
 
 ## Compile on Linux
 
-         g++ -std=c++0x -o straw main.cpp straw.cpp -lcurl -lz
- 
+```bash
+g++ -std=c++0x -o straw main.cpp straw.cpp -lcurl -lz
+```
+
 Please see [the wiki](https://github.com/theaidenlab/straw/wiki) for more documentation.
 
 For questions, please use
