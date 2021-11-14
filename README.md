@@ -22,7 +22,7 @@ Then run your code via `import strawC` and `strawC.strawC`, for example:
 
 ```python
 import strawC
-result = strawC.strawC('NONE', 'HIC001.hic', 'X', 'X', 'BP', 1000000)
+result = strawC.strawC('observed', 'NONE', 'HIC001.hic', 'X', 'X', 'BP', 1000000)
 for i in range(len(result)):
     print("{0}\t{1}\t{2}".format(result[i].binX, result[i].binY, result[i].counts))
 ```
