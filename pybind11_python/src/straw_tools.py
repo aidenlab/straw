@@ -1,3 +1,6 @@
+import numpy as np
+from scipy import sparse
+import strawC # different
 
 class HiCFile:
     def __init__(self, filepath: str, resolutions: list, norm: str):
