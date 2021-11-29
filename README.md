@@ -12,26 +12,44 @@ A Jupyter notebook example can be found here: https://aidenlab.gitbook.io/juiceb
 
 ## Quick Start Python
 
-For the fastest version, you must have pybind11 installed.
+Use `pip install hic-straw`. Or if you want to build from the source code, you must have pybind11 installed. Clone the library and `cd` into the `straw/` directory. Then `pip install ./pybind11_python`.
 
-Clone the library and cd into the `straw/` directory.
-```
-pip install ./pybind11_python
-```
-Then run via `import strawC` and `strawC.strawC` 
+You can run your code via `import strawC` (or `hic-straw`) and `strawC.strawC`, for example:
 
+```python
+import strawC
+result = strawC.strawC('observed', 'NONE', 'HIC001.hic', 'X', 'X', 'BP', 1000000)
+for i in range(len(result)):
+    print("{0}\t{1}\t{2}".format(result[i].binX, result[i].binY, result[i].counts))
 ```
-    Example:
-    >>>import strawC
-    >>>result = strawC.strawC('NONE', 'HIC001.hic', 'X', 'X', 'BP', 1000000)
-    >>>for i in range(len(result)):
-    ...   print("{0}\t{1}\t{2}".format(result[i].binX, result[i].binY, result[i].counts))
+To query observed/expected data:
+```python
+import strawC
+result = strawC.strawC('oe', 'NONE', 'HIC001.hic', 'X', 'X', 'BP', 1000000)
+for i in range(len(result)):
+    print("{0}\t{1}\t{2}".format(result[i].binX, result[i].binY, result[i].counts))
 ```
+
+### Usage
+```
+strawC.strawC(data_type, normalization, file, region_x, region_y, 'BP', resolution)
+```
+
+`data_type`: `'observed'` (previous default / "main" data) or `'oe'` (observed/expected)<br>
+`normalization`: `NONE`, `VC`, `VC_SQRT`, `KR`, `SCALE`, etc.<br>
+`file`: filepath (local or URL)<br>
+`region_x/y`: provide the `chromosome` or utilize the syntax `chromosome:start_position:end_position` if using a smaller window within the chromosome<br>
+`resolution`: typically `2500000`, `1000000`, `500000`, `100000`, `50000`, `25000`, `10000`, `5000`, etc.<br><br>
+Note: the normalization, resolution, and chromosome/regions must already exist in the .hic to be read 
+(i.e. they are not calculated by straw, only read from the file if available)<br>
+
 
 ## Compile on Linux
 
-         g++ -std=c++0x -o straw main.cpp straw.cpp -lcurl -lz
- 
+```bash
+g++ -std=c++0x -o straw main.cpp straw.cpp -lcurl -lz
+```
+
 Please see [the wiki](https://github.com/theaidenlab/straw/wiki) for more documentation.
 
 For questions, please use
