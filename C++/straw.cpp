@@ -204,16 +204,12 @@ vector<int32_t> readResolutionsFromHeader(istream &fin) {
     return resolutions;
 }
 
-
 //https://www.techiedelight.com/get-slice-sub-vector-from-vector-cpp/
-vector<double> slice(vector<double> const &v, int m, int n){
-auto first = v.cbegin() + m;
-auto last = v.cbegin() + n + 1;
-
-vector<double> vec(first, last);
-return vec;
+vector<double> slice(vector<double> &v, int64_t m, int64_t n){
+    vector<double> vec;
+    copy(v.begin() + m, v.begin() + n + 1, back_inserter(vec));
+    return vec;
 }
-//------------------------------------
 
 // assume always an odd number for length of vector;
 // eve if even, this calculation should be close enough
@@ -223,49 +219,33 @@ double median(vector<double> &v){
     return v[n];
 }
 
-vector<double> rollingMedian(vector<double> initialValues, int window) {
+vector<double> rollingMedian(vector<double> initialValues, int32_t window) {
+    // window is actually a ~wing-span
+    if (window < 1) return initialValues;
 
-    if (window >= initialValues.size() || window < 1) return initialValues;
+    vector<double> finalResult;
+    finalResult.push_back(initialValues[0]);
 
-
-    size_t length = initialValues.size();
-    int effective_wingspan;
-    int left_index;
-    int right_index;
-    //goes from 0-9
-    //there may be a certain case that can throw off the code where we reach the end of the vector while we still have not
-    //fully expanded the wings prior.
-    for (int index = 0; index < length; index++) {
-        if (index<wingsize){
-            //expanding window from leftside.
-            effective_wingspan=index;
-            left_index=index-effective_wingspan;
-            right_index=index+effective_wingspan;
-            std::vector<int> sub_vec = slice(initialValues, left_index, right_index);
-            rollingMedian[index]=median(sub_vec);
-        }
-        else{
-            //case of shrinking right side of window towards end of vector
-            if (index+1+wingsize>length) {
-                int diff=index+1+wingsize-length;
-                left_index = index - wingsize;
-                right_index = index + wingsize-diff;
-                std::vector<int> sub_vec = slice(initialValues, left_index, right_index);
-                rollingMedian[index] = median(sub_vec);
-            }
-            else{
-                //case of the moving window without any truncation
-                effective_wingspan = wingsize;
-                left_index = index - wingsize;
-                right_index = index + wingsize;
-                std::vector<int> sub_vec = slice(initialValues, left_index, right_index);
-                rollingMedian[index] = median(sub_vec);
-            }
+    int64_t length = initialValues.size();
+    for (int64_t index = 1; index < length; index++) {
+        int64_t initialIndex;
+        int64_t finalIndex;
+        if (index < window){
+            initialIndex = 0;
+            finalIndex = 2*index;
+        } else {
+            initialIndex = index - window;
+            finalIndex = index + window;
         }
 
-        // to be implemented @Mahdi
+        if(finalIndex > length - 1){
+            finalIndex = length - 1;
+        }
+
+        vector<double> subVector = slice(initialValues, initialIndex, finalIndex);
+        finalResult.push_back(median(subVector));
     }
-    return initialValues;
+    return finalResult;
 }
 
 vector<double> readVectorFromFileAndSmooth(int32_t version, int64_t nValues, bool store, istream &fin, int resolution);
