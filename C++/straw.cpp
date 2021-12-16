@@ -204,13 +204,48 @@ vector<int32_t> readResolutionsFromHeader(istream &fin) {
     return resolutions;
 }
 
+// assume always an odd number for length of vector;
+// eve if even, this calculation should be close enough
+double median(vector<double> &v){
+    size_t n = v.size() / 2;
+    nth_element(v.begin(), v.begin()+n, v.end());
+    return v[n];
+}
+
+vector<double> rollingMedian(vector<double> initialValues, int window) {
+
+    if (window >= initialValues.size() || window < 1) return initialValues;
+
+    /*
+        double[] secondArray = new double[data.length - window];
+        List<Double> values = getInitialList(window, data);
+        for (int z = 0; z < secondArray.length; z++) {
+            secondArray[z] = QuickMedian.fastMedian(values);
+            values.remove(0);
+            int nextIndexToAdd = 2 * (window + 1) + z;
+            if (nextIndexToAdd < data.length) {
+                values.add(data[nextIndexToAdd]);
+            }
+        }
+        return secondArray;
+     */
+
+    size_t length = initialValues.size();
+    for (int i = 0; i < length; i++) {
+        // to be implemented @Mahdi
+    }
+    return initialValues;
+}
+
+vector<double> readVectorFromFileAndSmooth(int32_t version, int64_t nValues, bool store, istream &fin, int resolution);
+
 // reads the footer from the master pointer location. takes in the chromosomes,
 // norm, unit (BP or FRAG) and resolution or binsize, and sets the file
 // position of the matrix and the normalization vectors for those chromosomes
 // at the given normalization and resolution
 bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32_t c2, const string &matrixType, const string &norm,
                 const string &unit, int32_t resolution, int64_t &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry,
-                vector<double> &expectedValues) {
+                vector<double> &smoothExpectedValues) {
     if (version > 8) {
         int64_t nBytes = readInt64FromFile(fin);
     } else {
@@ -258,20 +293,9 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
 
         bool store = c1 == c2 && (matrixType == "oe" || matrixType == "expected") && norm == "NONE" && unit0 == unit && binSize == resolution;
 
-        if (version > 8) {
-            for (int j = 0; j < nValues; j++) {
-                double v = readFloatFromFile(fin);
-                if (store) {
-                    expectedValues.push_back(v);
-                }
-            }
-        } else {
-            for (int j = 0; j < nValues; j++) {
-                double v = readDoubleFromFile(fin);
-                if (store) {
-                    expectedValues.push_back(v);
-                }
-            }
+        vector<double> initialExpectedValues = readVectorFromFileAndSmooth(version, nValues, store, fin);
+        if (store){
+            smoothExpectedValues = initialExpectedValues;
         }
 
         int32_t nNormalizationFactors = readInt32FromFile(fin);
@@ -284,7 +308,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
                 v = readDoubleFromFile(fin);
             }
             if (store && chrIdx == c1) {
-                for (double &expectedValue : expectedValues) {
+                for (double &expectedValue : smoothExpectedValues) {
                     expectedValue = expectedValue / v;
                 }
             }
@@ -292,7 +316,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
     }
 
     if (c1 == c2 && (matrixType == "oe" || matrixType == "expected") && norm == "NONE") {
-        if (expectedValues.empty()) {
+        if (smoothExpectedValues.empty()) {
             cerr << "File did not contain expected values vectors at " << resolution << " " << unit << endl;
             return false;
         }
@@ -314,21 +338,9 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
         }
         bool store = c1 == c2 && (matrixType == "oe" || matrixType == "expected") && type == norm && unit0 == unit && binSize == resolution;
 
-        if (version > 8) {
-            for (int j = 0; j < nValues; j++) {
-                double v = readFloatFromFile(fin);
-                if (store) {
-                    expectedValues.push_back(v);
-                }
-            }
-        } else {
-            for (int j = 0; j < nValues; j++) {
-                double v = readDoubleFromFile(fin);
-                if (store) {
-                    expectedValues.push_back(v);
-                }
-            }
-
+        vector<double> expectedValues = readVectorFromFileAndSmooth(version, nValues, store, fin, resolution);
+        if (store){
+            smoothExpectedValues = expectedValues;
         }
 
         int32_t nNormalizationFactors = readInt32FromFile(fin);
@@ -341,7 +353,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
                 v = readDoubleFromFile(fin);
             }
             if (store && chrIdx == c1) {
-                for (double &expectedValue : expectedValues) {
+                for (double &expectedValue : smoothExpectedValues) {
                     expectedValue = expectedValue / v;
                 }
             }
@@ -349,7 +361,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
     }
 
     if (c1 == c2 && (matrixType == "oe" || matrixType == "expected") && norm != "NONE") {
-        if (expectedValues.empty()) {
+        if (smoothExpectedValues.empty()) {
             cerr << "File did not contain normalized expected values vectors at " << resolution << " " << unit << endl;
             return false;
         }
@@ -390,6 +402,32 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
              << resolution << " " << unit << endl;
     }
     return true;
+}
+
+vector<double> readVectorFromFileAndSmooth(int32_t version, int64_t nValues, bool store, istream &fin, int32_t resolution) {
+    vector<double> initialExpectedValues;
+    if (version > 8) {
+        for (int j = 0; j < nValues; j++) {
+            double v = readFloatFromFile(fin);
+            if (store) {
+                initialExpectedValues.push_back(v);
+            }
+        }
+    } else {
+        for (int j = 0; j < nValues; j++) {
+            double v = readDoubleFromFile(fin);
+            if (store) {
+                initialExpectedValues.push_back(v);
+            }
+        }
+    }
+
+    if (store){
+        int32_t window = 5000000 / resolution;
+        return rollingMedian(initialExpectedValues, window);
+    }
+
+    return initialExpectedValues;
 }
 
 // reads the raw binned contact matrix at specified resolution, setting the block bin count and block column count
