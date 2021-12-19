@@ -248,7 +248,31 @@ vector<double> rollingMedian(vector<double> initialValues, int32_t window) {
     return finalResult;
 }
 
-vector<double> readVectorFromFileAndSmooth(int32_t version, int64_t nValues, bool store, istream &fin, int resolution);
+vector<double> readVectorFromFileAndSmooth(int32_t version, int64_t nValues, bool store, istream &fin, int32_t resolution) {
+    vector<double> initialExpectedValues;
+    if (version > 8) {
+        for (int j = 0; j < nValues; j++) {
+            double v = readFloatFromFile(fin);
+            if (store) {
+                initialExpectedValues.push_back(v);
+            }
+        }
+    } else {
+        for (int j = 0; j < nValues; j++) {
+            double v = readDoubleFromFile(fin);
+            if (store) {
+                initialExpectedValues.push_back(v);
+            }
+        }
+    }
+
+    if (store){
+        int32_t window = 5000000 / resolution;
+        return rollingMedian(initialExpectedValues, window);
+    }
+
+    return initialExpectedValues;
+}
 
 // reads the footer from the master pointer location. takes in the chromosomes,
 // norm, unit (BP or FRAG) and resolution or binsize, and sets the file
@@ -304,7 +328,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
 
         bool store = c1 == c2 && (matrixType == "oe" || matrixType == "expected") && norm == "NONE" && unit0 == unit && binSize == resolution;
 
-        vector<double> initialExpectedValues = readVectorFromFileAndSmooth(version, nValues, store, fin);
+        vector<double> initialExpectedValues = readVectorFromFileAndSmooth(version, nValues, store, fin, resolution);
         if (store){
             smoothExpectedValues = initialExpectedValues;
         }
@@ -413,32 +437,6 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
              << resolution << " " << unit << endl;
     }
     return true;
-}
-
-vector<double> readVectorFromFileAndSmooth(int32_t version, int64_t nValues, bool store, istream &fin, int32_t resolution) {
-    vector<double> initialExpectedValues;
-    if (version > 8) {
-        for (int j = 0; j < nValues; j++) {
-            double v = readFloatFromFile(fin);
-            if (store) {
-                initialExpectedValues.push_back(v);
-            }
-        }
-    } else {
-        for (int j = 0; j < nValues; j++) {
-            double v = readDoubleFromFile(fin);
-            if (store) {
-                initialExpectedValues.push_back(v);
-            }
-        }
-    }
-
-    if (store){
-        int32_t window = 5000000 / resolution;
-        return rollingMedian(initialExpectedValues, window);
-    }
-
-    return initialExpectedValues;
 }
 
 // reads the raw binned contact matrix at specified resolution, setting the block bin count and block column count
