@@ -92,7 +92,7 @@ std::vector<contactRecord> readBlock(std::istream &fin, int32_t blockNumber);
 std::vector<double> readNormalizationVector(std::istream &fin, indexEntry entry);
 
 std::vector<contactRecord>
-straw(std::string matrixType, std::string norm, std::string fname, std::string chr1loc, std::string chr2loc,
+straw(const std::string& matrixType, const std::string& norm, const std::string& fname, const std::string& chr1loc, const std::string& chr2loc,
       const std::string &unit, int32_t binsize);
 
 #endif

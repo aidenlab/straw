@@ -28,6 +28,7 @@
 #include <map>
 #include <cmath>
 #include <set>
+#include <utility>
 #include <vector>
 #include <streambuf>
 #include <curl/curl.h>
@@ -61,7 +62,8 @@ struct MemoryStruct {
 static size_t
 WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
     size_t realsize = size * nmemb;
-    struct MemoryStruct *mem = (struct MemoryStruct *) userp;
+    struct MemoryStruct *mem;
+    mem = (struct MemoryStruct *) userp;
 
     mem->memory = static_cast<char *>(realloc(mem->memory, mem->size + realsize + 1));
     if (mem->memory == nullptr) {
@@ -80,8 +82,7 @@ WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
 // get a buffer that can be used as an input stream from the URL
 char *getData(CURL *curl, int64_t position, int64_t chunksize) {
     std::ostringstream oss;
-    struct MemoryStruct chunk;
-
+    struct MemoryStruct chunk{};
     chunk.memory = static_cast<char *>(malloc(1));
     chunk.size = 0;    /* no data at this point */
     oss << position << "-" << position + chunksize;
@@ -551,10 +552,11 @@ map<int32_t, indexEntry> readMatrix(istream &fin, int64_t myFilePosition, const 
 // or not this is intrachromosomal.
 set<int32_t> getBlockNumbersForRegionFromBinPosition(const int64_t *regionIndices, int32_t blockBinCount, int32_t blockColumnCount,
                                                  bool intra) {
-    int32_t col1 = static_cast<int32_t>(regionIndices[0] / blockBinCount);
-    int32_t col2 = static_cast<int32_t>((regionIndices[1] + 1) / blockBinCount);
-    int32_t row1 = static_cast<int32_t>(regionIndices[2] / blockBinCount);
-    int32_t row2 = static_cast<int32_t>((regionIndices[3] + 1) / blockBinCount);
+    int32_t col1, col2, row1, row2;
+    col1 = static_cast<int32_t>(regionIndices[0] / blockBinCount);
+    col2 = static_cast<int32_t>((regionIndices[1] + 1) / blockBinCount);
+    row1 = static_cast<int32_t>(regionIndices[2] / blockBinCount);
+    row2 = static_cast<int32_t>((regionIndices[3] + 1) / blockBinCount);
 
     set<int32_t> blocksSet;
     // first check the upper triangular matrixType
@@ -579,11 +581,12 @@ set<int32_t> getBlockNumbersForRegionFromBinPosition(const int64_t *regionIndice
 set<int32_t> getBlockNumbersForRegionFromBinPositionV9Intra(int64_t *regionIndices, int32_t blockBinCount, int32_t blockColumnCount) {
     // regionIndices is binX1 binX2 binY1 binY2
     set<int32_t> blocksSet;
-    int32_t translatedLowerPAD = static_cast<int32_t>((regionIndices[0] + regionIndices[2]) / 2 / blockBinCount);
-    int32_t translatedHigherPAD = static_cast<int32_t>((regionIndices[1] + regionIndices[3]) / 2 / blockBinCount + 1);
-    int32_t translatedNearerDepth = static_cast<int32_t>(log2(
+    int32_t translatedLowerPAD, translatedHigherPAD, translatedNearerDepth, translatedFurtherDepth;
+    translatedLowerPAD = static_cast<int32_t>((regionIndices[0] + regionIndices[2]) / 2 / blockBinCount);
+    translatedHigherPAD = static_cast<int32_t>((regionIndices[1] + regionIndices[3]) / 2 / blockBinCount + 1);
+    translatedNearerDepth = static_cast<int32_t>(log2(
             1 + abs(regionIndices[0] - regionIndices[3]) / sqrt(2) / blockBinCount));
-    int32_t translatedFurtherDepth = static_cast<int32_t>(log2(
+    translatedFurtherDepth = static_cast<int32_t>(log2(
             1 + abs(regionIndices[1] - regionIndices[2]) / sqrt(2) / blockBinCount));
 
     // because code above assume above diagonal; but we could be below diagonal
@@ -642,12 +645,14 @@ vector<contactRecord> readBlock(istream &fin, CURL *curl, bool isHttp, indexEntr
     inflateInit(&infstream);
     inflate(&infstream, Z_NO_FLUSH);
     inflateEnd(&infstream);
-    int32_t uncompressedSize = static_cast<int32_t>(infstream.total_out);
+    int32_t uncompressedSize;
+    uncompressedSize = static_cast<int32_t>(infstream.total_out);
 
     // create stream from buffer for ease of use
     membuf sbuf(uncompressedBytes, uncompressedBytes + uncompressedSize);
     istream bufferin(&sbuf);
-    uint64_t nRecords = static_cast<uint64_t>(readInt32FromFile(bufferin));
+    uint64_t nRecords;
+    nRecords = static_cast<uint64_t>(readInt32FromFile(bufferin));
     vector<contactRecord> v(nRecords);
     // different versions have different specific formats
     if (version < 7) {
@@ -777,7 +782,8 @@ vector<double> readNormalizationVector(istream &bufferin, int32_t version) {
         nValues = (int64_t) readInt32FromFile(bufferin);
     }
 
-    uint64_t numValues = static_cast<uint64_t>(nValues);
+    uint64_t numValues;
+    numValues = static_cast<uint64_t>(nValues);
     vector<double> values(numValues);
 
     if (version > 8) {
@@ -811,20 +817,20 @@ public:
         return curl;
     }
 
-    explicit FileReader(const string &fname) {
+    explicit FileReader(const string &fileName) {
 
         // read header into buffer; 100K should be sufficient
-        if (std::strncmp(fname.c_str(), prefix.c_str(), prefix.size()) == 0) {
+        if (std::strncmp(fileName.c_str(), prefix.c_str(), prefix.size()) == 0) {
             isHttp = true;
-            curl = initCURL(fname.c_str());
+            curl = initCURL(fileName.c_str());
             if (!curl) {
-                cerr << "URL " << fname << " cannot be opened for reading" << endl;
+                cerr << "URL " << fileName << " cannot be opened for reading" << endl;
                 exit(1);
             }
         } else {
-            fin.open(fname, fstream::in | fstream::binary);
+            fin.open(fileName, fstream::in | fstream::binary);
             if (!fin) {
-                cerr << "File " << fname << " cannot be opened for reading" << endl;
+                cerr << "File " << fileName << " cannot be opened for reading" << endl;
                 exit(2);
             }
         }
@@ -859,12 +865,14 @@ public:
         size_t numbytes = size * nitems;
         b[numbytes + 1] = '\0';
         string s(b);
-        int32_t found = static_cast<int32_t>(s.find("content-range"));
+        int32_t found;
+        found = static_cast<int32_t>(s.find("content-range"));
         if ((size_t)found == string::npos) {
           found = static_cast<int32_t>(s.find("Content-Range"));
         }
         if ((size_t)found != string::npos) {
-            int32_t found2 = static_cast<int32_t>(s.find("/"));
+            int32_t found2;
+            found2 = static_cast<int32_t>(s.find("/"));
             //content-range: bytes 0-100000/891471462
             if ((size_t)found2 != string::npos) {
                 string total = s.substr(found2 + 1);
@@ -887,17 +895,17 @@ public:
         return curl;
     }
 
-    explicit HiCFile(const string &fname) {
+    explicit HiCFile(const string &fileName) {
 
         // read header into buffer; 100K should be sufficient
-        if (std::strncmp(fname.c_str(), prefix.c_str(), prefix.size()) == 0) {
+        if (std::strncmp(fileName.c_str(), prefix.c_str(), prefix.size()) == 0) {
             isHttp = true;
             char *buffer;
-            curl = initCURL(fname.c_str());
+            curl = initCURL(fileName.c_str());
             if (curl) {
                 buffer = getData(curl, 0, 100000);
             } else {
-                cerr << "URL " << fname << " cannot be opened for reading" << endl;
+                cerr << "URL " << fileName << " cannot be opened for reading" << endl;
                 exit(1);
             }
             membuf sbuf(buffer, buffer + 100000);
@@ -907,9 +915,9 @@ public:
             resolutions = readResolutionsFromHeader(bufin);
             delete buffer;
         } else {
-            fin.open(fname, fstream::in | fstream::binary);
+            fin.open(fileName, fstream::in | fstream::binary);
             if (!fin) {
-                cerr << "File " << fname << " cannot be opened for reading" << endl;
+                cerr << "File " << fileName << " cannot be opened for reading" << endl;
                 exit(2);
             }
             chromosomeMap = readHeader(fin, master, genomeID, numChromosomes,
@@ -940,6 +948,10 @@ public:
         vector<double> cNorm = readNormalizationVector(bufferin, version);
         delete buffer;
         return cNorm;
+    }
+
+    vector<int32_t> getResolutions() const{
+        return resolutions;
     }
 };
 
@@ -986,7 +998,7 @@ public:
 
         if (hiCFile->isHttp) {
             char *buffer2;
-            int64_t bytes_to_read = hiCFile->totalFileSize - hiCFile->master;
+            int64_t bytes_to_read = HiCFile::totalFileSize - hiCFile->master;
             buffer2 = getData(hiCFile->curl, hiCFile->master, bytes_to_read);
             membuf sbuf2(buffer2, buffer2 + bytes_to_read);
             istream bufin2(&sbuf2);
@@ -1019,12 +1031,12 @@ public:
 };
 
 MatrixZoomData *
-getMatrixZoomData(HiCFile *hiCFile, const string &chr1, const string &chr2, string matrixType, string norm,
-                  string unit, int32_t resolution) {
+getMatrixZoomData(HiCFile *hiCFile, const string &chr1, const string &chr2, const string& matrixType, const string& norm,
+                  const string& unit, int32_t resolution) {
 
     chromosome chrom1 = hiCFile->chromosomeMap[chr1];
     chromosome chrom2 = hiCFile->chromosomeMap[chr2];
-    return new MatrixZoomData(hiCFile, chrom1, chrom2, std::move(matrixType), std::move(norm), std::move(unit),
+    return new MatrixZoomData(hiCFile, chrom1, chrom2, (matrixType), (norm), (unit),
                               resolution);
 }
 
@@ -1075,7 +1087,8 @@ public:
         }
     }
 
-    set<int32_t> getBlockNumbers(int32_t version, bool isIntra, int64_t *regionIndices, int32_t blockBinCount, int32_t blockColumnCount) {
+    static set<int32_t> getBlockNumbers(int32_t version, bool isIntra, int64_t *regionIndices,
+                                 int32_t blockBinCount, int32_t blockColumnCount) {
         set<int32_t> blockNumbers;
         if (version > 8 && isIntra) {
             blockNumbers = getBlockNumbersForRegionFromBinPositionV9Intra(regionIndices, blockBinCount,
@@ -1157,17 +1170,18 @@ vector<contactRecord> getBlockRecords(FileReader *fileReader, int64_t origRegion
     regionIndices[2] = origRegionIndices[2] / footer.resolution;
     regionIndices[3] = origRegionIndices[3] / footer.resolution;
 
-    BlocksRecords *blocksRecords = new BlocksRecords(fileReader, footer);
+    BlocksRecords *blocksRecords;
+    blocksRecords = new BlocksRecords(fileReader, footer);
     return blocksRecords->getRecords(fileReader, regionIndices, origRegionIndices, footer);
 }
 
-footerInfo getNormalizationInfoForRegion(string fname, string chr1, string chr2,
+footerInfo getNormalizationInfoForRegion(const string& fileName, const string& chr1, const string& chr2,
                                          const string &matrixType, const string &norm,
                                          const string &unit, int32_t binsize) {
 
-    HiCFile *hiCFile = new HiCFile(std::move(fname));
-    MatrixZoomData *mzd = getMatrixZoomData(hiCFile, chr1, chr2, std::move(matrixType), std::move(norm), unit,
-                                            binsize);
+    HiCFile *hiCFile;
+    hiCFile = new HiCFile(fileName);
+    MatrixZoomData *mzd = getMatrixZoomData(hiCFile, chr1, chr2, matrixType, norm, unit, binsize);
     footerInfo footer = footerInfo();
     footer.resolution = mzd->resolution;
     footer.foundFooter = mzd->foundFooter;
@@ -1188,7 +1202,7 @@ footerInfo getNormalizationInfoForRegion(string fname, string chr1, string chr2,
 }
 
 vector<contactRecord>
-getBlockRecordsWithNormalization(string fname,
+getBlockRecordsWithNormalization(const string& fileName,
                                  int64_t c1pos1, int64_t c1pos2, int64_t c2pos1, int64_t c2pos2,
                                  int32_t resolution, bool foundFooter, int32_t version, int32_t c1, int32_t c2,
                                  int32_t numBins1, int32_t numBins2, int64_t myFilePos, string unit, string norm,
@@ -1200,7 +1214,8 @@ getBlockRecordsWithNormalization(string fname,
     origRegionIndices[2] = c2pos1;
     origRegionIndices[3] = c2pos2;
 
-    FileReader *fileReader = new FileReader(std::move(fname));
+    FileReader *fileReader;
+    fileReader = new FileReader((fileName));
     footerInfo footer = footerInfo();
     footer.resolution = resolution;
     footer.foundFooter = foundFooter;
@@ -1210,19 +1225,20 @@ getBlockRecordsWithNormalization(string fname,
     footer.numBins1 = numBins1;
     footer.numBins2 = numBins2;
     footer.myFilePos = myFilePos;
-    footer.unit = unit;
-    footer.norm = norm;
-    footer.matrixType = matrixType;
-    footer.c1Norm = c1Norm;
-    footer.c2Norm = c2Norm;
-    footer.expectedValues = expectedValues;
+    footer.unit = std::move(unit);
+    footer.norm = std::move(norm);
+    footer.matrixType = std::move(matrixType);
+    footer.c1Norm = std::move(c1Norm);
+    footer.c2Norm = std::move(c2Norm);
+    footer.expectedValues = std::move(expectedValues);
     vector<contactRecord> v = getBlockRecords(fileReader, origRegionIndices, footer);
     fileReader->close();
     return v;
 }
 
 vector<contactRecord>
-straw(string matrixType, string norm, string fname, string chr1loc, string chr2loc, const string &unit, int32_t binsize) {
+straw(const string& matrixType, const string& norm, const string& fileName, const string& chr1loc,
+      const string& chr2loc, const string &unit, int32_t binsize) {
     if (!(unit == "BP" || unit == "FRAG")) {
         cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl;
         cerr << "Usage: straw [observed/oe/expected] <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>"
@@ -1231,12 +1247,13 @@ straw(string matrixType, string norm, string fname, string chr1loc, string chr2l
         return v;
     }
 
-    HiCFile *hiCFile = new HiCFile(std::move(fname));
+    HiCFile *hiCFile;
+    hiCFile = new HiCFile((fileName));
 
     string chr1, chr2;
     int64_t c1pos1 = -100LL, c1pos2 = -100LL, c2pos1 = -100LL, c2pos2 = -100LL;
-    parsePositions(std::move(chr1loc), chr1, c1pos1, c1pos2, hiCFile->chromosomeMap);
-    parsePositions(std::move(chr2loc), chr2, c2pos1, c2pos2, hiCFile->chromosomeMap);
+    parsePositions((chr1loc), chr1, c1pos1, c1pos2, hiCFile->chromosomeMap);
+    parsePositions((chr2loc), chr2, c2pos1, c2pos2, hiCFile->chromosomeMap);
 
     // from header have size of chromosomes, set region to read
 
@@ -1255,9 +1272,9 @@ straw(string matrixType, string norm, string fname, string chr1loc, string chr2l
     }
     hiCFile->close();
 
-    footerInfo footer = getNormalizationInfoForRegion(fname, chr1, chr2, matrixType, norm, unit, binsize);
+    footerInfo footer = getNormalizationInfoForRegion(fileName, chr1, chr2, matrixType, norm, unit, binsize);
 
-    return getBlockRecordsWithNormalization(fname,
+    return getBlockRecordsWithNormalization(fileName,
                                             origRegionIndices[0], origRegionIndices[1],
                                             origRegionIndices[2], origRegionIndices[3],
                                             footer.resolution, footer.foundFooter, footer.version,
@@ -1266,21 +1283,16 @@ straw(string matrixType, string norm, string fname, string chr1loc, string chr2l
                                             footer.c1Norm, footer.c2Norm, footer.expectedValues);
 }
 
-vector<chromosome> getChromosomes(string fname){
-    HiCFile *hiCFile = new HiCFile(std::move(fname));
+vector<chromosome> getChromosomes(const string& fileName){
+    HiCFile *hiCFile;
+    hiCFile = new HiCFile((fileName));
     vector<chromosome> chromosomes;
-    std::map<std::string, chromosome>::iterator iter = hiCFile->chromosomeMap.begin();
+    std::map<std::string, chromosome>::iterator iter;
+    iter = hiCFile->chromosomeMap.begin();
     while (iter != hiCFile->chromosomeMap.end()) {
         chromosomes.push_back(static_cast<chromosome>(iter->second));
         iter++;
     }
     hiCFile->close();
     return chromosomes;
-}
-
-vector<int32_t> getResolutions(string fname){
-    HiCFile *hiCFile = new HiCFile(std::move(fname));
-    vector<int32_t> resolutions = hiCFile->resolutions;
-    hiCFile->close();
-    return resolutions;
 }
