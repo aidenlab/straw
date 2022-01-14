@@ -93,12 +93,10 @@ char *getData(CURL *curl, int64_t position, int64_t chunksize) {
         fprintf(stderr, "curl_easy_perform() failed: %s\n",
                 curl_easy_strerror(res));
     }
-    //  printf("%lu bytes retrieved\n", (int64_t)chunk.size);
 
     return chunk.memory;
 }
 
-// returns whether or not this is valid HiC file
 bool readMagicString(istream &fin) {
     string str;
     getline(fin, str, '\0');
@@ -141,6 +139,20 @@ double readDoubleFromFile(istream &fin) {
     return tempDouble;
 }
 
+static CURL *initCURL(const char *url) {
+    CURL *curl = curl_easy_init();
+    if (curl) {
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+        curl_easy_setopt(curl, CURLOPT_URL, url);
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(curl, CURLOPT_USERAGENT, "straw");
+    } else {
+        cerr << "Unable to initialize curl " << endl;
+        exit(2);
+    }
+    return curl;
+}
+
 class HiCFileStream {
 public:
     string prefix = "http"; // HTTP code
@@ -148,32 +160,19 @@ public:
     CURL *curl;
     bool isHttp = false;
 
-    static CURL *initCURL(const char *url) {
-        CURL *curl = curl_easy_init();
-        if (curl) {
-            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
-            curl_easy_setopt(curl, CURLOPT_URL, url);
-            curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-            curl_easy_setopt(curl, CURLOPT_USERAGENT, "straw");
-        }
-        return curl;
-    }
-
     explicit HiCFileStream(const string &fileName) {
-
-        // read header into buffer; 100K should be sufficient
         if (std::strncmp(fileName.c_str(), prefix.c_str(), prefix.size()) == 0) {
             isHttp = true;
             curl = initCURL(fileName.c_str());
             if (!curl) {
                 cerr << "URL " << fileName << " cannot be opened for reading" << endl;
-                exit(1);
+                exit(3);
             }
         } else {
             fin.open(fileName, fstream::in | fstream::binary);
             if (!fin) {
                 cerr << "File " << fileName << " cannot be opened for reading" << endl;
-                exit(2);
+                exit(4);
             }
         }
     }
@@ -681,8 +680,7 @@ vector<contactRecord> readBlock(const string& fileName, indexEntry idx, int32_t 
         return v;
     }
     char *uncompressedBytes = new char[idx.size * 10]; //biggest seen so far is 3
-    HiCFileStream *stream;
-    stream = new HiCFileStream(fileName);
+    HiCFileStream *stream = new HiCFileStream(fileName);
     char *compressedBytes = stream->readCompressedBytes(idx);
 
     // Decompress the block
@@ -824,6 +822,7 @@ vector<contactRecord> readBlock(const string& fileName, indexEntry idx, int32_t 
     }
     delete[] compressedBytes;
     delete[] uncompressedBytes; // don't forget to delete your heap arrays in C++!
+    stream->close();
     return v;
 }
 
@@ -890,14 +889,8 @@ public:
     }
 
     static CURL *oneTimeInitCURL(const char *url) {
-        CURL *curl = curl_easy_init();
-        if (curl) {
-            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
-            curl_easy_setopt(curl, CURLOPT_URL, url);
-            curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-            curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, hdf);
-            curl_easy_setopt(curl, CURLOPT_USERAGENT, "straw");
-        }
+        CURL *curl = initCURL(url);
+        curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, hdf);
         return curl;
     }
 
@@ -909,12 +902,7 @@ public:
             char *buffer;
             CURL *curl;
             curl = oneTimeInitCURL(fileName.c_str());
-            if (curl) {
-                buffer = getData(curl, 0, 100000);
-            } else {
-                cerr << "URL " << fileName << " cannot be opened for reading" << endl;
-                exit(1);
-            }
+            buffer = getData(curl, 0, 100000);
             membuf sbuf(buffer, buffer + 100000);
             istream bufin(&sbuf);
             chromosomeMap = readHeader(bufin, master, genomeID, numChromosomes,
@@ -927,7 +915,7 @@ public:
             fin.open(fileName, fstream::in | fstream::binary);
             if (!fin) {
                 cerr << "File " << fileName << " cannot be opened for reading" << endl;
-                exit(2);
+                exit(6);
             }
             chromosomeMap = readHeader(fin, master, genomeID, numChromosomes,
                                        version, nviPosition, nviLength);
@@ -937,14 +925,14 @@ public:
     }
 
     vector<double> readNormalizationVectorFromFooter(indexEntry cNormEntry) {
-        HiCFileStream *stream;
-        stream = new HiCFileStream((fileName));
+        HiCFileStream *stream = new HiCFileStream((fileName));
         char *buffer;
         buffer = stream->readCompressedBytes(cNormEntry);
         membuf sbuf3(buffer, buffer + cNormEntry.size);
         istream bufferin(&sbuf3);
         vector<double> cNorm = readNormalizationVector(bufferin, version);
         delete buffer;
+        stream->close();
         return cNorm;
     }
 
@@ -994,9 +982,7 @@ public:
         this->unit = unit;
         this->resolution = resolution;
 
-        HiCFileStream *stream;
-        stream = new HiCFileStream(hiCFile->fileName);
-
+        HiCFileStream *stream = new HiCFileStream(hiCFile->fileName);
 
         if (stream->isHttp) {
             char *buffer2;
@@ -1029,6 +1015,7 @@ public:
                 c2Norm = hiCFile->readNormalizationVectorFromFooter(c2NormEntry);
             }
         }
+        stream->close();
     }
 };
 
@@ -1048,7 +1035,7 @@ void parsePositions(const string &chrLoc, string &chrom, int64_t &pos1, int64_t 
     getline(ss, chrom, ':');
     if (map.count(chrom) == 0) {
         cerr << chrom << " not found in the file." << endl;
-        exit(6);
+        exit(7);
     }
 
     if (getline(ss, x, ':') && getline(ss, y, ':')) {
@@ -1071,8 +1058,7 @@ public:
 
     BlocksRecords(const string &fileName, const footerInfo &footer) {
         this->fileName = fileName;
-        HiCFileStream *stream;
-        stream = new HiCFileStream((fileName));
+        HiCFileStream *stream = new HiCFileStream((fileName));
 
         isIntra = footer.c1 == footer.c2;
 
