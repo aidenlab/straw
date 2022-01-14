@@ -996,9 +996,7 @@ public:
 
     vector<contactRecord>
     getRecords(int64_t regionIndices[4], const int64_t origRegionIndices[4]) {
-
         set<int32_t> blockNumbers = getBlockNumbers(regionIndices);
-
         vector<contactRecord> records;
         for (int32_t blockNumber : blockNumbers) {
             // get contacts in this block
@@ -1047,8 +1045,6 @@ public:
         }
         return records;
     }
-
-
 };
 
 class HiCFile {
@@ -1127,10 +1123,19 @@ public:
         return resolutions;
     }
 
+    vector<chromosome> getChromosomes(){
+        vector<chromosome> chromosomes;
+        auto iter = chromosomeMap.begin();
+        while (iter != chromosomeMap.end()) {
+            chromosomes.push_back(static_cast<chromosome>(iter->second));
+            iter++;
+        }
+        return chromosomes;
+    }
+
     MatrixZoomData *
     getMatrixZoomData(const string &chr1, const string &chr2, const string& matrixType, const string& norm,
                       const string& unit, int32_t resolution) {
-
         chromosome chrom1 = chromosomeMap[chr1];
         chromosome chrom2 = chromosomeMap[chr2];
         return new MatrixZoomData(chrom1, chrom2, (matrixType), (norm), (unit),
@@ -1192,17 +1197,4 @@ straw(const string& matrixType, const string& norm, const string& fileName, cons
 
     MatrixZoomData *mzd = hiCFile->getMatrixZoomData(chr1, chr2, matrixType, norm, unit, binsize);
     return mzd->getBlockRecordsWithNormalization(origRegionIndices);
-}
-
-vector<chromosome> getChromosomes(const string& fileName){
-    HiCFile *hiCFile;
-    hiCFile = new HiCFile((fileName));
-    vector<chromosome> chromosomes;
-    std::map<std::string, chromosome>::iterator iter;
-    iter = hiCFile->chromosomeMap.begin();
-    while (iter != hiCFile->chromosomeMap.end()) {
-        chromosomes.push_back(static_cast<chromosome>(iter->second));
-        iter++;
-    }
-    return chromosomes;
 }
