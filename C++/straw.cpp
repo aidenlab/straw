@@ -852,6 +852,205 @@ vector<double> readNormalizationVector(istream &bufferin, int32_t version) {
     return values;
 }
 
+class MatrixZoomData {
+public:
+    bool isIntra;
+    string fileName;
+    indexEntry c1NormEntry, c2NormEntry;
+    int64_t myFilePos = 0LL;
+    vector<double> expectedValues;
+    bool foundFooter = false;
+    vector<double> c1Norm;
+    vector<double> c2Norm;
+    int32_t c1 = 0;
+    int32_t c2 = 0;
+    string matrixType;
+    string norm;
+    string unit;
+    int32_t version = 0;
+    int32_t resolution = 0;
+    int32_t numBins1 = 0;
+    int32_t numBins2 = 0;
+
+    float sumCounts;
+    int32_t blockBinCount, blockColumnCount;
+    map<int32_t, indexEntry> blockMap;
+    double avgCount;
+
+    MatrixZoomData(const chromosome &chrom1, const chromosome &chrom2, const string &matrixType,
+                   const string &norm, const string &unit, int32_t resolution,
+                   int32_t &version, int64_t &master, int64_t &totalFileSize,
+                   const string &fileName) {
+        this->version = version;
+        this->fileName = fileName;
+        int32_t c01 = chrom1.index;
+        int32_t c02 = chrom2.index;
+        if (c01 <= c02) { // default is ok
+            this->c1 = c01;
+            this->c2 = c02;
+            this->numBins1 = static_cast<int32_t>(chrom1.length / resolution);
+            this->numBins2 = static_cast<int32_t>(chrom2.length / resolution);
+        } else { // flip
+            this->c1 = c02;
+            this->c2 = c01;
+            this->numBins1 = static_cast<int32_t>(chrom2.length / resolution);
+            this->numBins2 = static_cast<int32_t>(chrom1.length / resolution);
+        }
+        isIntra = c1 == c2;
+
+        this->matrixType = matrixType;
+        this->norm = norm;
+        this->unit = unit;
+        this->resolution = resolution;
+
+        HiCFileStream *stream = new HiCFileStream(fileName);
+
+        if (stream->isHttp) {
+            char *buffer2;
+            int64_t bytes_to_read = totalFileSize - master;
+            buffer2 = getData(stream->curl, master, bytes_to_read);
+            membuf sbuf2(buffer2, buffer2 + bytes_to_read);
+            istream bufin2(&sbuf2);
+            foundFooter = readFooter(bufin2, master, version, c1, c2, matrixType, norm, unit,
+                                     resolution,
+                                     myFilePos,
+                                     c1NormEntry, c2NormEntry, expectedValues);
+            delete buffer2;
+        } else {
+            stream->fin.seekg(master, ios::beg);
+            foundFooter = readFooter(stream->fin, master, version, c1, c2, matrixType, norm,
+                                     unit,
+                                     resolution, myFilePos,
+                                     c1NormEntry, c2NormEntry, expectedValues);
+        }
+
+        if (!foundFooter) {
+            return;
+        }
+
+        if (norm != "NONE") {
+            c1Norm = readNormalizationVectorFromFooter(c1NormEntry, version, fileName);
+            if (isIntra) {
+                c2Norm = c1Norm;
+            } else {
+                c2Norm = readNormalizationVectorFromFooter(c2NormEntry, version, fileName);
+            }
+        }
+        stream->close();
+
+        HiCFileStream *stream2 = new HiCFileStream((fileName));
+        if (stream2->isHttp) {
+            // readMatrix will assign blockBinCount and blockColumnCount
+            blockMap = readMatrixHttp(stream2->curl, myFilePos, unit, resolution, sumCounts,
+                                      blockBinCount,
+                                      blockColumnCount);
+        } else {
+            // readMatrix will assign blockBinCount and blockColumnCount
+            blockMap = readMatrix(stream2->fin, myFilePos, unit, resolution, sumCounts,
+                                  blockBinCount,
+                                  blockColumnCount);
+        }
+        stream2->close();
+
+        if (!isIntra) {
+            avgCount = (sumCounts / numBins1) / numBins2;   // <= trying to avoid overflows
+        }
+    }
+
+    vector<double> readNormalizationVectorFromFooter(indexEntry cNormEntry, int32_t &version, const string &fileName) {
+        HiCFileStream *stream = new HiCFileStream(fileName);
+        char *buffer;
+        buffer = stream->readCompressedBytes(cNormEntry);
+        membuf sbuf3(buffer, buffer + cNormEntry.size);
+        istream bufferin(&sbuf3);
+        vector<double> cNorm = readNormalizationVector(bufferin, version);
+        delete buffer;
+        stream->close();
+        return cNorm;
+    }
+
+    vector<contactRecord> getBlockRecordsWithNormalization(int64_t origRegionIndices[4]) {
+        if (!foundFooter) {
+            vector<contactRecord> v;
+            return v;
+        }
+
+        int64_t regionIndices[4]; // used to find the blocks we need to access
+        regionIndices[0] = origRegionIndices[0] / resolution;
+        regionIndices[1] = origRegionIndices[1] / resolution;
+        regionIndices[2] = origRegionIndices[2] / resolution;
+        regionIndices[3] = origRegionIndices[3] / resolution;
+
+        return getRecords(regionIndices, origRegionIndices);
+    }
+
+    set<int32_t> getBlockNumbers(int64_t *regionIndices) {
+        if (version > 8 && isIntra) {
+            return getBlockNumbersForRegionFromBinPositionV9Intra(regionIndices, blockBinCount,
+                                                                          blockColumnCount);
+        } else {
+            return getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount,
+                                                                   isIntra);
+        }
+    }
+
+    vector<contactRecord>
+    getRecords(int64_t regionIndices[4], const int64_t origRegionIndices[4]) {
+
+        set<int32_t> blockNumbers = getBlockNumbers(regionIndices);
+
+        vector<contactRecord> records;
+        for (int32_t blockNumber : blockNumbers) {
+            // get contacts in this block
+            //cout << *it << " -- " << blockMap.size() << endl;
+            //cout << blockMap[*it].size << " " <<  blockMap[*it].position << endl;
+            vector<contactRecord> tmp_records = readBlock(fileName, blockMap[blockNumber], version);
+            for (contactRecord rec : tmp_records) {
+                int64_t x = rec.binX * resolution;
+                int64_t y = rec.binY * resolution;
+
+                if ((x >= origRegionIndices[0] && x <= origRegionIndices[1] &&
+                     y >= origRegionIndices[2] && y <= origRegionIndices[3]) ||
+                    // or check regions that overlap with lower left
+                    (isIntra && y >= origRegionIndices[0] && y <= origRegionIndices[1] && x >= origRegionIndices[2] &&
+                     x <= origRegionIndices[3])) {
+
+                    float c = rec.counts;
+                    if (norm != "NONE") {
+                        c = static_cast<float>(c / (c1Norm[rec.binX] * c2Norm[rec.binY]));
+                    }
+                    if (matrixType == "oe") {
+                        if (isIntra) {
+                            c = static_cast<float>(c / expectedValues[min(expectedValues.size() - 1,
+                                                                                 (size_t) floor(abs(y - x) /
+                                                                                                resolution))]);
+                        } else {
+                            c = static_cast<float>(c / avgCount);
+                        }
+                    } else if (matrixType == "expected") {
+                        if (isIntra) {
+                            c = static_cast<float>(expectedValues[min(expectedValues.size() - 1,
+                                                                             (size_t) floor(abs(y - x) /
+                                                                                            resolution))]);
+                        } else {
+                            c = static_cast<float>(avgCount);
+                        }
+                    }
+
+                    contactRecord record = contactRecord();
+                    record.binX = static_cast<int32_t>(x);
+                    record.binY = static_cast<int32_t>(y);
+                    record.counts = c;
+                    records.push_back(record);
+                }
+            }
+        }
+        return records;
+    }
+
+
+};
+
 class HiCFile {
 public:
     string prefix = "http"; // HTTP code
@@ -924,110 +1123,22 @@ public:
         }
     }
 
-    vector<double> readNormalizationVectorFromFooter(indexEntry cNormEntry) {
-        HiCFileStream *stream = new HiCFileStream((fileName));
-        char *buffer;
-        buffer = stream->readCompressedBytes(cNormEntry);
-        membuf sbuf3(buffer, buffer + cNormEntry.size);
-        istream bufferin(&sbuf3);
-        vector<double> cNorm = readNormalizationVector(bufferin, version);
-        delete buffer;
-        stream->close();
-        return cNorm;
-    }
-
     vector<int32_t> getResolutions() const{
         return resolutions;
+    }
+
+    MatrixZoomData *
+    getMatrixZoomData(const string &chr1, const string &chr2, const string& matrixType, const string& norm,
+                      const string& unit, int32_t resolution) {
+
+        chromosome chrom1 = chromosomeMap[chr1];
+        chromosome chrom2 = chromosomeMap[chr2];
+        return new MatrixZoomData(chrom1, chrom2, (matrixType), (norm), (unit),
+                                  resolution, version, master, totalFileSize, fileName);
     }
 };
 
 int64_t HiCFile::totalFileSize = 0LL;
-
-class MatrixZoomData {
-public:
-    indexEntry c1NormEntry, c2NormEntry;
-    int64_t myFilePos = 0LL;
-    vector<double> expectedValues;
-    bool foundFooter = false;
-    vector<double> c1Norm;
-    vector<double> c2Norm;
-    int32_t c1 = 0;
-    int32_t c2 = 0;
-    string matrixType;
-    string norm;
-    string unit;
-    int32_t resolution = 0;
-    int32_t numBins1 = 0;
-    int32_t numBins2 = 0;
-
-    MatrixZoomData(HiCFile *hiCFile, const chromosome &chrom1, const chromosome &chrom2, const string &matrixType,
-                   const string &norm, const string &unit, int32_t resolution) {
-
-        int32_t c01 = chrom1.index;
-        int32_t c02 = chrom2.index;
-        if (c01 <= c02) { // default is ok
-            this->c1 = c01;
-            this->c2 = c02;
-            this->numBins1 = static_cast<int32_t>(chrom1.length / resolution);
-            this->numBins2 = static_cast<int32_t>(chrom2.length / resolution);
-        } else { // flip
-            this->c1 = c02;
-            this->c2 = c01;
-            this->numBins1 = static_cast<int32_t>(chrom2.length / resolution);
-            this->numBins2 = static_cast<int32_t>(chrom1.length / resolution);
-        }
-
-        this->matrixType = matrixType;
-        this->norm = norm;
-        this->unit = unit;
-        this->resolution = resolution;
-
-        HiCFileStream *stream = new HiCFileStream(hiCFile->fileName);
-
-        if (stream->isHttp) {
-            char *buffer2;
-            int64_t bytes_to_read = HiCFile::totalFileSize - hiCFile->master;
-            buffer2 = getData(stream->curl, hiCFile->master, bytes_to_read);
-            membuf sbuf2(buffer2, buffer2 + bytes_to_read);
-            istream bufin2(&sbuf2);
-            foundFooter = readFooter(bufin2, hiCFile->master, hiCFile->version, c1, c2, matrixType, norm, unit,
-                                     resolution,
-                                     myFilePos,
-                                     c1NormEntry, c2NormEntry, expectedValues);
-            delete buffer2;
-        } else {
-            stream->fin.seekg(hiCFile->master, ios::beg);
-            foundFooter = readFooter(stream->fin, hiCFile->master, hiCFile->version, c1, c2, matrixType, norm,
-                                     unit,
-                                     resolution, myFilePos,
-                                     c1NormEntry, c2NormEntry, expectedValues);
-        }
-
-        if (!foundFooter) {
-            return;
-        }
-
-        if (norm != "NONE") {
-            c1Norm = hiCFile->readNormalizationVectorFromFooter(c1NormEntry);
-            if (c1 == c2) {
-                c2Norm = c1Norm;
-            } else {
-                c2Norm = hiCFile->readNormalizationVectorFromFooter(c2NormEntry);
-            }
-        }
-        stream->close();
-    }
-};
-
-MatrixZoomData *
-getMatrixZoomData(HiCFile *hiCFile, const string &chr1, const string &chr2, const string& matrixType, const string& norm,
-                  const string& unit, int32_t resolution) {
-
-    chromosome chrom1 = hiCFile->chromosomeMap[chr1];
-    chromosome chrom2 = hiCFile->chromosomeMap[chr2];
-    return new MatrixZoomData(hiCFile, chrom1, chrom2, (matrixType), (norm), (unit),
-                              resolution);
-}
 
 void parsePositions(const string &chrLoc, string &chrom, int64_t &pos1, int64_t &pos2, map<string, chromosome> map) {
     string x, y;
@@ -1045,183 +1156,6 @@ void parsePositions(const string &chrLoc, string &chrom, int64_t &pos1, int64_t 
         pos1 = 0LL;
         pos2 = map[chrom].length;
     }
-}
-
-class BlocksRecords {
-public:
-    float sumCounts;
-    int32_t blockBinCount, blockColumnCount;
-    map<int32_t, indexEntry> blockMap;
-    double avgCount;
-    bool isIntra;
-    string fileName;
-
-    BlocksRecords(const string &fileName, const footerInfo &footer) {
-        this->fileName = fileName;
-        HiCFileStream *stream = new HiCFileStream((fileName));
-
-        isIntra = footer.c1 == footer.c2;
-
-        if (stream->isHttp) {
-            // readMatrix will assign blockBinCount and blockColumnCount
-            blockMap = readMatrixHttp(stream->curl, footer.myFilePos, footer.unit, footer.resolution, sumCounts,
-                                      blockBinCount,
-                                      blockColumnCount);
-        } else {
-            // readMatrix will assign blockBinCount and blockColumnCount
-            blockMap = readMatrix(stream->fin, footer.myFilePos, footer.unit, footer.resolution, sumCounts,
-                                  blockBinCount,
-                                  blockColumnCount);
-        }
-
-        if (!isIntra) {
-            avgCount = (sumCounts / footer.numBins1) / footer.numBins2;   // <= trying to avoid overflows
-        }
-        stream->close();
-    }
-
-    static set<int32_t> getBlockNumbers(int32_t version, bool isIntra, int64_t *regionIndices,
-                                 int32_t blockBinCount, int32_t blockColumnCount) {
-        set<int32_t> blockNumbers;
-        if (version > 8 && isIntra) {
-            blockNumbers = getBlockNumbersForRegionFromBinPositionV9Intra(regionIndices, blockBinCount,
-                                                                          blockColumnCount);
-        } else {
-            blockNumbers = getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount,
-                                                                   isIntra);
-        }
-        return blockNumbers;
-    }
-
-    vector<contactRecord>
-    getRecords(int64_t regionIndices[4],
-               const int64_t origRegionIndices[4], const footerInfo &footer) {
-
-        set<int32_t> blockNumbers = getBlockNumbers(footer.version, isIntra, regionIndices, blockBinCount,
-                                                blockColumnCount);
-
-        vector<contactRecord> records;
-        for (int32_t blockNumber : blockNumbers) {
-            // get contacts in this block
-            //cout << *it << " -- " << blockMap.size() << endl;
-            //cout << blockMap[*it].size << " " <<  blockMap[*it].position << endl;
-            vector<contactRecord> tmp_records = readBlock(fileName, blockMap[blockNumber], footer.version);
-            for (contactRecord rec : tmp_records) {
-                int64_t x = rec.binX * footer.resolution;
-                int64_t y = rec.binY * footer.resolution;
-
-                if ((x >= origRegionIndices[0] && x <= origRegionIndices[1] &&
-                     y >= origRegionIndices[2] && y <= origRegionIndices[3]) ||
-                    // or check regions that overlap with lower left
-                    (isIntra && y >= origRegionIndices[0] && y <= origRegionIndices[1] && x >= origRegionIndices[2] &&
-                     x <= origRegionIndices[3])) {
-
-                    float c = rec.counts;
-                    if (footer.norm != "NONE") {
-                        c = static_cast<float>(c / (footer.c1Norm[rec.binX] * footer.c2Norm[rec.binY]));
-                    }
-                    if (footer.matrixType == "oe") {
-                        if (isIntra) {
-                            c = static_cast<float>(c / footer.expectedValues[min(footer.expectedValues.size() - 1,
-                                                                                 (size_t) floor(abs(y - x) /
-                                                                                                footer.resolution))]);
-                        } else {
-                            c = static_cast<float>(c / avgCount);
-                        }
-                    } else if (footer.matrixType == "expected") {
-                        if (isIntra) {
-                            c = static_cast<float>(footer.expectedValues[min(footer.expectedValues.size() - 1,
-                                                                                 (size_t) floor(abs(y - x) /
-                                                                                                footer.resolution))]);
-                        } else {
-                            c = static_cast<float>(avgCount);
-                        }
-                    }
-
-                    contactRecord record = contactRecord();
-                    record.binX = static_cast<int32_t>(x);
-                    record.binY = static_cast<int32_t>(y);
-                    record.counts = c;
-                    records.push_back(record);
-                }
-            }
-        }
-        return records;
-    }
-};
-
-vector<contactRecord> getBlockRecords(const string& fileName, int64_t origRegionIndices[4], const footerInfo &footer) {
-    if (!footer.foundFooter) {
-        vector<contactRecord> v;
-        return v;
-    }
-
-    int64_t regionIndices[4]; // used to find the blocks we need to access
-    regionIndices[0] = origRegionIndices[0] / footer.resolution;
-    regionIndices[1] = origRegionIndices[1] / footer.resolution;
-    regionIndices[2] = origRegionIndices[2] / footer.resolution;
-    regionIndices[3] = origRegionIndices[3] / footer.resolution;
-
-    BlocksRecords *blocksRecords;
-    blocksRecords = new BlocksRecords(fileName, footer);
-    return blocksRecords->getRecords(regionIndices, origRegionIndices, footer);
-}
-
-footerInfo getNormalizationInfoForRegion(const string& fileName, const string& chr1, const string& chr2,
-                                         const string &matrixType, const string &norm,
-                                         const string &unit, int32_t binsize) {
-
-    HiCFile *hiCFile;
-    hiCFile = new HiCFile(fileName);
-    MatrixZoomData *mzd = getMatrixZoomData(hiCFile, chr1, chr2, matrixType, norm, unit, binsize);
-    footerInfo footer = footerInfo();
-    footer.resolution = mzd->resolution;
-    footer.foundFooter = mzd->foundFooter;
-    footer.version = hiCFile->version;
-    footer.c1 = mzd->c1;
-    footer.c2 = mzd->c2;
-    footer.numBins1 = mzd->numBins1;
-    footer.numBins2 = mzd->numBins2;
-    footer.myFilePos = mzd->myFilePos;
-    footer.unit = mzd->unit;
-    footer.norm = mzd->norm;
-    footer.matrixType = mzd->matrixType;
-    footer.c1Norm = mzd->c1Norm;
-    footer.c2Norm = mzd->c2Norm;
-    footer.expectedValues = mzd->expectedValues;
-    return footer;
-}
-
-vector<contactRecord>
-getBlockRecordsWithNormalization(const string& fileName,
-                                 int64_t c1pos1, int64_t c1pos2, int64_t c2pos1, int64_t c2pos2,
-                                 int32_t resolution, bool foundFooter, int32_t version, int32_t c1, int32_t c2,
-                                 int32_t numBins1, int32_t numBins2, int64_t myFilePos, string unit, string norm,
-                                 string matrixType,
-                                 vector<double> c1Norm, vector<double> c2Norm, vector<double> expectedValues) {
-    int64_t origRegionIndices[4]; // as given by user
-    origRegionIndices[0] = c1pos1;
-    origRegionIndices[1] = c1pos2;
-    origRegionIndices[2] = c2pos1;
-    origRegionIndices[3] = c2pos2;
-
-    footerInfo footer = footerInfo();
-    footer.resolution = resolution;
-    footer.foundFooter = foundFooter;
-    footer.version = version;
-    footer.c1 = c1;
-    footer.c2 = c2;
-    footer.numBins1 = numBins1;
-    footer.numBins2 = numBins2;
-    footer.myFilePos = myFilePos;
-    footer.unit = std::move(unit);
-    footer.norm = std::move(norm);
-    footer.matrixType = std::move(matrixType);
-    footer.c1Norm = std::move(c1Norm);
-    footer.c2Norm = std::move(c2Norm);
-    footer.expectedValues = std::move(expectedValues);
-    vector<contactRecord> v = getBlockRecords(fileName, origRegionIndices, footer);
-    return v;
 }
 
 vector<contactRecord>
@@ -1243,10 +1177,7 @@ straw(const string& matrixType, const string& norm, const string& fileName, cons
     parsePositions((chr1loc), chr1, c1pos1, c1pos2, hiCFile->chromosomeMap);
     parsePositions((chr2loc), chr2, c2pos1, c2pos2, hiCFile->chromosomeMap);
 
-    // from header have size of chromosomes, set region to read
-
     int64_t origRegionIndices[4]; // as given by user
-    // reverse order if necessary
     if (hiCFile->chromosomeMap[chr1].index > hiCFile->chromosomeMap[chr2].index) {
         origRegionIndices[0] = c2pos1;
         origRegionIndices[1] = c2pos2;
@@ -1259,15 +1190,8 @@ straw(const string& matrixType, const string& norm, const string& fileName, cons
         origRegionIndices[3] = c2pos2;
     }
 
-    footerInfo footer = getNormalizationInfoForRegion(fileName, chr1, chr2, matrixType, norm, unit, binsize);
-
-    return getBlockRecordsWithNormalization(fileName,
-                                            origRegionIndices[0], origRegionIndices[1],
-                                            origRegionIndices[2], origRegionIndices[3],
-                                            footer.resolution, footer.foundFooter, footer.version,
-                                            footer.c1, footer.c2, footer.numBins1, footer.numBins2,
-                                            footer.myFilePos, footer.unit, footer.norm, footer.matrixType,
-                                            footer.c1Norm, footer.c2Norm, footer.expectedValues);
+    MatrixZoomData *mzd = hiCFile->getMatrixZoomData(chr1, chr2, matrixType, norm, unit, binsize);
+    return mzd->getBlockRecordsWithNormalization(origRegionIndices);
 }
 
 vector<chromosome> getChromosomes(const string& fileName){

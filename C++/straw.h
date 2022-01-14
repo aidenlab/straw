@@ -42,38 +42,12 @@ struct contactRecord {
   float counts;
 };
 
-struct footerInfo {
-    int32_t resolution;
-    bool foundFooter;
-    int32_t version;
-    int32_t c1;
-    int32_t c2;
-    int32_t numBins1;
-    int32_t numBins2;
-    int64_t myFilePos;
-    std::string unit;
-    std::string norm;
-    std::string matrixType;
-    std::vector<double> c1Norm;
-    std::vector<double> c2Norm;
-    std::vector<double> expectedValues;
-};
-
 // chromosome
 struct chromosome {
     std::string name;
     int32_t index;
     int64_t length;
 };
-
-
-bool readMagicString(std::ifstream &fin);
-
-std::map<std::string, chromosome> readHeader(std::istream &fin, int64_t &masterIndexPosition);
-
-bool readFooter(std::istream &fin, int64_t master, int32_t c1, int32_t c2, std::string matrix, std::string norm, std::string unit,
-                int32_t resolution, int64_t &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry,
-                std::vector<double> &expectedValues);
 
 std::map<int32_t, indexEntry>
 readMatrixZoomData(std::istream &fin, const std::string &myunit, int32_t mybinsize, float &mySumCounts,
@@ -83,11 +57,6 @@ readMatrixZoomData(std::istream &fin, const std::string &myunit, int32_t mybinsi
 std::map<int32_t, indexEntry>
 readMatrix(std::istream &fin, int32_t myFilePosition, std::string unit, int32_t resolution, float &mySumCounts,
            int32_t &myBlockBinCount, int32_t &myBlockColumnCount);
-
-std::set<int32_t>
-getBlockNumbersForRegionFromBinPosition(int32_t *regionIndices, int32_t blockBinCount, int32_t blockColumnCount, bool intra);
-
-std::vector<contactRecord> readBlock(std::istream &fin, int32_t blockNumber);
 
 std::vector<double> readNormalizationVector(std::istream &fin, indexEntry entry);
 
