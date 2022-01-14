@@ -186,6 +186,14 @@ public:
     }
 };
 
+char *readCompressedBytesFromFile(const string &fileName, indexEntry idx) {
+    HiCFileStream *stream = new HiCFileStream(fileName);
+    char *compressedBytes = stream->readCompressedBytes(idx);
+    stream->close();
+    delete stream;
+    return compressedBytes;
+}
+
 // reads the header, storing the positions of the normalization vectors and returning the masterIndexPosition pointer
 map<string, chromosome> readHeader(istream &fin, int64_t &masterIndexPosition, string &genomeID, int32_t &numChromosomes,
                                    int32_t &version, int64_t &nviPosition, int64_t &nviLength) {
@@ -667,12 +675,8 @@ vector<contactRecord> readBlock(const string& fileName, indexEntry idx, int32_t 
         vector<contactRecord> v;
         return v;
     }
+    char *compressedBytes = readCompressedBytesFromFile(fileName, idx);
     char *uncompressedBytes = new char[idx.size * 10]; //biggest seen so far is 3
-    HiCFileStream *stream = new HiCFileStream(fileName);
-    char *compressedBytes = stream->readCompressedBytes(idx);
-    stream->close();
-    delete stream;
-
     // Decompress the block
     // zlib struct
     z_stream infstream;
@@ -945,11 +949,7 @@ public:
     }
 
     static vector<double> readNormalizationVectorFromFooter(indexEntry cNormEntry, int32_t &version, const string &fileName) {
-        HiCFileStream *stream = new HiCFileStream(fileName);
-        char *buffer = stream->readCompressedBytes(cNormEntry);
-        stream->close();
-        delete stream;
-
+        char *buffer = readCompressedBytesFromFile(fileName, cNormEntry);
         membuf sbuf3(buffer, buffer + cNormEntry.size);
         istream bufferin(&sbuf3);
         vector<double> cNorm = readNormalizationVector(bufferin, version);
