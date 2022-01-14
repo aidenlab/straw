@@ -976,11 +976,9 @@ public:
         }
 
         int64_t regionIndices[4]; // used to find the blocks we need to access
-        regionIndices[0] = origRegionIndices[0] / resolution;
-        regionIndices[1] = origRegionIndices[1] / resolution;
-        regionIndices[2] = origRegionIndices[2] / resolution;
-        regionIndices[3] = origRegionIndices[3] / resolution;
-
+        for(uint16_t q = 0; q < 4; q++){
+            regionIndices[q] = origRegionIndices[q] / resolution;
+        }
         return getRecords(regionIndices, origRegionIndices);
     }
 
@@ -1178,21 +1176,13 @@ straw(const string& matrixType, const string& norm, const string& fileName, cons
     hiCFile = new HiCFile((fileName));
 
     string chr1, chr2;
-    int64_t c1pos1 = -100LL, c1pos2 = -100LL, c2pos1 = -100LL, c2pos2 = -100LL;
-    parsePositions((chr1loc), chr1, c1pos1, c1pos2, hiCFile->chromosomeMap);
-    parsePositions((chr2loc), chr2, c2pos1, c2pos2, hiCFile->chromosomeMap);
-
-    int64_t origRegionIndices[4]; // as given by user
+    int64_t origRegionIndices[4] = {-100LL, -100LL, -100LL, -100LL};
     if (hiCFile->chromosomeMap[chr1].index > hiCFile->chromosomeMap[chr2].index) {
-        origRegionIndices[0] = c2pos1;
-        origRegionIndices[1] = c2pos2;
-        origRegionIndices[2] = c1pos1;
-        origRegionIndices[3] = c1pos2;
+        parsePositions((chr1loc), chr1, origRegionIndices[2], origRegionIndices[3], hiCFile->chromosomeMap);
+        parsePositions((chr2loc), chr2, origRegionIndices[0], origRegionIndices[1], hiCFile->chromosomeMap);
     } else {
-        origRegionIndices[0] = c1pos1;
-        origRegionIndices[1] = c1pos2;
-        origRegionIndices[2] = c2pos1;
-        origRegionIndices[3] = c2pos2;
+        parsePositions((chr1loc), chr1, origRegionIndices[0], origRegionIndices[1], hiCFile->chromosomeMap);
+        parsePositions((chr2loc), chr2, origRegionIndices[2], origRegionIndices[3], hiCFile->chromosomeMap);
     }
 
     MatrixZoomData *mzd = hiCFile->getMatrixZoomData(chr1, chr2, matrixType, norm, unit, binsize);
