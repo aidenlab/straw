@@ -45,18 +45,6 @@ using namespace std;
 
   Usage: straw [observed/oe/expected] <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>
  */
-// this is for creating a stream from a byte array for ease of use
-struct membuf : std::streambuf {
-    membuf(char *begin, char *end) {
-        this->setg(begin, begin, end);
-    }
-};
-
-// for holding data from URL call
-struct MemoryStruct {
-    char *memory;
-    size_t size;
-};
 
 // callback for libcurl. data written to this buffer
 static size_t
@@ -682,6 +670,8 @@ vector<contactRecord> readBlock(const string& fileName, indexEntry idx, int32_t 
     char *uncompressedBytes = new char[idx.size * 10]; //biggest seen so far is 3
     HiCFileStream *stream = new HiCFileStream(fileName);
     char *compressedBytes = stream->readCompressedBytes(idx);
+    stream->close();
+    delete stream;
 
     // Decompress the block
     // zlib struct
@@ -822,7 +812,6 @@ vector<contactRecord> readBlock(const string& fileName, indexEntry idx, int32_t 
     }
     delete[] compressedBytes;
     delete[] uncompressedBytes; // don't forget to delete your heap arrays in C++!
-    stream->close();
     return v;
 }
 
@@ -866,7 +855,6 @@ public:
     int32_t c2 = 0;
     string matrixType;
     string norm;
-    string unit;
     int32_t version = 0;
     int32_t resolution = 0;
     int32_t numBins1 = 0;
@@ -900,7 +888,6 @@ public:
 
         this->matrixType = matrixType;
         this->norm = norm;
-        this->unit = unit;
         this->resolution = resolution;
 
         HiCFileStream *stream = new HiCFileStream(fileName);
@@ -957,15 +944,16 @@ public:
         }
     }
 
-    vector<double> readNormalizationVectorFromFooter(indexEntry cNormEntry, int32_t &version, const string &fileName) {
+    static vector<double> readNormalizationVectorFromFooter(indexEntry cNormEntry, int32_t &version, const string &fileName) {
         HiCFileStream *stream = new HiCFileStream(fileName);
-        char *buffer;
-        buffer = stream->readCompressedBytes(cNormEntry);
+        char *buffer = stream->readCompressedBytes(cNormEntry);
+        stream->close();
+        delete stream;
+
         membuf sbuf3(buffer, buffer + cNormEntry.size);
         istream bufferin(&sbuf3);
         vector<double> cNorm = readNormalizationVector(bufferin, version);
         delete buffer;
-        stream->close();
         return cNorm;
     }
 
@@ -982,7 +970,7 @@ public:
         return getRecords(regionIndices, origRegionIndices);
     }
 
-    set<int32_t> getBlockNumbers(int64_t *regionIndices) {
+    set<int32_t> getBlockNumbers(int64_t *regionIndices) const {
         if (version > 8 && isIntra) {
             return getBlockNumbersForRegionFromBinPositionV9Intra(regionIndices, blockBinCount,
                                                                           blockColumnCount);
@@ -1070,7 +1058,7 @@ public:
         }
         if ((size_t)found != string::npos) {
             int32_t found2;
-            found2 = static_cast<int32_t>(s.find("/"));
+            found2 = static_cast<int32_t>(s.find('/'));
             //content-range: bytes 0-100000/891471462
             if ((size_t)found2 != string::npos) {
                 string total = s.substr(found2 + 1);

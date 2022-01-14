@@ -49,6 +49,19 @@ struct chromosome {
     int64_t length;
 };
 
+// this is for creating a stream from a byte array for ease of use
+struct membuf : std::streambuf {
+    membuf(char *begin, char *end) {
+        this->setg(begin, begin, end);
+    }
+};
+
+// for holding data from URL call
+struct MemoryStruct {
+    char *memory;
+    size_t size;
+};
+
 std::map<int32_t, indexEntry>
 readMatrixZoomData(std::istream &fin, const std::string &myunit, int32_t mybinsize, float &mySumCounts,
                    int32_t &myBlockBinCount,
