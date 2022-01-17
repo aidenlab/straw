@@ -455,11 +455,8 @@ indexEntry readIndexEntry(istream &fin) {
     return entry;
 }
 
-// reads the raw binned contact matrix at specified resolution, setting the block bin count and block column count
-map<int32_t, indexEntry> readMatrixZoomData(istream &fin, const string &myunit, int32_t mybinsize, float &mySumCounts,
-                                        int32_t &myBlockBinCount, int32_t &myBlockColumnCount, bool &found) {
-
-    map<int32_t, indexEntry> blockMap;
+void setValuesForMZD(istream &fin, const string &myunit, float &mySumCounts, int32_t &mybinsize, int32_t &myBlockBinCount,
+                     int32_t &myBlockColumnCount, bool &found) {
     string unit;
     getline(fin, unit, '\0'); // unit
     readInt32FromFile(fin); // Old "zoom" index -- not used
@@ -470,7 +467,6 @@ map<int32_t, indexEntry> readMatrixZoomData(istream &fin, const string &myunit, 
     int32_t binSize = readInt32FromFile(fin);
     int32_t blockBinCount = readInt32FromFile(fin);
     int32_t blockColumnCount = readInt32FromFile(fin);
-
     found = false;
     if (myunit == unit && mybinsize == binSize) {
         mySumCounts = sumCounts;
@@ -478,6 +474,14 @@ map<int32_t, indexEntry> readMatrixZoomData(istream &fin, const string &myunit, 
         myBlockColumnCount = blockColumnCount;
         found = true;
     }
+}
+
+// reads the raw binned contact matrix at specified resolution, setting the block bin count and block column count
+map<int32_t, indexEntry> readMatrixZoomData(istream &fin, const string &myunit, int32_t mybinsize, float &mySumCounts,
+                                        int32_t &myBlockBinCount, int32_t &myBlockColumnCount, bool &found) {
+
+    map<int32_t, indexEntry> blockMap;
+    setValuesForMZD(fin, myunit, mySumCounts, mybinsize, myBlockBinCount, myBlockColumnCount, found);
 
     int32_t nBlocks = readInt32FromFile(fin);
     if (found){
@@ -514,26 +518,7 @@ map<int32_t, indexEntry> readMatrixZoomDataHttp(CURL *curl, int64_t &myFilePosit
     buffer = getData(curl, myFilePosition, header_size);
     membuf sbuf(buffer, buffer + header_size);
     istream fin(&sbuf);
-
-    string unit;
-    getline(fin, unit, '\0'); // unit
-    readInt32FromFile(fin); // Old "zoom" index -- not used
-    float sumCounts = readFloatFromFile(fin); // sumCounts
-    readFloatFromFile(fin); // occupiedCellCount
-    readFloatFromFile(fin); // stdDev
-    readFloatFromFile(fin); // percent95
-    int32_t binSize = readInt32FromFile(fin);
-    int32_t blockBinCount = readInt32FromFile(fin);
-    int32_t blockColumnCount = readInt32FromFile(fin);
-
-    found = false;
-    if (myunit == unit && mybinsize == binSize) {
-        mySumCounts = sumCounts;
-        myBlockBinCount = blockBinCount;
-        myBlockColumnCount = blockColumnCount;
-        found = true;
-    }
-
+    setValuesForMZD(fin, myunit, mySumCounts, mybinsize, myBlockBinCount, myBlockColumnCount, found);
     int32_t nBlocks = readInt32FromFile(fin);
 
     if (found) {
