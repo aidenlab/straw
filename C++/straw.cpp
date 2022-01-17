@@ -446,6 +446,15 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
     return true;
 }
 
+indexEntry readIndexEntry(istream &fin) {
+    int64_t filePosition = readInt64FromFile(fin);
+    int32_t blockSizeInBytes = readInt32FromFile(fin);
+    indexEntry entry = indexEntry();
+    entry.size = (int64_t) blockSizeInBytes;
+    entry.position = filePosition;
+    return entry;
+}
+
 // reads the raw binned contact matrix at specified resolution, setting the block bin count and block column count
 map<int32_t, indexEntry> readMatrixZoomData(istream &fin, const string &myunit, int32_t mybinsize, float &mySumCounts,
                                         int32_t &myBlockBinCount, int32_t &myBlockColumnCount, bool &found) {
@@ -471,15 +480,15 @@ map<int32_t, indexEntry> readMatrixZoomData(istream &fin, const string &myunit, 
     }
 
     int32_t nBlocks = readInt32FromFile(fin);
-
-    for (int b = 0; b < nBlocks; b++) {
-        int32_t blockNumber = readInt32FromFile(fin);
-        int64_t filePosition = readInt64FromFile(fin);
-        int32_t blockSizeInBytes = readInt32FromFile(fin);
-        indexEntry entry = indexEntry();
-        entry.size = (int64_t) blockSizeInBytes;
-        entry.position = filePosition;
-        if (found) blockMap[blockNumber] = entry;
+    if (found){
+        for (int b = 0; b < nBlocks; b++) {
+            int32_t blockNumber = readInt32FromFile(fin);
+            blockMap[blockNumber] = readIndexEntry(fin);
+        }
+    } else {
+        int64_t position = fin.tellg();
+        position = position + (nBlocks * (sizeof(int32_t) + sizeof(int64_t) + sizeof(int32_t)));
+        fin.seekg(position, ios::beg);
     }
     return blockMap;
 }
@@ -534,12 +543,7 @@ map<int32_t, indexEntry> readMatrixZoomDataHttp(CURL *curl, int64_t &myFilePosit
         istream fin2(&sbuf2);
         for (int b = 0; b < nBlocks; b++) {
             int32_t blockNumber = readInt32FromFile(fin2);
-            int64_t filePosition = readInt64FromFile(fin2);
-            int32_t blockSizeInBytes = readInt32FromFile(fin2);
-            indexEntry entry = indexEntry();
-            entry.size = (int64_t) blockSizeInBytes;
-            entry.position = filePosition;
-            blockMap[blockNumber] = entry;
+            blockMap[blockNumber] = readIndexEntry(fin2);
         }
     } else {
         myFilePosition = myFilePosition + header_size + (nBlocks * (sizeof(int32_t) + sizeof(int64_t) + sizeof(int32_t)));
