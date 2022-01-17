@@ -127,6 +127,12 @@ double readDoubleFromFile(istream &fin) {
     return tempDouble;
 }
 
+void skipAhead(istream &fin, int64_t offset) {
+    int64_t position = fin.tellg();
+    position = position + offset;
+    fin.seekg(position, ios::beg);
+}
+
 static CURL *initCURL(const char *url) {
     CURL *curl = curl_easy_init();
     if (curl) {
@@ -490,9 +496,7 @@ map<int32_t, indexEntry> readMatrixZoomData(istream &fin, const string &myunit, 
             blockMap[blockNumber] = readIndexEntry(fin);
         }
     } else {
-        int64_t position = fin.tellg();
-        position = position + (nBlocks * (sizeof(int32_t) + sizeof(int64_t) + sizeof(int32_t)));
-        fin.seekg(position, ios::beg);
+        skipAhead(fin, nBlocks * (sizeof(int32_t) + sizeof(int64_t) + sizeof(int32_t)));
     }
     return blockMap;
 }
