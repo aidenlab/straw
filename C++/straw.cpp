@@ -264,6 +264,99 @@ vector<int32_t> readResolutionsFromHeader(istream &fin) {
     return resolutions;
 }
 
+void populateVectorWithFloats(istream &fin, vector<double> &vector, int64_t nValues) {
+    for (int j = 0; j < nValues; j++) {
+        double v = readFloatFromFile(fin);
+        vector.push_back(v);
+    }
+}
+
+void populateVectorWithDoubles(istream &fin, vector<double> &vector, int64_t nValues) {
+    for (int j = 0; j < nValues; j++) {
+        double v = readDoubleFromFile(fin);
+        vector.push_back(v);
+    }
+}
+
+void readThroughExpectedVector(int32_t version, istream &fin, vector<double> &expectedValues, int64_t nValues, bool store) {
+    if (version > 8) {
+        for (int j = 0; j < nValues; j++) {
+            double v = readFloatFromFile(fin);
+            if (store) {
+                expectedValues.push_back(v);
+            }
+        }
+    } else {
+        for (int j = 0; j < nValues; j++) {
+            double v = readDoubleFromFile(fin);
+            if (store) {
+                expectedValues.push_back(v);
+            }
+        }
+
+    }
+
+    /*
+    if (store) {
+        if (version > 8) {
+            populateVectorWithFloats(fin, expectedValues, nValues);
+        } else {
+            populateVectorWithDoubles(fin,expectedValues, nValues);
+        }
+    } else if (nValues > 0) {
+        if (version > 8) {
+            skipAhead(fin, nValues*sizeof(float));
+        } else {
+            skipAhead(fin, nValues*sizeof(double));
+        }
+    }
+    */
+}
+
+void readThroughNormalizationFactors(istream &fin, int32_t version, bool store, vector<double> &expectedValues,
+                                     int32_t c1) {
+    int32_t nNormalizationFactors = readInt32FromFile(fin);
+    for (int j = 0; j < nNormalizationFactors; j++) {
+        int32_t chrIdx = readInt32FromFile(fin);
+        double v;
+        if (version > 8) {
+            v = readFloatFromFile(fin);
+        } else {
+            v = readDoubleFromFile(fin);
+        }
+        if (store && chrIdx == c1) {
+            for (double &expectedValue : expectedValues) {
+                expectedValue = expectedValue / v;
+            }
+        }
+    }
+    /*
+    int32_t nNormalizationFactors = readInt32FromFile(fin);
+    if (store){
+        for (int j = 0; j < nNormalizationFactors; j++) {
+            int32_t chrIdx = readInt32FromFile(fin);
+            double v;
+            if (version > 8) {
+                v = (double) readFloatFromFile(fin);
+            } else {
+                v = readDoubleFromFile(fin);
+            }
+            if(chrIdx == c1) {
+                for (double &expectedValue : expectedValues) {
+                    expectedValue = expectedValue / v;
+                }
+            }
+        }
+    } else if (nNormalizationFactors > 0) {
+        if (version > 8) {
+            skipAhead(fin, nNormalizationFactors * (sizeof(int32_t)+sizeof(float)));
+        } else {
+            skipAhead(fin, nNormalizationFactors * (sizeof(int32_t)+sizeof(double)));
+        }
+    }
+     */
+}
+
 // reads the footer from the master pointer location. takes in the chromosomes,
 // norm, unit (BP or FRAG) and resolution or binsize, and sets the file
 // position of the matrix and the normalization vectors for those chromosomes
@@ -317,38 +410,8 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
         }
 
         bool store = c1 == c2 && (matrixType == "oe" || matrixType == "expected") && norm == "NONE" && unit0 == unit && binSize == resolution;
-
-        if (version > 8) {
-            for (int j = 0; j < nValues; j++) {
-                double v = readFloatFromFile(fin);
-                if (store) {
-                    expectedValues.push_back(v);
-                }
-            }
-        } else {
-            for (int j = 0; j < nValues; j++) {
-                double v = readDoubleFromFile(fin);
-                if (store) {
-                    expectedValues.push_back(v);
-                }
-            }
-        }
-
-        int32_t nNormalizationFactors = readInt32FromFile(fin);
-        for (int j = 0; j < nNormalizationFactors; j++) {
-            int32_t chrIdx = readInt32FromFile(fin);
-            double v;
-            if (version > 8) {
-                v = readFloatFromFile(fin);
-            } else {
-                v = readDoubleFromFile(fin);
-            }
-            if (store && chrIdx == c1) {
-                for (double &expectedValue : expectedValues) {
-                    expectedValue = expectedValue / v;
-                }
-            }
-        }
+        readThroughExpectedVector(version, fin, expectedValues, nValues, store);
+        readThroughNormalizationFactors(fin, version, store, expectedValues, c1);
     }
 
     if (c1 == c2 && (matrixType == "oe" || matrixType == "expected") && norm == "NONE") {
@@ -373,39 +436,8 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
             nValues = (int64_t) readInt32FromFile(fin);
         }
         bool store = c1 == c2 && (matrixType == "oe" || matrixType == "expected") && type == norm && unit0 == unit && binSize == resolution;
-
-        if (version > 8) {
-            for (int j = 0; j < nValues; j++) {
-                double v = readFloatFromFile(fin);
-                if (store) {
-                    expectedValues.push_back(v);
-                }
-            }
-        } else {
-            for (int j = 0; j < nValues; j++) {
-                double v = readDoubleFromFile(fin);
-                if (store) {
-                    expectedValues.push_back(v);
-                }
-            }
-
-        }
-
-        int32_t nNormalizationFactors = readInt32FromFile(fin);
-        for (int j = 0; j < nNormalizationFactors; j++) {
-            int32_t chrIdx = readInt32FromFile(fin);
-            double v;
-            if (version > 8) {
-                v = (double) readFloatFromFile(fin);
-            } else {
-                v = readDoubleFromFile(fin);
-            }
-            if (store && chrIdx == c1) {
-                for (double &expectedValue : expectedValues) {
-                    expectedValue = expectedValue / v;
-                }
-            }
-        }
+        readThroughExpectedVector(version, fin, expectedValues, nValues, store);
+        readThroughNormalizationFactors(fin, version, store, expectedValues, c1);
     }
 
     if (c1 == c2 && (matrixType == "oe" || matrixType == "expected") && norm != "NONE") {
@@ -1098,6 +1130,10 @@ public:
         }
     }
 
+    string getGenomeID() const{
+        return genomeID;
+    }
+
     vector<int32_t> getResolutions() const{
         return resolutions;
     }
@@ -1153,8 +1189,7 @@ straw(const string& matrixType, const string& norm, const string& fileName, cons
         return v;
     }
 
-    HiCFile *hiCFile;
-    hiCFile = new HiCFile((fileName));
+    HiCFile *hiCFile = new HiCFile(fileName);
 
     string chr1, chr2;
     int64_t origRegionIndices[4] = {-100LL, -100LL, -100LL, -100LL};
