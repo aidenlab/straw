@@ -1138,12 +1138,7 @@ straw(const string& matrixType, const string& norm, const string& fileName, cons
         return v;
     }
 
-    auto start = std::chrono::high_resolution_clock::now();
     HiCFile *hiCFile = new HiCFile(fileName);
-    auto stop = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-    cerr << "Time taken by hicFile loading: " << duration.count() << " milliseconds" << endl;
-
     string chr1, chr2;
     int64_t origRegionIndices[4] = {-100LL, -100LL, -100LL, -100LL};
     if (hiCFile->chromosomeMap[chr1].index > hiCFile->chromosomeMap[chr2].index) {
@@ -1154,17 +1149,6 @@ straw(const string& matrixType, const string& norm, const string& fileName, cons
         parsePositions((chr2loc), chr2, origRegionIndices[2], origRegionIndices[3], hiCFile->chromosomeMap);
     }
 
-    start = std::chrono::high_resolution_clock::now();
     MatrixZoomData *mzd = hiCFile->getMatrixZoomData(chr1, chr2, matrixType, norm, unit, binsize);
-    stop = std::chrono::high_resolution_clock::now();
-    duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-    cerr << "Time taken by MZD loading: " << duration.count() << " milliseconds" << endl;
-
-    start = std::chrono::high_resolution_clock::now();
-    vector<contactRecord> v = mzd->getBlockRecordsWithNormalization(origRegionIndices);
-    stop = std::chrono::high_resolution_clock::now();
-    duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-    cerr << "Time taken by records loading: " << duration.count() << " milliseconds" << endl;
-
-    return v;
+    return mzd->getBlockRecordsWithNormalization(origRegionIndices);
 }
