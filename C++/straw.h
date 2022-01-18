@@ -50,9 +50,33 @@ struct chromosome {
 };
 
 // this is for creating a stream from a byte array for ease of use
+// see https://stackoverflow.com/questions/41141175/how-to-implement-seekg-seekpos-on-an-in-memory-buffer
 struct membuf : std::streambuf {
-    membuf(char *begin, char *end) {
-        this->setg(begin, begin, end);
+    membuf(char *begin, int32_t l) {
+        setg(begin, begin, begin + l);
+    }
+};
+
+struct memstream : virtual membuf, std::istream {
+    memstream(char *begin, int32_t l) :
+            membuf(begin, l),
+            std::istream(static_cast<std::streambuf*>(this)) {
+    }
+
+    std::istream::pos_type seekpos(std::istream::pos_type sp, std::ios_base::openmode which) override {
+        return seekoff(sp - std::istream::pos_type(std::istream::off_type(0)), std::ios_base::beg, which);
+    }
+
+    std::istream::pos_type seekoff(std::istream::off_type off,
+                                    std::ios_base::seekdir dir,
+                                    std::ios_base::openmode which = std::ios_base::in) override {
+        if (dir == std::ios_base::cur)
+            gbump(off);
+        else if (dir == std::ios_base::end)
+            setg(eback(), egptr() + off, egptr());
+        else if (dir == std::ios_base::beg)
+            setg(eback(), eback() + off, egptr());
+        return gptr() - eback();
     }
 };
 

@@ -127,12 +127,6 @@ double readDoubleFromFile(istream &fin) {
     return tempDouble;
 }
 
-void skipAhead(istream &fin, int64_t offset) {
-    int64_t position = fin.tellg();
-    position = position + offset;
-    fin.seekg(position, ios::beg);
-}
-
 static CURL *initCURL(const char *url) {
     CURL *curl = curl_easy_init();
     if (curl) {
@@ -278,25 +272,8 @@ void populateVectorWithDoubles(istream &fin, vector<double> &vector, int64_t nVa
     }
 }
 
-void readThroughExpectedVector(int32_t version, istream &fin, vector<double> &expectedValues, int64_t nValues, bool store) {
-    if (version > 8) {
-        for (int j = 0; j < nValues; j++) {
-            double v = readFloatFromFile(fin);
-            if (store) {
-                expectedValues.push_back(v);
-            }
-        }
-    } else {
-        for (int j = 0; j < nValues; j++) {
-            double v = readDoubleFromFile(fin);
-            if (store) {
-                expectedValues.push_back(v);
-            }
-        }
-
-    }
-
-    /*
+void readThroughExpectedVector(int32_t version, istream &fin, vector<double> &expectedValues, int64_t nValues,
+                               bool store) {
     if (store) {
         if (version > 8) {
             populateVectorWithFloats(fin, expectedValues, nValues);
@@ -305,39 +282,22 @@ void readThroughExpectedVector(int32_t version, istream &fin, vector<double> &ex
         }
     } else if (nValues > 0) {
         if (version > 8) {
-            skipAhead(fin, nValues*sizeof(float));
+            fin.seekg(nValues*sizeof(float), ios_base::cur);
         } else {
-            skipAhead(fin, nValues*sizeof(double));
+            fin.seekg(nValues*sizeof(double), ios_base::cur);
         }
     }
-    */
 }
 
 void readThroughNormalizationFactors(istream &fin, int32_t version, bool store, vector<double> &expectedValues,
                                      int32_t c1) {
-    int32_t nNormalizationFactors = readInt32FromFile(fin);
-    for (int j = 0; j < nNormalizationFactors; j++) {
-        int32_t chrIdx = readInt32FromFile(fin);
-        double v;
-        if (version > 8) {
-            v = readFloatFromFile(fin);
-        } else {
-            v = readDoubleFromFile(fin);
-        }
-        if (store && chrIdx == c1) {
-            for (double &expectedValue : expectedValues) {
-                expectedValue = expectedValue / v;
-            }
-        }
-    }
-    /*
     int32_t nNormalizationFactors = readInt32FromFile(fin);
     if (store){
         for (int j = 0; j < nNormalizationFactors; j++) {
             int32_t chrIdx = readInt32FromFile(fin);
             double v;
             if (version > 8) {
-                v = (double) readFloatFromFile(fin);
+                v = readFloatFromFile(fin);
             } else {
                 v = readDoubleFromFile(fin);
             }
@@ -349,12 +309,11 @@ void readThroughNormalizationFactors(istream &fin, int32_t version, bool store, 
         }
     } else if (nNormalizationFactors > 0) {
         if (version > 8) {
-            skipAhead(fin, nNormalizationFactors * (sizeof(int32_t)+sizeof(float)));
+            fin.seekg(nNormalizationFactors * (sizeof(int32_t)+sizeof(float)), ios_base::cur);
         } else {
-            skipAhead(fin, nNormalizationFactors * (sizeof(int32_t)+sizeof(double)));
+            fin.seekg(nNormalizationFactors * (sizeof(int32_t)+sizeof(double)), ios_base::cur);
         }
     }
-     */
 }
 
 // reads the footer from the master pointer location. takes in the chromosomes,
@@ -362,8 +321,8 @@ void readThroughNormalizationFactors(istream &fin, int32_t version, bool store, 
 // position of the matrix and the normalization vectors for those chromosomes
 // at the given normalization and resolution
 bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32_t c2, const string &matrixType, const string &norm,
-                const string &unit, int32_t resolution, int64_t &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry,
-                vector<double> &expectedValues) {
+                const string &unit, int32_t resolution, int64_t &myFilePos,
+                indexEntry &c1NormEntry, indexEntry &c2NormEntry, vector<double> &expectedValues) {
     if (version > 8) {
         int64_t nBytes = readInt64FromFile(fin);
     } else {
@@ -528,7 +487,7 @@ map<int32_t, indexEntry> readMatrixZoomData(istream &fin, const string &myunit, 
             blockMap[blockNumber] = readIndexEntry(fin);
         }
     } else {
-        skipAhead(fin, nBlocks * (sizeof(int32_t) + sizeof(int64_t) + sizeof(int32_t)));
+        fin.seekg(nBlocks * (sizeof(int32_t) + sizeof(int64_t) + sizeof(int32_t)), ios_base::cur);
     }
     return blockMap;
 }
@@ -552,16 +511,14 @@ map<int32_t, indexEntry> readMatrixZoomDataHttp(CURL *curl, int64_t &myFilePosit
         return blockMap;
     }
     buffer = getData(curl, myFilePosition, header_size);
-    membuf sbuf(buffer, buffer + header_size);
-    istream fin(&sbuf);
+    memstream fin(buffer, header_size);
     setValuesForMZD(fin, myunit, mySumCounts, mybinsize, myBlockBinCount, myBlockColumnCount, found);
     int32_t nBlocks = readInt32FromFile(fin);
 
     if (found) {
         int32_t chunkSize = nBlocks * (sizeof(int32_t) + sizeof(int64_t) + sizeof(int32_t));
         buffer = getData(curl, myFilePosition + header_size, chunkSize);
-        membuf sbuf2(buffer, buffer + chunkSize);
-        istream fin2(&sbuf2);
+        memstream fin2(buffer, chunkSize);
         for (int b = 0; b < nBlocks; b++) {
             int32_t blockNumber = readInt32FromFile(fin2);
             blockMap[blockNumber] = readIndexEntry(fin2);
@@ -580,8 +537,7 @@ map<int32_t, indexEntry> readMatrixHttp(CURL *curl, int64_t myFilePosition, cons
     char *buffer;
     int32_t size = sizeof(int32_t) * 3;
     buffer = getData(curl, myFilePosition, size);
-    membuf sbuf(buffer, buffer + size);
-    istream bufin(&sbuf);
+    memstream bufin(buffer, size);
 
     int32_t c1 = readInt32FromFile(bufin);
     int32_t c2 = readInt32FromFile(bufin);
@@ -720,8 +676,7 @@ vector<contactRecord> readBlock(const string& fileName, indexEntry idx, int32_t 
     uncompressedSize = static_cast<int32_t>(infstream.total_out);
 
     // create stream from buffer for ease of use
-    membuf sbuf(uncompressedBytes, uncompressedBytes + uncompressedSize);
-    istream bufferin(&sbuf);
+    memstream bufferin(uncompressedBytes, uncompressedSize);
     uint64_t nRecords;
     nRecords = static_cast<uint64_t>(readInt32FromFile(bufferin));
     vector<contactRecord> v(nRecords);
@@ -925,8 +880,7 @@ public:
             char *buffer2;
             int64_t bytes_to_read = totalFileSize - master;
             buffer2 = getData(stream->curl, master, bytes_to_read);
-            membuf sbuf2(buffer2, buffer2 + bytes_to_read);
-            istream bufin2(&sbuf2);
+            memstream bufin2(buffer2, bytes_to_read);
             foundFooter = readFooter(bufin2, master, version, c1, c2, matrixType, norm, unit,
                                      resolution,
                                      myFilePos,
@@ -975,8 +929,7 @@ public:
 
     static vector<double> readNormalizationVectorFromFooter(indexEntry cNormEntry, int32_t &version, const string &fileName) {
         char *buffer = readCompressedBytesFromFile(fileName, cNormEntry);
-        membuf sbuf3(buffer, buffer + cNormEntry.size);
-        istream bufferin(&sbuf3);
+        memstream bufferin(buffer, cNormEntry.size);
         vector<double> cNorm = readNormalizationVector(bufferin, version);
         delete buffer;
         return cNorm;
@@ -1109,8 +1062,7 @@ public:
             CURL *curl;
             curl = oneTimeInitCURL(fileName.c_str());
             buffer = getData(curl, 0, 100000);
-            membuf sbuf(buffer, buffer + 100000);
-            istream bufin(&sbuf);
+            memstream bufin(buffer, 100000);
             chromosomeMap = readHeader(bufin, master, genomeID, numChromosomes,
                                        version, nviPosition, nviLength);
             resolutions = readResolutionsFromHeader(bufin);
