@@ -473,6 +473,13 @@ void setValuesForMZD(istream &fin, const string &myunit, float &mySumCounts, int
     }
 }
 
+void populateBlockMap(istream &fin, int32_t nBlocks, map<int32_t, indexEntry> &blockMap) {
+    for (int b = 0; b < nBlocks; b++) {
+        int32_t blockNumber = readInt32FromFile(fin);
+        blockMap[blockNumber] = readIndexEntry(fin);
+    }
+}
+
 // reads the raw binned contact matrix at specified resolution, setting the block bin count and block column count
 map<int32_t, indexEntry> readMatrixZoomData(istream &fin, const string &myunit, int32_t mybinsize, float &mySumCounts,
                                         int32_t &myBlockBinCount, int32_t &myBlockColumnCount, bool &found) {
@@ -482,10 +489,7 @@ map<int32_t, indexEntry> readMatrixZoomData(istream &fin, const string &myunit, 
 
     int32_t nBlocks = readInt32FromFile(fin);
     if (found){
-        for (int b = 0; b < nBlocks; b++) {
-            int32_t blockNumber = readInt32FromFile(fin);
-            blockMap[blockNumber] = readIndexEntry(fin);
-        }
+        populateBlockMap(fin, nBlocks, blockMap);
     } else {
         fin.seekg(nBlocks * (sizeof(int32_t) + sizeof(int64_t) + sizeof(int32_t)), ios_base::cur);
     }
@@ -519,10 +523,7 @@ map<int32_t, indexEntry> readMatrixZoomDataHttp(CURL *curl, int64_t &myFilePosit
         int32_t chunkSize = nBlocks * (sizeof(int32_t) + sizeof(int64_t) + sizeof(int32_t));
         buffer = getData(curl, myFilePosition + header_size, chunkSize);
         memstream fin2(buffer, chunkSize);
-        for (int b = 0; b < nBlocks; b++) {
-            int32_t blockNumber = readInt32FromFile(fin2);
-            blockMap[blockNumber] = readIndexEntry(fin2);
-        }
+        populateBlockMap(fin2, nBlocks, blockMap);
     } else {
         myFilePosition = myFilePosition + header_size + (nBlocks * (sizeof(int32_t) + sizeof(int64_t) + sizeof(int32_t)));
     }
