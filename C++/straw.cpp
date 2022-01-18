@@ -174,15 +174,14 @@ public:
     }
 
     char *readCompressedBytes(indexEntry idx) {
-        char *buffer;
         if (isHttp) {
-            buffer = getData(curl, idx.position, idx.size);
+            return getData(curl, idx.position, idx.size);
         } else {
-            buffer = new char[idx.size];
+            char *buffer = new char[idx.size];
             fin.seekg(idx.position, ios::beg);
             fin.read(buffer, idx.size);
+            return buffer;
         }
-        return buffer;
     }
 };
 
@@ -502,10 +501,8 @@ map<int32_t, indexEntry> readMatrixZoomDataHttp(CURL *curl, int64_t &myFilePosit
                                             bool &found) {
 
     map<int32_t, indexEntry> blockMap;
-    char *buffer;
     int32_t header_size = 5 * sizeof(int32_t) + 4 * sizeof(float);
-    char *first;
-    first = getData(curl, myFilePosition, 1);
+    char *first = getData(curl, myFilePosition, 1);
     if (first[0] == 'B') {
         header_size += 3;
     } else if (first[0] == 'F') {
@@ -514,20 +511,22 @@ map<int32_t, indexEntry> readMatrixZoomDataHttp(CURL *curl, int64_t &myFilePosit
         cerr << "Unit not understood" << endl;
         return blockMap;
     }
-    buffer = getData(curl, myFilePosition, header_size);
+    delete first;
+    char *buffer = getData(curl, myFilePosition, header_size);
     memstream fin(buffer, header_size);
     setValuesForMZD(fin, myunit, mySumCounts, mybinsize, myBlockBinCount, myBlockColumnCount, found);
     int32_t nBlocks = readInt32FromFile(fin);
+    delete buffer;
 
     if (found) {
         int32_t chunkSize = nBlocks * (sizeof(int32_t) + sizeof(int64_t) + sizeof(int32_t));
         buffer = getData(curl, myFilePosition + header_size, chunkSize);
         memstream fin2(buffer, chunkSize);
         populateBlockMap(fin2, nBlocks, blockMap);
+        delete buffer;
     } else {
         myFilePosition = myFilePosition + header_size + (nBlocks * (sizeof(int32_t) + sizeof(int64_t) + sizeof(int32_t)));
     }
-    delete buffer;
     return blockMap;
 }
 
@@ -535,9 +534,8 @@ map<int32_t, indexEntry> readMatrixZoomDataHttp(CURL *curl, int64_t &myFilePosit
 // sets blockbincount and blockcolumncount
 map<int32_t, indexEntry> readMatrixHttp(CURL *curl, int64_t myFilePosition, const string &unit, int32_t resolution,
                                     float &mySumCounts, int32_t &myBlockBinCount, int32_t &myBlockColumnCount) {
-    char *buffer;
     int32_t size = sizeof(int32_t) * 3;
-    buffer = getData(curl, myFilePosition, size);
+    char *buffer = getData(curl, myFilePosition, size);
     memstream bufin(buffer, size);
 
     int32_t c1 = readInt32FromFile(bufin);
@@ -878,15 +876,14 @@ public:
         HiCFileStream *stream = new HiCFileStream(fileName);
 
         if (stream->isHttp) {
-            char *buffer2;
             int64_t bytes_to_read = totalFileSize - master;
-            buffer2 = getData(stream->curl, master, bytes_to_read);
-            memstream bufin2(buffer2, bytes_to_read);
+            char *buffer = getData(stream->curl, master, bytes_to_read);
+            memstream bufin2(buffer, bytes_to_read);
             foundFooter = readFooter(bufin2, master, version, c1, c2, matrixType, norm, unit,
                                      resolution,
                                      myFilePos,
                                      c1NormEntry, c2NormEntry, expectedValues);
-            delete buffer2;
+            delete buffer;
         } else {
             stream->fin.seekg(master, ios::beg);
             foundFooter = readFooter(stream->fin, master, version, c1, c2, matrixType, norm,
@@ -898,6 +895,7 @@ public:
         if (!foundFooter) {
             return;
         }
+        stream->close();
 
         if (norm != "NONE") {
             c1Norm = readNormalizationVectorFromFooter(c1NormEntry, version, fileName);
@@ -907,7 +905,6 @@ public:
                 c2Norm = readNormalizationVectorFromFooter(c2NormEntry, version, fileName);
             }
         }
-        stream->close();
 
         HiCFileStream *stream2 = new HiCFileStream((fileName));
         if (stream2->isHttp) {
@@ -1059,10 +1056,9 @@ public:
 
         // read header into buffer; 100K should be sufficient
         if (std::strncmp(fileName.c_str(), prefix.c_str(), prefix.size()) == 0) {
-            char *buffer;
             CURL *curl;
             curl = oneTimeInitCURL(fileName.c_str());
-            buffer = getData(curl, 0, 100000);
+            char *buffer = getData(curl, 0, 100000);
             memstream bufin(buffer, 100000);
             chromosomeMap = readHeader(bufin, master, genomeID, numChromosomes,
                                        version, nviPosition, nviLength);
@@ -1142,7 +1138,11 @@ straw(const string& matrixType, const string& norm, const string& fileName, cons
         return v;
     }
 
+    auto start = std::chrono::high_resolution_clock::now();
     HiCFile *hiCFile = new HiCFile(fileName);
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+    cerr << "Time taken by hicFile loading: " << duration.count() << " milliseconds" << endl;
 
     string chr1, chr2;
     int64_t origRegionIndices[4] = {-100LL, -100LL, -100LL, -100LL};
@@ -1154,6 +1154,17 @@ straw(const string& matrixType, const string& norm, const string& fileName, cons
         parsePositions((chr2loc), chr2, origRegionIndices[2], origRegionIndices[3], hiCFile->chromosomeMap);
     }
 
+    start = std::chrono::high_resolution_clock::now();
     MatrixZoomData *mzd = hiCFile->getMatrixZoomData(chr1, chr2, matrixType, norm, unit, binsize);
-    return mzd->getBlockRecordsWithNormalization(origRegionIndices);
+    stop = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+    cerr << "Time taken by MZD loading: " << duration.count() << " milliseconds" << endl;
+
+    start = std::chrono::high_resolution_clock::now();
+    vector<contactRecord> v = mzd->getBlockRecordsWithNormalization(origRegionIndices);
+    stop = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+    cerr << "Time taken by records loading: " << duration.count() << " milliseconds" << endl;
+
+    return v;
 }
