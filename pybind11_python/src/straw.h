@@ -42,23 +42,6 @@ struct contactRecord {
   float counts;
 };
 
-struct footerInfo {
-    int32_t resolution;
-    bool foundFooter;
-    int32_t version;
-    int32_t c1;
-    int32_t c2;
-    int32_t numBins1;
-    int32_t numBins2;
-    int64_t myFilePos;
-    std::string unit;
-    std::string norm;
-    std::string matrixType;
-    std::vector<double> c1Norm;
-    std::vector<double> c2Norm;
-    std::vector<double> expectedValues;
-};
-
 // chromosome
 struct chromosome {
     std::string name;
@@ -66,14 +49,42 @@ struct chromosome {
     int64_t length;
 };
 
+// this is for creating a stream from a byte array for ease of use
+// see https://stackoverflow.com/questions/41141175/how-to-implement-seekg-seekpos-on-an-in-memory-buffer
+struct membuf : std::streambuf {
+    membuf(char *begin, int32_t l) {
+        setg(begin, begin, begin + l);
+    }
+};
 
-bool readMagicString(std::ifstream &fin);
+struct memstream : virtual membuf, std::istream {
+    memstream(char *begin, int32_t l) :
+            membuf(begin, l),
+            std::istream(static_cast<std::streambuf*>(this)) {
+    }
 
-std::map<std::string, chromosome> readHeader(std::istream &fin, int64_t &masterIndexPosition);
+    std::istream::pos_type seekpos(std::istream::pos_type sp, std::ios_base::openmode which) override {
+        return seekoff(sp - std::istream::pos_type(std::istream::off_type(0)), std::ios_base::beg, which);
+    }
 
-bool readFooter(std::istream &fin, int64_t master, int32_t c1, int32_t c2, std::string matrix, std::string norm, std::string unit,
-                int32_t resolution, int64_t &myFilePos, indexEntry &c1NormEntry, indexEntry &c2NormEntry,
-                std::vector<double> &expectedValues);
+    std::istream::pos_type seekoff(std::istream::off_type off,
+                                    std::ios_base::seekdir dir,
+                                    std::ios_base::openmode which = std::ios_base::in) override {
+        if (dir == std::ios_base::cur)
+            gbump(off);
+        else if (dir == std::ios_base::end)
+            setg(eback(), egptr() + off, egptr());
+        else if (dir == std::ios_base::beg)
+            setg(eback(), eback() + off, egptr());
+        return gptr() - eback();
+    }
+};
+
+// for holding data from URL call
+struct MemoryStruct {
+    char *memory;
+    size_t size;
+};
 
 std::map<int32_t, indexEntry>
 readMatrixZoomData(std::istream &fin, const std::string &myunit, int32_t mybinsize, float &mySumCounts,
@@ -84,15 +95,10 @@ std::map<int32_t, indexEntry>
 readMatrix(std::istream &fin, int32_t myFilePosition, std::string unit, int32_t resolution, float &mySumCounts,
            int32_t &myBlockBinCount, int32_t &myBlockColumnCount);
 
-std::set<int32_t>
-getBlockNumbersForRegionFromBinPosition(int32_t *regionIndices, int32_t blockBinCount, int32_t blockColumnCount, bool intra);
-
-std::vector<contactRecord> readBlock(std::istream &fin, int32_t blockNumber);
-
 std::vector<double> readNormalizationVector(std::istream &fin, indexEntry entry);
 
 std::vector<contactRecord>
-straw(std::string matrixType, std::string norm, std::string fname, std::string chr1loc, std::string chr2loc,
+straw(const std::string& matrixType, const std::string& norm, const std::string& fname, const std::string& chr1loc, const std::string& chr2loc,
       const std::string &unit, int32_t binsize);
 
 #endif
