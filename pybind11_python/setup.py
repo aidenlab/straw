@@ -24,7 +24,7 @@ class get_pybind_include(object):
 ext_modules = [
     Extension(
         'strawC',
-        ['src/straw.cpp', 'src/straw_tools.py'],
+        ['src/straw.cpp'],
         include_dirs=[
             # Path to pybind11 headers
             get_pybind_include(),

@@ -482,7 +482,7 @@ void populateBlockMap(istream &fin, int32_t nBlocks, map<int32_t, indexEntry> &b
 
 // reads the raw binned contact matrix at specified resolution, setting the block bin count and block column count
 map<int32_t, indexEntry> readMatrixZoomData(istream &fin, const string &myunit, int32_t mybinsize, float &mySumCounts,
-                                        int32_t &myBlockBinCount, int32_t &myBlockColumnCount, bool &found) {
+                                            int32_t &myBlockBinCount, int32_t &myBlockColumnCount, bool &found) {
 
     map<int32_t, indexEntry> blockMap;
     setValuesForMZD(fin, myunit, mySumCounts, mybinsize, myBlockBinCount, myBlockColumnCount, found);
@@ -498,8 +498,8 @@ map<int32_t, indexEntry> readMatrixZoomData(istream &fin, const string &myunit, 
 
 // reads the raw binned contact matrix at specified resolution, setting the block bin count and block column count
 map<int32_t, indexEntry> readMatrixZoomDataHttp(CURL *curl, int64_t &myFilePosition, const string &myunit, int32_t mybinsize,
-                                            float &mySumCounts, int32_t &myBlockBinCount, int32_t &myBlockColumnCount,
-                                            bool &found) {
+                                                float &mySumCounts, int32_t &myBlockBinCount, int32_t &myBlockColumnCount,
+                                                bool &found) {
 
     map<int32_t, indexEntry> blockMap;
     int32_t header_size = 5 * sizeof(int32_t) + 4 * sizeof(float);
@@ -534,7 +534,7 @@ map<int32_t, indexEntry> readMatrixZoomDataHttp(CURL *curl, int64_t &myFilePosit
 // goes to the specified file pointer in http and finds the raw contact matrixType at specified resolution, calling readMatrixZoomData.
 // sets blockbincount and blockcolumncount
 map<int32_t, indexEntry> readMatrixHttp(CURL *curl, int64_t myFilePosition, const string &unit, int32_t resolution,
-                                    float &mySumCounts, int32_t &myBlockBinCount, int32_t &myBlockColumnCount) {
+                                        float &mySumCounts, int32_t &myBlockBinCount, int32_t &myBlockColumnCount) {
     int32_t size = sizeof(int32_t) * 3;
     char *buffer = getData(curl, myFilePosition, size);
     memstream bufin(buffer, size);
@@ -563,7 +563,7 @@ map<int32_t, indexEntry> readMatrixHttp(CURL *curl, int64_t myFilePosition, cons
 // goes to the specified file pointer and finds the raw contact matrixType at specified resolution, calling readMatrixZoomData.
 // sets blockbincount and blockcolumncount
 map<int32_t, indexEntry> readMatrix(istream &fin, int64_t myFilePosition, const string &unit, int32_t resolution,
-                                float &mySumCounts, int32_t &myBlockBinCount, int32_t &myBlockColumnCount) {
+                                    float &mySumCounts, int32_t &myBlockBinCount, int32_t &myBlockColumnCount) {
     map<int32_t, indexEntry> blockMap;
 
     fin.seekg(myFilePosition, ios::beg);
@@ -585,7 +585,7 @@ map<int32_t, indexEntry> readMatrix(istream &fin, int64_t myFilePosition, const 
 // gets the blocks that need to be read for this slice of the data.  needs blockbincount, blockcolumncount, and whether
 // or not this is intrachromosomal.
 set<int32_t> getBlockNumbersForRegionFromBinPosition(const int64_t *regionIndices, int32_t blockBinCount, int32_t blockColumnCount,
-                                                 bool intra) {
+                                                     bool intra) {
     int32_t col1, col2, row1, row2;
     col1 = static_cast<int32_t>(regionIndices[0] / blockBinCount);
     col2 = static_cast<int32_t>((regionIndices[1] + 1) / blockBinCount);
@@ -950,10 +950,10 @@ public:
     set<int32_t> getBlockNumbers(int64_t *regionIndices) const {
         if (version > 8 && isIntra) {
             return getBlockNumbersForRegionFromBinPositionV9Intra(regionIndices, blockBinCount,
-                                                                          blockColumnCount);
+                                                                  blockColumnCount);
         } else {
             return getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount,
-                                                                   isIntra);
+                                                           isIntra);
         }
     }
 
@@ -983,16 +983,16 @@ public:
                     if (matrixType == "oe") {
                         if (isIntra) {
                             c = static_cast<float>(c / expectedValues[min(expectedValues.size() - 1,
-                                                                                 (size_t) floor(abs(y - x) /
-                                                                                                resolution))]);
+                                                                          (size_t) floor(abs(y - x) /
+                                                                                         resolution))]);
                         } else {
                             c = static_cast<float>(c / avgCount);
                         }
                     } else if (matrixType == "expected") {
                         if (isIntra) {
                             c = static_cast<float>(expectedValues[min(expectedValues.size() - 1,
-                                                                             (size_t) floor(abs(y - x) /
-                                                                                            resolution))]);
+                                                                      (size_t) floor(abs(y - x) /
+                                                                                     resolution))]);
                         } else {
                             c = static_cast<float>(avgCount);
                         }
@@ -1031,7 +1031,7 @@ public:
         int32_t found;
         found = static_cast<int32_t>(s.find("content-range"));
         if ((size_t)found == string::npos) {
-          found = static_cast<int32_t>(s.find("Content-Range"));
+            found = static_cast<int32_t>(s.find("Content-Range"));
         }
         if ((size_t)found != string::npos) {
             int32_t found2;
@@ -1154,16 +1154,14 @@ straw(const string& matrixType, const string& norm, const string& fileName, cons
     return mzd->getBlockRecordsWithNormalization(origRegionIndices);
 }
 
+
+
 namespace py = pybind11;
 
 PYBIND11_MODULE(strawC, m) {
 m.doc() = "Fast hybrid tool for reading .hic files; see https://github.com/aidenlab/straw for documentation";
 
 m.def("strawC", &straw, "get contact records");
-m.def("getRecords", &getBlockRecordsWithNormalization, "get contact records using normalization info");
-m.def("getChromosomes", &getChromosomes, "get chromosomes in hic file");
-m.def("getResolutions", &getResolutions, "get resolutions in hic file");
-m.def("getNormExpVectors", &getNormalizationInfoForRegion, "get normalization or expected vectors");
 
 py::class_<contactRecord>(m, "contactRecord")
 .def(py::init<>())
@@ -1177,6 +1175,23 @@ py::class_<chromosome>(m, "chromosome")
 .def_readwrite("name", &chromosome::name)
 .def_readwrite("index", &chromosome::index)
 .def_readwrite("length", &chromosome::length)
+;
+
+
+py::class_<MatrixZoomData>(m, "MatrixZoomData")
+//must include the & when defining parameters that require it
+.def(py::init<chromosome &, chromosome &, string &, string &, string &, int32_t, int32_t &, int64_t &, int64_t &, string &>())
+.def("getBlockRecordsWithNormalization", &MatrixZoomData::getBlockRecordsWithNormalization)
+;
+
+
+py::class_<HiCFile>(m, "HiCFile")
+.def(py::init<string>())
+.def("getChromosomes", &HiCFile::getChromosomes)
+.def("getResolutions", &HiCFile::getResolutions)
+.def("getGenomeID", &HiCFile::getGenomeID)
+.def("getMatrixZoomData", &HiCFile::getMatrixZoomData)
+
 ;
 
 #ifdef VERSION_INFO

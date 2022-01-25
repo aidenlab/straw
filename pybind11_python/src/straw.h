@@ -37,9 +37,9 @@ struct indexEntry {
 
 // sparse matrixType entry
 struct contactRecord {
-  int32_t binX;
-  int32_t binY;
-  float counts;
+    int32_t binX;
+    int32_t binY;
+    float counts;
 };
 
 // chromosome
@@ -68,8 +68,8 @@ struct memstream : virtual membuf, std::istream {
     }
 
     std::istream::pos_type seekoff(std::istream::off_type off,
-                                    std::ios_base::seekdir dir,
-                                    std::ios_base::openmode which = std::ios_base::in) override {
+                                   std::ios_base::seekdir dir,
+                                   std::ios_base::openmode which = std::ios_base::in) override {
         if (dir == std::ios_base::cur)
             gbump(off);
         else if (dir == std::ios_base::end)
