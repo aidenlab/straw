@@ -420,7 +420,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
     }
 
     if (c1 == c2 && (matrixType == "oe" || matrixType == "expected") && norm == "NONE") {
-        if (smoothExpectedValues.empty()) {
+        if (expectedValues.empty()) {
             cerr << "File did not contain expected values vectors at " << resolution << " " << unit << endl;
             return false;
         }
@@ -446,7 +446,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
     }
 
     if (c1 == c2 && (matrixType == "oe" || matrixType == "expected") && norm != "NONE") {
-        if (smoothExpectedValues.empty()) {
+        if (expectedValues.empty()) {
             cerr << "File did not contain normalized expected values vectors at " << resolution << " " << unit << endl;
             return false;
         }
@@ -1001,6 +1001,22 @@ public:
             return getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount,
                                                                    isIntra);
         }
+    }
+
+    vector<double> getNormVector(int32_t index){
+        if(index == c1){
+            return c1Norm;
+        } else if(index == c2){
+            return c2Norm;
+        }
+        cerr << "Invalid index provided: " << index << endl;
+        cerr << "Should be either " << c1 << " or " << c2 << endl;
+        vector<double> v;
+        return v;
+    }
+
+    vector<double> getExpectedValues(){
+        return expectedValues;
     }
 
     vector<contactRecord>
