@@ -272,13 +272,14 @@ double median(vector<double> &v){
     return v[n];
 }
 
-vector<double> rollingMedian(vector<double> initialValues, int32_t window) {
+void rollingMedian(vector<double> &initialValues, vector<double> &finalResult, int32_t window) {
     // window is actually a ~wing-span
-    if (window < 1) return initialValues;
+    if (window < 1) {
+        finalResult = initialValues;
+        return;
+    }
 
-    vector<double> finalResult;
     finalResult.push_back(initialValues[0]);
-
     int64_t length = initialValues.size();
     for (int64_t index = 1; index < length; index++) {
         int64_t initialIndex;
@@ -298,7 +299,6 @@ vector<double> rollingMedian(vector<double> initialValues, int32_t window) {
         vector<double> subVector = slice(initialValues, initialIndex, finalIndex);
         finalResult.push_back(median(subVector));
     }
-    return finalResult;
 }
 
 void populateVectorWithFloats(istream &fin, vector<double> &vector, int64_t nValues) {
@@ -316,15 +316,16 @@ void populateVectorWithDoubles(istream &fin, vector<double> &vector, int64_t nVa
 }
 
 void readThroughExpectedVector(int32_t version, istream &fin, vector<double> &expectedValues, int64_t nValues,
-                               bool store) {
+                               bool store, int32_t resolution) {
     if (store) {
+        vector<double> initialExpectedValues;
         if (version > 8) {
-            populateVectorWithFloats(fin, expectedValues, nValues);
+            populateVectorWithFloats(fin, initialExpectedValues, nValues);
         } else {
-            populateVectorWithDoubles(fin,expectedValues, nValues);
+            populateVectorWithDoubles(fin, initialExpectedValues, nValues);
         }
-        //int32_t window = 5000000 / resolution;
-        //return rollingMedian(initialExpectedValues, window);
+        int32_t window = 5000000 / resolution;
+        rollingMedian(initialExpectedValues, expectedValues, window);
     } else if (nValues > 0) {
         if (version > 8) {
             fin.seekg(nValues*sizeof(float), ios_base::cur);
@@ -415,7 +416,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
         }
 
         bool store = c1 == c2 && (matrixType == "oe" || matrixType == "expected") && norm == "NONE" && unit0 == unit && binSize == resolution;
-        readThroughExpectedVector(version, fin, expectedValues, nValues, store);
+        readThroughExpectedVector(version, fin, expectedValues, nValues, store, resolution);
         readThroughNormalizationFactors(fin, version, store, expectedValues, c1);
     }
 
@@ -441,7 +442,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
             nValues = (int64_t) readInt32FromFile(fin);
         }
         bool store = c1 == c2 && (matrixType == "oe" || matrixType == "expected") && type == norm && unit0 == unit && binSize == resolution;
-        readThroughExpectedVector(version, fin, expectedValues, nValues, store);
+        readThroughExpectedVector(version, fin, expectedValues, nValues, store, resolution);
         readThroughNormalizationFactors(fin, version, store, expectedValues, c1);
     }
 
@@ -875,7 +876,6 @@ class MatrixZoomData {
 public:
     bool isIntra;
     string fileName;
-    indexEntry c1NormEntry, c2NormEntry;
     int64_t myFilePos = 0LL;
     vector<double> expectedValues;
     bool foundFooter = false;
@@ -889,7 +889,6 @@ public:
     int32_t resolution = 0;
     int32_t numBins1 = 0;
     int32_t numBins2 = 0;
-
     float sumCounts;
     int32_t blockBinCount, blockColumnCount;
     map<int32_t, indexEntry> blockMap;
@@ -921,6 +920,7 @@ public:
         this->resolution = resolution;
 
         HiCFileStream *stream = new HiCFileStream(fileName);
+        indexEntry c1NormEntry{}, c2NormEntry{};
 
         if (stream->isHttp) {
             int64_t bytes_to_read = totalFileSize - master;
