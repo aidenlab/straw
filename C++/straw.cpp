@@ -257,6 +257,50 @@ vector<int32_t> readResolutionsFromHeader(istream &fin) {
     return resolutions;
 }
 
+//https://www.techiedelight.com/get-slice-sub-vector-from-vector-cpp/
+vector<double> slice(vector<double> &v, int64_t m, int64_t n){
+    vector<double> vec;
+    copy(v.begin() + m, v.begin() + n + 1, back_inserter(vec));
+    return vec;
+}
+
+// assume always an odd number for length of vector;
+// eve if even, this calculation should be close enough
+double median(vector<double> &v){
+    size_t n = v.size() / 2;
+    nth_element(v.begin(), v.begin()+n, v.end());
+    return v[n];
+}
+
+vector<double> rollingMedian(vector<double> initialValues, int32_t window) {
+    // window is actually a ~wing-span
+    if (window < 1) return initialValues;
+
+    vector<double> finalResult;
+    finalResult.push_back(initialValues[0]);
+
+    int64_t length = initialValues.size();
+    for (int64_t index = 1; index < length; index++) {
+        int64_t initialIndex;
+        int64_t finalIndex;
+        if (index < window){
+            initialIndex = 0;
+            finalIndex = 2*index;
+        } else {
+            initialIndex = index - window;
+            finalIndex = index + window;
+        }
+
+        if(finalIndex > length - 1){
+            finalIndex = length - 1;
+        }
+
+        vector<double> subVector = slice(initialValues, initialIndex, finalIndex);
+        finalResult.push_back(median(subVector));
+    }
+    return finalResult;
+}
+
 void populateVectorWithFloats(istream &fin, vector<double> &vector, int64_t nValues) {
     for (int j = 0; j < nValues; j++) {
         double v = readFloatFromFile(fin);
@@ -279,6 +323,8 @@ void readThroughExpectedVector(int32_t version, istream &fin, vector<double> &ex
         } else {
             populateVectorWithDoubles(fin,expectedValues, nValues);
         }
+        //int32_t window = 5000000 / resolution;
+        //return rollingMedian(initialExpectedValues, window);
     } else if (nValues > 0) {
         if (version > 8) {
             fin.seekg(nValues*sizeof(float), ios_base::cur);
@@ -322,6 +368,7 @@ void readThroughNormalizationFactors(istream &fin, int32_t version, bool store, 
 bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32_t c2, const string &matrixType, const string &norm,
                 const string &unit, int32_t resolution, int64_t &myFilePos,
                 indexEntry &c1NormEntry, indexEntry &c2NormEntry, vector<double> &expectedValues) {
+
     if (version > 8) {
         int64_t nBytes = readInt64FromFile(fin);
     } else {
@@ -373,7 +420,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
     }
 
     if (c1 == c2 && (matrixType == "oe" || matrixType == "expected") && norm == "NONE") {
-        if (expectedValues.empty()) {
+        if (smoothExpectedValues.empty()) {
             cerr << "File did not contain expected values vectors at " << resolution << " " << unit << endl;
             return false;
         }
@@ -399,7 +446,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
     }
 
     if (c1 == c2 && (matrixType == "oe" || matrixType == "expected") && norm != "NONE") {
-        if (expectedValues.empty()) {
+        if (smoothExpectedValues.empty()) {
             cerr << "File did not contain normalized expected values vectors at " << resolution << " " << unit << endl;
             return false;
         }
