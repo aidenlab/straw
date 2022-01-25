@@ -1,7 +1,7 @@
 /*
   The MIT License (MIT)
 
-  Copyright (c) 2011-2016 Broad Institute, Aiden Lab
+  Copyright (c) 2017-2021 Aiden Lab, Rice University, Baylor College of Medicine
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -28,6 +28,7 @@
 #include <map>
 #include <cmath>
 #include <set>
+#include <utility>
 #include <vector>
 #include <streambuf>
 #include <curl/curl.h>
@@ -258,6 +259,50 @@ vector<int32_t> readResolutionsFromHeader(istream &fin) {
     return resolutions;
 }
 
+//https://www.techiedelight.com/get-slice-sub-vector-from-vector-cpp/
+vector<double> slice(vector<double> &v, int64_t m, int64_t n){
+    vector<double> vec;
+    copy(v.begin() + m, v.begin() + n + 1, back_inserter(vec));
+    return vec;
+}
+
+// assume always an odd number for length of vector;
+// eve if even, this calculation should be close enough
+double median(vector<double> &v){
+    size_t n = v.size() / 2;
+    nth_element(v.begin(), v.begin()+n, v.end());
+    return v[n];
+}
+
+void rollingMedian(vector<double> &initialValues, vector<double> &finalResult, int32_t window) {
+    // window is actually a ~wing-span
+    if (window < 1) {
+        finalResult = initialValues;
+        return;
+    }
+
+    finalResult.push_back(initialValues[0]);
+    int64_t length = initialValues.size();
+    for (int64_t index = 1; index < length; index++) {
+        int64_t initialIndex;
+        int64_t finalIndex;
+        if (index < window){
+            initialIndex = 0;
+            finalIndex = 2*index;
+        } else {
+            initialIndex = index - window;
+            finalIndex = index + window;
+        }
+
+        if(finalIndex > length - 1){
+            finalIndex = length - 1;
+        }
+
+        vector<double> subVector = slice(initialValues, initialIndex, finalIndex);
+        finalResult.push_back(median(subVector));
+    }
+}
+
 void populateVectorWithFloats(istream &fin, vector<double> &vector, int64_t nValues) {
     for (int j = 0; j < nValues; j++) {
         double v = readFloatFromFile(fin);
@@ -273,13 +318,16 @@ void populateVectorWithDoubles(istream &fin, vector<double> &vector, int64_t nVa
 }
 
 void readThroughExpectedVector(int32_t version, istream &fin, vector<double> &expectedValues, int64_t nValues,
-                               bool store) {
+                               bool store, int32_t resolution) {
     if (store) {
+        vector<double> initialExpectedValues;
         if (version > 8) {
-            populateVectorWithFloats(fin, expectedValues, nValues);
+            populateVectorWithFloats(fin, initialExpectedValues, nValues);
         } else {
-            populateVectorWithDoubles(fin,expectedValues, nValues);
+            populateVectorWithDoubles(fin, initialExpectedValues, nValues);
         }
+        int32_t window = 5000000 / resolution;
+        rollingMedian(initialExpectedValues, expectedValues, window);
     } else if (nValues > 0) {
         if (version > 8) {
             fin.seekg(nValues*sizeof(float), ios_base::cur);
@@ -323,6 +371,7 @@ void readThroughNormalizationFactors(istream &fin, int32_t version, bool store, 
 bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32_t c2, const string &matrixType, const string &norm,
                 const string &unit, int32_t resolution, int64_t &myFilePos,
                 indexEntry &c1NormEntry, indexEntry &c2NormEntry, vector<double> &expectedValues) {
+
     if (version > 8) {
         int64_t nBytes = readInt64FromFile(fin);
     } else {
@@ -369,7 +418,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
         }
 
         bool store = c1 == c2 && (matrixType == "oe" || matrixType == "expected") && norm == "NONE" && unit0 == unit && binSize == resolution;
-        readThroughExpectedVector(version, fin, expectedValues, nValues, store);
+        readThroughExpectedVector(version, fin, expectedValues, nValues, store, resolution);
         readThroughNormalizationFactors(fin, version, store, expectedValues, c1);
     }
 
@@ -395,7 +444,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
             nValues = (int64_t) readInt32FromFile(fin);
         }
         bool store = c1 == c2 && (matrixType == "oe" || matrixType == "expected") && type == norm && unit0 == unit && binSize == resolution;
-        readThroughExpectedVector(version, fin, expectedValues, nValues, store);
+        readThroughExpectedVector(version, fin, expectedValues, nValues, store, resolution);
         readThroughNormalizationFactors(fin, version, store, expectedValues, c1);
     }
 
@@ -829,7 +878,6 @@ class MatrixZoomData {
 public:
     bool isIntra;
     string fileName;
-    indexEntry c1NormEntry, c2NormEntry;
     int64_t myFilePos = 0LL;
     vector<double> expectedValues;
     bool foundFooter = false;
@@ -843,7 +891,6 @@ public:
     int32_t resolution = 0;
     int32_t numBins1 = 0;
     int32_t numBins2 = 0;
-
     float sumCounts;
     int32_t blockBinCount, blockColumnCount;
     map<int32_t, indexEntry> blockMap;
@@ -875,6 +922,7 @@ public:
         this->resolution = resolution;
 
         HiCFileStream *stream = new HiCFileStream(fileName);
+        indexEntry c1NormEntry{}, c2NormEntry{};
 
         if (stream->isHttp) {
             int64_t bytes_to_read = totalFileSize - master;
@@ -955,6 +1003,22 @@ public:
             return getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount,
                                                            isIntra);
         }
+    }
+
+    vector<double> getNormVector(int32_t index){
+        if(index == c1){
+            return c1Norm;
+        } else if(index == c2){
+            return c2Norm;
+        }
+        cerr << "Invalid index provided: " << index << endl;
+        cerr << "Should be either " << c1 << " or " << c2 << endl;
+        vector<double> v;
+        return v;
+    }
+
+    vector<double> getExpectedValues(){
+        return expectedValues;
     }
 
     vector<contactRecord>
@@ -1153,7 +1217,6 @@ straw(const string& matrixType, const string& norm, const string& fileName, cons
     MatrixZoomData *mzd = hiCFile->getMatrixZoomData(chr1, chr2, matrixType, norm, unit, binsize);
     return mzd->getBlockRecordsWithNormalization(origRegionIndices);
 }
-
 
 
 namespace py = pybind11;
