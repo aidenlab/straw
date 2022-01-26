@@ -129,6 +129,13 @@ double readDoubleFromFile(istream &fin) {
     return tempDouble;
 }
 
+void convertGenomeToBinPos(const int64_t origRegionIndices[4], int64_t regionIndices[4], int32_t resolution) {
+    for(uint16_t q = 0; q < 4; q++){
+        // used to find the blocks we need to access
+        regionIndices[q] = origRegionIndices[q] / resolution;
+    }
+}
+
 static CURL *initCURL(const char *url) {
     CURL *curl = curl_easy_init();
     if (curl) {
@@ -982,17 +989,44 @@ public:
         return cNorm;
     }
 
-    vector<contactRecord> getBlockRecordsWithNormalization(int64_t origRegionIndices[4]) {
-        if (!foundFooter) {
-            vector<contactRecord> v;
-            return v;
-        }
+    bool isInRange(int32_t r, int32_t c, int32_t numRows, int32_t numCols) {
+        return 0 <= r && r < numRows && 0 <= c && c < numCols;
+    }
 
-        int64_t regionIndices[4]; // used to find the blocks we need to access
-        for(uint16_t q = 0; q < 4; q++){
-            regionIndices[q] = origRegionIndices[q] / resolution;
+    void fillInMatrixIfInRange(vector<vector<float>> matrix, int32_t r, int32_t c, int32_t numRows, int32_t numCols,
+                               float counts) {
+        if (isInRange(r, c, numRows, numCols)) {
+            matrix[r][c] = counts;
         }
-        return getRecords(regionIndices, origRegionIndices);
+    }
+
+    vector<vector<float>> getRecordsAsMatrix(int64_t origRegionIndices[4]){
+        vector<contactRecord> records = getRecords(origRegionIndices);
+        if (records.empty()) return vector<vector<float>>(1, vector<float>(1, 0));
+
+        int64_t regionIndices[4];
+        convertGenomeToBinPos(origRegionIndices, regionIndices, resolution);
+
+        int64_t originR = regionIndices[0];
+        int64_t endR = regionIndices[1];
+        int64_t originC = regionIndices[2];
+        int64_t endC = regionIndices[3];
+        int32_t numRows = endR - originR;
+        int32_t numCols = endC - originC;
+        vector<vector<float>> matrix = vector<vector<float>>(numRows, vector<float>(numCols, 0));
+
+        for(contactRecord cr : records) {
+            if (isnan(cr.counts) || isinf(cr.counts)) continue;
+            int32_t r = cr.binX - originR;
+            int32_t c = cr.binY - originC;
+            fillInMatrixIfInRange(matrix, r, c, numRows, numCols, cr.counts);
+            if (isIntra) {
+                r = cr.binY - originR;
+                c = cr.binX - originC;
+                fillInMatrixIfInRange(matrix, r, c, numRows, numCols, cr.counts);
+            }
+        }
+        return matrix;
     }
 
     set<int32_t> getBlockNumbers(int64_t *regionIndices) const {
@@ -1021,8 +1055,14 @@ public:
         return expectedValues;
     }
 
-    vector<contactRecord>
-    getRecords(int64_t regionIndices[4], const int64_t origRegionIndices[4]) {
+    vector<contactRecord> getRecords(const int64_t origRegionIndices[4]) {
+        if (!foundFooter) {
+            vector<contactRecord> v;
+            return v;
+        }
+        int64_t regionIndices[4];
+        convertGenomeToBinPos(origRegionIndices, regionIndices, resolution);
+
         set<int32_t> blockNumbers = getBlockNumbers(regionIndices);
         vector<contactRecord> records;
         for (int32_t blockNumber : blockNumbers) {
@@ -1215,7 +1255,7 @@ straw(const string& matrixType, const string& norm, const string& fileName, cons
     }
 
     MatrixZoomData *mzd = hiCFile->getMatrixZoomData(chr1, chr2, matrixType, norm, unit, binsize);
-    return mzd->getBlockRecordsWithNormalization(origRegionIndices);
+    return mzd->getRecords(origRegionIndices);
 }
 
 
@@ -1244,7 +1284,7 @@ py::class_<chromosome>(m, "chromosome")
 py::class_<MatrixZoomData>(m, "MatrixZoomData")
 //must include the & when defining parameters that require it
 .def(py::init<chromosome &, chromosome &, string &, string &, string &, int32_t, int32_t &, int64_t &, int64_t &, string &>())
-.def("getBlockRecordsWithNormalization", &MatrixZoomData::getBlockRecordsWithNormalization)
+.def("getRecords", &MatrixZoomData::getRecords)
 ;
 
 
