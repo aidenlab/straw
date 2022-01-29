@@ -36,7 +36,9 @@
 #include "straw.h"
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/numpy.h>
 using namespace std;
+namespace py = pybind11;
 
 /*
   Straw: fast C++ implementation of dump. Not as fully featured as the
@@ -273,42 +275,7 @@ vector<double> slice(vector<double> &v, int64_t m, int64_t n){
     return vec;
 }
 
-// assume always an odd number for length of vector;
-// eve if even, this calculation should be close enough
-double median(vector<double> &v){
-    size_t n = v.size() / 2;
-    nth_element(v.begin(), v.begin()+n, v.end());
-    return v[n];
-}
 
-void rollingMedian(vector<double> &initialValues, vector<double> &finalResult, int32_t window) {
-    // window is actually a ~wing-span
-    if (window < 1) {
-        finalResult = initialValues;
-        return;
-    }
-
-    finalResult.push_back(initialValues[0]);
-    int64_t length = initialValues.size();
-    for (int64_t index = 1; index < length; index++) {
-        int64_t initialIndex;
-        int64_t finalIndex;
-        if (index < window){
-            initialIndex = 0;
-            finalIndex = 2*index;
-        } else {
-            initialIndex = index - window;
-            finalIndex = index + window;
-        }
-
-        if(finalIndex > length - 1){
-            finalIndex = length - 1;
-        }
-
-        vector<double> subVector = slice(initialValues, initialIndex, finalIndex);
-        finalResult.push_back(median(subVector));
-    }
-}
 
 void populateVectorWithFloats(istream &fin, vector<double> &vector, int64_t nValues) {
     for (int j = 0; j < nValues; j++) {
@@ -327,14 +294,12 @@ void populateVectorWithDoubles(istream &fin, vector<double> &vector, int64_t nVa
 void readThroughExpectedVector(int32_t version, istream &fin, vector<double> &expectedValues, int64_t nValues,
                                bool store, int32_t resolution) {
     if (store) {
-        vector<double> initialExpectedValues;
+        vector<double> expectedValues;
         if (version > 8) {
-            populateVectorWithFloats(fin, initialExpectedValues, nValues);
+            populateVectorWithFloats(fin, expectedValues, nValues);
         } else {
-            populateVectorWithDoubles(fin, initialExpectedValues, nValues);
+            populateVectorWithDoubles(fin, expectedValues, nValues);
         }
-        int32_t window = 5000000 / resolution;
-        rollingMedian(initialExpectedValues, expectedValues, window);
     } else if (nValues > 0) {
         if (version > 8) {
             fin.seekg(nValues*sizeof(float), ios_base::cur);
@@ -343,7 +308,6 @@ void readThroughExpectedVector(int32_t version, istream &fin, vector<double> &ex
         }
     }
 }
-
 void readThroughNormalizationFactors(istream &fin, int32_t version, bool store, vector<double> &expectedValues,
                                      int32_t c1) {
     int32_t nNormalizationFactors = readInt32FromFile(fin);
@@ -1000,10 +964,12 @@ public:
         }
     }
 
-    vector<vector<float>> getRecordsAsMatrix(int64_t origRegionIndices[4]){
+    auto getRecordsAsMatrix(int64_t origRegionIndices[4]){
         vector<contactRecord> records = getRecords(origRegionIndices);
-        if (records.empty()) return vector<vector<float>>(1, vector<float>(1, 0));
-
+        if (records.empty()){
+            auto res = vector<vector<float>>(1, vector<float>(1, 0));
+            return py::array(py::cast(res));
+        }
         int64_t regionIndices[4];
         convertGenomeToBinPos(origRegionIndices, regionIndices, resolution);
 
@@ -1026,7 +992,7 @@ public:
                 fillInMatrixIfInRange(matrix, r, c, numRows, numCols, cr.counts);
             }
         }
-        return matrix;
+        return py::array(py::cast(matrix));
     }
 
     set<int32_t> getBlockNumbers(int64_t *regionIndices) const {
@@ -1259,7 +1225,7 @@ straw(const string& matrixType, const string& norm, const string& fileName, cons
 }
 
 
-namespace py = pybind11;
+//namespace py = pybind11;
 
 PYBIND11_MODULE(strawC, m) {
 m.doc() = "Fast hybrid tool for reading .hic files; see https://github.com/aidenlab/straw for documentation";
@@ -1285,6 +1251,7 @@ py::class_<MatrixZoomData>(m, "MatrixZoomData")
 //must include the & when defining parameters that require it
 .def(py::init<chromosome &, chromosome &, string &, string &, string &, int32_t, int32_t &, int64_t &, int64_t &, string &>())
 .def("getRecords", &MatrixZoomData::getRecords)
+.def("getRecordsAsMatrix", &MatrixZoomData::getRecordsAsMatrix)
 ;
 
 
