@@ -963,45 +963,6 @@ public:
         }
     }
 
-    auto getRecordsAsMatrix(int64_t gx0, int64_t gx1, int64_t gy0, int64_t gy1){
-        cout << "It reached this line at the beginning" << endl;
-        int64_t origRegionIndices[] = {gx0, gx1, gy0, gy1};
-        vector<contactRecord> records = getRecords(gx0, gx1, gy0, gy1);
-        if (records.empty()){
-            cerr << "empty matrix" << endl;
-            auto res = vector<vector<float>>(1, vector<float>(1, 0));
-            //return py::array(py::cast(res));
-            return res;
-        }
-        int64_t regionIndices[4];
-        convertGenomeToBinPos(origRegionIndices, regionIndices, resolution);
-
-        int64_t originR = regionIndices[0];
-        int64_t endR = regionIndices[1];
-        int64_t originC = regionIndices[2];
-        int64_t endC = regionIndices[3];
-        int32_t numRows = endR - originR;
-        int32_t numCols = endC - originC;
-        vector<vector<float>> matrix = vector<vector<float>>(numRows, vector<float>(numCols, 0));
-
-        for(contactRecord cr : records) {
-            if (isnan(cr.counts) || isinf(cr.counts)) continue;
-            int32_t r = cr.binX - originR;
-            int32_t c = cr.binY - originC;
-            fillInMatrixIfInRange(matrix, r, c, numRows, numCols, cr.counts);
-            if (isIntra) {
-                r = cr.binY - originR;
-                c = cr.binX - originC;
-                fillInMatrixIfInRange(matrix, r, c, numRows, numCols, cr.counts);
-                cout << r << " " << c << " " << matrix[r][c] << endl;
-            }
-        }
-        cout << "It reached this line" << endl;
-
-        //return py::array(py::cast(matrix));
-        return matrix;
-    }
-
     set<int32_t> getBlockNumbers(int64_t *regionIndices) const {
         if (version > 8 && isIntra) {
             return getBlockNumbersForRegionFromBinPositionV9Intra(regionIndices, blockBinCount,
@@ -1085,6 +1046,45 @@ public:
             }
         }
         return records;
+    }
+
+    vector<vector<float>> getRecordsAsMatrix(int64_t gx0, int64_t gx1, int64_t gy0, int64_t gy1){
+        cout << "It reached this line at the beginning" << endl;
+        int64_t origRegionIndices[] = {gx0, gx1, gy0, gy1};
+        vector<contactRecord> records = getRecords(gx0, gx1, gy0, gy1);
+        if (records.empty()){
+            cerr << "empty matrix" << endl;
+            auto res = vector<vector<float>>(1, vector<float>(1, 0));
+            //return py::array(py::cast(res));
+            return res;
+        }
+        int64_t regionIndices[4];
+        convertGenomeToBinPos(origRegionIndices, regionIndices, resolution);
+
+        int64_t originR = regionIndices[0];
+        int64_t endR = regionIndices[1];
+        int64_t originC = regionIndices[2];
+        int64_t endC = regionIndices[3];
+        int32_t numRows = endR - originR;
+        int32_t numCols = endC - originC;
+        vector<vector<float>> matrix = vector<vector<float>>(numRows, vector<float>(numCols, 0));
+
+        for(contactRecord cr : records) {
+            if (isnan(cr.counts) || isinf(cr.counts)) continue;
+            int32_t r = cr.binX - originR;
+            int32_t c = cr.binY - originC;
+            fillInMatrixIfInRange(matrix, r, c, numRows, numCols, cr.counts);
+            if (isIntra) {
+                r = cr.binY - originR;
+                c = cr.binX - originC;
+                fillInMatrixIfInRange(matrix, r, c, numRows, numCols, cr.counts);
+                cout << r << " " << c << " " << matrix[r][c] << endl;
+            }
+        }
+        cout << "It reached this line" << endl;
+
+        //return py::array(py::cast(matrix));
+        return matrix;
     }
 };
 
