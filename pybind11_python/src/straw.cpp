@@ -964,8 +964,8 @@ public:
     }
 
     auto getRecordsAsMatrix(int64_t gx0, int64_t gx1, int64_t gy0, int64_t gy1){
-        int64_t[] origRegionIndices = {gx0, gx1, gy0, gy1};
-        vector<contactRecord> records = getRecords(origRegionIndices);
+        int64_t origRegionIndices[] = {gx0, gx1, gy0, gy1};
+        vector<contactRecord> records = getRecords(gx0, gx1, gy0, gy1);
         if (records.empty()){
             auto res = vector<vector<float>>(1, vector<float>(1, 0));
             return py::array(py::cast(res));
@@ -1021,7 +1021,8 @@ public:
         return expectedValues;
     }
 
-    vector<contactRecord> getRecords(const int64_t origRegionIndices[4]) {
+    vector<contactRecord> getRecords(int64_t gx0, int64_t gx1, int64_t gy0, int64_t gy1) {
+        int64_t origRegionIndices[] = {gx0, gx1, gy0, gy1};
         if (!foundFooter) {
             vector<contactRecord> v;
             return v;
@@ -1221,7 +1222,7 @@ straw(const string& matrixType, const string& norm, const string& fileName, cons
     }
 
     MatrixZoomData *mzd = hiCFile->getMatrixZoomData(chr1, chr2, matrixType, norm, unit, binsize);
-    return mzd->getRecords(origRegionIndices);
+    return mzd->getRecords(origRegionIndices[0], origRegionIndices[1], origRegionIndices[2], origRegionIndices[3]);
 }
 
 
