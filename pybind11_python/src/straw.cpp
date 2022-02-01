@@ -964,11 +964,14 @@ public:
     }
 
     auto getRecordsAsMatrix(int64_t gx0, int64_t gx1, int64_t gy0, int64_t gy1){
+        cout << "It reached this line at the beginning" << endl;
         int64_t origRegionIndices[] = {gx0, gx1, gy0, gy1};
         vector<contactRecord> records = getRecords(gx0, gx1, gy0, gy1);
         if (records.empty()){
+            cerr << "empty matrix" << endl;
             auto res = vector<vector<float>>(1, vector<float>(1, 0));
-            return py::array(py::cast(res));
+            //return py::array(py::cast(res));
+            return res;
         }
         int64_t regionIndices[4];
         convertGenomeToBinPos(origRegionIndices, regionIndices, resolution);
@@ -990,9 +993,13 @@ public:
                 r = cr.binY - originR;
                 c = cr.binX - originC;
                 fillInMatrixIfInRange(matrix, r, c, numRows, numCols, cr.counts);
+                cout << r << " " << c << " " << matrix[r][c] << endl;
             }
         }
-        return py::array(py::cast(matrix));
+        cout << "It reached this line" << endl;
+
+        //return py::array(py::cast(matrix));
+        return matrix;
     }
 
     set<int32_t> getBlockNumbers(int64_t *regionIndices) const {
