@@ -307,6 +307,7 @@ void readThroughExpectedVector(int32_t version, istream &fin, vector<double> &ex
         }
     }
 }
+
 void readThroughNormalizationFactors(istream &fin, int32_t version, bool store, vector<double> &expectedValues,
                                      int32_t c1) {
     int32_t nNormalizationFactors = readInt32FromFile(fin);
@@ -965,11 +966,9 @@ public:
 
     set<int32_t> getBlockNumbers(int64_t *regionIndices) const {
         if (version > 8 && isIntra) {
-            return getBlockNumbersForRegionFromBinPositionV9Intra(regionIndices, blockBinCount,
-                                                                  blockColumnCount);
+            return getBlockNumbersForRegionFromBinPositionV9Intra(regionIndices, blockBinCount, blockColumnCount);
         } else {
-            return getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount,
-                                                           isIntra);
+            return getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount, isIntra);
         }
     }
 
@@ -990,11 +989,11 @@ public:
     }
 
     vector<contactRecord> getRecords(int64_t gx0, int64_t gx1, int64_t gy0, int64_t gy1) {
-        int64_t origRegionIndices[] = {gx0, gx1, gy0, gy1};
         if (!foundFooter) {
             vector<contactRecord> v;
             return v;
         }
+        int64_t origRegionIndices[] = {gx0, gx1, gy0, gy1};
         int64_t regionIndices[4];
         convertGenomeToBinPos(origRegionIndices, regionIndices, resolution);
 
@@ -1050,14 +1049,15 @@ public:
 
     vector<vector<float>> getRecordsAsMatrix(int64_t gx0, int64_t gx1, int64_t gy0, int64_t gy1){
         cout << "It reached this line at the beginning" << endl;
-        int64_t origRegionIndices[] = {gx0, gx1, gy0, gy1};
-        vector<contactRecord> records = getRecords(gx0, gx1, gy0, gy1);
+        vector<contactRecord> records = this->getRecords(gx0, gx1, gy0, gy1);
         if (records.empty()){
             cerr << "empty matrix" << endl;
             auto res = vector<vector<float>>(1, vector<float>(1, 0));
             //return py::array(py::cast(res));
             return res;
         }
+
+        int64_t origRegionIndices[] = {gx0, gx1, gy0, gy1};
         int64_t regionIndices[4];
         convertGenomeToBinPos(origRegionIndices, regionIndices, resolution);
 
@@ -1071,18 +1071,15 @@ public:
 
         for(contactRecord cr : records) {
             if (isnan(cr.counts) || isinf(cr.counts)) continue;
-            int32_t r = cr.binX - originR;
-            int32_t c = cr.binY - originC;
+            int32_t r = cr.binX/resolution - originR;
+            int32_t c = cr.binY/resolution - originC;
             fillInMatrixIfInRange(matrix, r, c, numRows, numCols, cr.counts);
             if (isIntra) {
-                r = cr.binY - originR;
-                c = cr.binX - originC;
+                r = cr.binY/resolution - originR;
+                c = cr.binX/resolution - originC;
                 fillInMatrixIfInRange(matrix, r, c, numRows, numCols, cr.counts);
-                cout << r << " " << c << " " << matrix[r][c] << endl;
             }
         }
-        cout << "It reached this line" << endl;
-
         //return py::array(py::cast(matrix));
         return matrix;
     }
