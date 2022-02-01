@@ -1,7 +1,7 @@
 /*
   The MIT License (MIT)
 
-  Copyright (c) 2011-2016 Broad Institute, Aiden Lab
+  Copyright (c) 2017-2021 Aiden Lab, Rice University, Baylor College of Medicine
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -998,42 +998,11 @@ public:
         }
     }
 
-    vector<vector<float>> getRecordsAsMatrix(int64_t origRegionIndices[4]){
-        vector<contactRecord> records = getRecords(origRegionIndices);
-        if (records.empty()) return vector<vector<float>>(1, vector<float>(1, 0));
-
-        int64_t regionIndices[4];
-        convertGenomeToBinPos(origRegionIndices, regionIndices, resolution);
-
-        int64_t originR = regionIndices[0];
-        int64_t endR = regionIndices[1];
-        int64_t originC = regionIndices[2];
-        int64_t endC = regionIndices[3];
-        int32_t numRows = endR - originR;
-        int32_t numCols = endC - originC;
-        vector<vector<float>> matrix = vector<vector<float>>(numRows, vector<float>(numCols, 0));
-
-        for(contactRecord cr : records) {
-            if (isnan(cr.counts) || isinf(cr.counts)) continue;
-            int32_t r = cr.binX - originR;
-            int32_t c = cr.binY - originC;
-            fillInMatrixIfInRange(matrix, r, c, numRows, numCols, cr.counts);
-            if (isIntra) {
-                r = cr.binY - originR;
-                c = cr.binX - originC;
-                fillInMatrixIfInRange(matrix, r, c, numRows, numCols, cr.counts);
-            }
-        }
-        return matrix;
-    }
-
     set<int32_t> getBlockNumbers(int64_t *regionIndices) const {
         if (version > 8 && isIntra) {
-            return getBlockNumbersForRegionFromBinPositionV9Intra(regionIndices, blockBinCount,
-                                                                          blockColumnCount);
+            return getBlockNumbersForRegionFromBinPositionV9Intra(regionIndices, blockBinCount, blockColumnCount);
         } else {
-            return getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount,
-                                                                   isIntra);
+            return getBlockNumbersForRegionFromBinPosition(regionIndices, blockBinCount, blockColumnCount, isIntra);
         }
     }
 
@@ -1053,11 +1022,12 @@ public:
         return expectedValues;
     }
 
-    vector<contactRecord> getRecords(const int64_t origRegionIndices[4]) {
+    vector<contactRecord> getRecords(int64_t gx0, int64_t gx1, int64_t gy0, int64_t gy1) {
         if (!foundFooter) {
             vector<contactRecord> v;
             return v;
         }
+        int64_t origRegionIndices[] = {gx0, gx1, gy0, gy1};
         int64_t regionIndices[4];
         convertGenomeToBinPos(origRegionIndices, regionIndices, resolution);
 
@@ -1109,6 +1079,43 @@ public:
             }
         }
         return records;
+    }
+
+    vector<vector<float>> getRecordsAsMatrix(int64_t gx0, int64_t gx1, int64_t gy0, int64_t gy1){
+        cout << "It reached this line at the beginning" << endl;
+        vector<contactRecord> records = this->getRecords(gx0, gx1, gy0, gy1);
+        if (records.empty()){
+            cerr << "empty matrix" << endl;
+            auto res = vector<vector<float>>(1, vector<float>(1, 0));
+            //return py::array(py::cast(res));
+            return res;
+        }
+
+        int64_t origRegionIndices[] = {gx0, gx1, gy0, gy1};
+        int64_t regionIndices[4];
+        convertGenomeToBinPos(origRegionIndices, regionIndices, resolution);
+
+        int64_t originR = regionIndices[0];
+        int64_t endR = regionIndices[1];
+        int64_t originC = regionIndices[2];
+        int64_t endC = regionIndices[3];
+        int32_t numRows = endR - originR;
+        int32_t numCols = endC - originC;
+        vector<vector<float>> matrix = vector<vector<float>>(numRows, vector<float>(numCols, 0));
+
+        for(contactRecord cr : records) {
+            if (isnan(cr.counts) || isinf(cr.counts)) continue;
+            int32_t r = cr.binX/resolution - originR;
+            int32_t c = cr.binY/resolution - originC;
+            fillInMatrixIfInRange(matrix, r, c, numRows, numCols, cr.counts);
+            if (isIntra) {
+                r = cr.binY/resolution - originR;
+                c = cr.binX/resolution - originC;
+                fillInMatrixIfInRange(matrix, r, c, numRows, numCols, cr.counts);
+            }
+        }
+        //return py::array(py::cast(matrix));
+        return matrix;
     }
 };
 
@@ -1253,5 +1260,5 @@ straw(const string& matrixType, const string& norm, const string& fileName, cons
     }
 
     MatrixZoomData *mzd = hiCFile->getMatrixZoomData(chr1, chr2, matrixType, norm, unit, binsize);
-    return mzd->getRecords(origRegionIndices);
+    return mzd->getRecords(origRegionIndices[0], origRegionIndices[1], origRegionIndices[2], origRegionIndices[3]);
 }
