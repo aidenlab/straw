@@ -294,7 +294,6 @@ void populateVectorWithDoubles(istream &fin, vector<double> &vector, int64_t nVa
 void readThroughExpectedVector(int32_t version, istream &fin, vector<double> &expectedValues, int64_t nValues,
                                bool store, int32_t resolution) {
     if (store) {
-        vector<double> expectedValues;
         if (version > 8) {
             populateVectorWithFloats(fin, expectedValues, nValues);
         } else {
@@ -964,7 +963,8 @@ public:
         }
     }
 
-    auto getRecordsAsMatrix(int64_t origRegionIndices[4]){
+    auto getRecordsAsMatrix(int64_t gx0, int64_t gx1, int64_t gy0, int64_t gy1){
+        int64_t[] origRegionIndices = {gx0, gx1, gy0, gy1};
         vector<contactRecord> records = getRecords(origRegionIndices);
         if (records.empty()){
             auto res = vector<vector<float>>(1, vector<float>(1, 0));
