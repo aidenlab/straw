@@ -32,6 +32,7 @@
 #include <vector>
 #include <streambuf>
 #include <curl/curl.h>
+#include <algorithm>
 #include "zlib.h"
 #include "straw.h"
 using namespace std;
