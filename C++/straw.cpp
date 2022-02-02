@@ -991,13 +991,6 @@ public:
         return 0 <= r && r < numRows && 0 <= c && c < numCols;
     }
 
-    void fillInMatrixIfInRange(vector<vector<float>> matrix, int32_t r, int32_t c, int32_t numRows, int32_t numCols,
-                               float counts) {
-        if (isInRange(r, c, numRows, numCols)) {
-            matrix[r][c] = counts;
-        }
-    }
-
     set<int32_t> getBlockNumbers(int64_t *regionIndices) const {
         if (version > 8 && isIntra) {
             return getBlockNumbersForRegionFromBinPositionV9Intra(regionIndices, blockBinCount, blockColumnCount);
@@ -1082,12 +1075,9 @@ public:
     }
 
     vector<vector<float>> getRecordsAsMatrix(int64_t gx0, int64_t gx1, int64_t gy0, int64_t gy1){
-        cout << "It reached this line at the beginning" << endl;
         vector<contactRecord> records = this->getRecords(gx0, gx1, gy0, gy1);
         if (records.empty()){
-            cerr << "empty matrix" << endl;
             auto res = vector<vector<float>>(1, vector<float>(1, 0));
-            //return py::array(py::cast(res));
             return res;
         }
 
@@ -1099,23 +1089,35 @@ public:
         int64_t endR = regionIndices[1];
         int64_t originC = regionIndices[2];
         int64_t endC = regionIndices[3];
-        int32_t numRows = endR - originR;
-        int32_t numCols = endC - originC;
-        vector<vector<float>> matrix = vector<vector<float>>(numRows, vector<float>(numCols, 0));
+        int32_t numRows = endR - originR + 1;
+        int32_t numCols = endC - originC + 1;
+        float matrix[numRows][numCols];
 
         for(contactRecord cr : records) {
             if (isnan(cr.counts) || isinf(cr.counts)) continue;
             int32_t r = cr.binX/resolution - originR;
             int32_t c = cr.binY/resolution - originC;
-            fillInMatrixIfInRange(matrix, r, c, numRows, numCols, cr.counts);
+            if (isInRange(r, c, numRows, numCols)) {
+                matrix[r][c] = cr.counts;
+            }
             if (isIntra) {
                 r = cr.binY/resolution - originR;
                 c = cr.binX/resolution - originC;
-                fillInMatrixIfInRange(matrix, r, c, numRows, numCols, cr.counts);
+                if (isInRange(r, c, numRows, numCols)) {
+                    matrix[r][c] = cr.counts;
+                }
             }
         }
-        //return py::array(py::cast(matrix));
-        return matrix;
+
+        vector<vector<float>> finalMatrix;
+        for(int32_t i = 0; i < numRows; i++){
+            vector<float> row;
+            for(int32_t j = 0; j < numCols; j++){
+                row.push_back(matrix[i][j]);
+            }
+            finalMatrix.push_back(row);
+        }
+        return finalMatrix;
     }
 };
 
