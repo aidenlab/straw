@@ -50,8 +50,7 @@ using namespace std;
  */
 
 // callback for libcurl. data written to this buffer
-static size_t
-WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
+static size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
     size_t realsize = size * nmemb;
     struct MemoryStruct *mem;
     mem = (struct MemoryStruct *) userp;
@@ -204,9 +203,9 @@ char *readCompressedBytesFromFile(const string &fileName, indexEntry idx) {
 }
 
 // reads the header, storing the positions of the normalization vectors and returning the masterIndexPosition pointer
-map<string, chromosome>
-readHeader(istream &fin, int64_t &masterIndexPosition, string &genomeID, int32_t &numChromosomes,
-           int32_t &version, int64_t &nviPosition, int64_t &nviLength) {
+map<string, chromosome> readHeader(istream &fin, int64_t &masterIndexPosition, string &genomeID,
+                                   int32_t &numChromosomes, int32_t &version, int64_t &nviPosition,
+                                   int64_t &nviLength) {
     map<string, chromosome> chromosomeMap;
     if (!readMagicString(fin)) {
         cerr << "Hi-C magic string is missing, does not appear to be a hic file" << endl;
@@ -378,8 +377,7 @@ void readThroughNormalizationFactors(istream &fin, int32_t version, bool store, 
 // position of the matrix and the normalization vectors for those chromosomes
 // at the given normalization and resolution
 bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32_t c2, const string &matrixType,
-                const string &norm,
-                const string &unit, int32_t resolution, int64_t &myFilePos,
+                const string &norm, const string &unit, int32_t resolution, int64_t &myFilePos,
                 indexEntry &c1NormEntry, indexEntry &c2NormEntry, vector<double> &expectedValues) {
 
     if (version > 8) {
@@ -514,9 +512,8 @@ indexEntry readIndexEntry(istream &fin) {
     return entry;
 }
 
-void
-setValuesForMZD(istream &fin, const string &myunit, float &mySumCounts, int32_t &mybinsize, int32_t &myBlockBinCount,
-                int32_t &myBlockColumnCount, bool &found) {
+void setValuesForMZD(istream &fin, const string &myunit, float &mySumCounts, int32_t &mybinsize,
+                     int32_t &myBlockBinCount, int32_t &myBlockColumnCount, bool &found) {
     string unit;
     getline(fin, unit, '\0'); // unit
     readInt32FromFile(fin); // Old "zoom" index -- not used
@@ -560,11 +557,9 @@ map<int32_t, indexEntry> readMatrixZoomData(istream &fin, const string &myunit, 
 }
 
 // reads the raw binned contact matrix at specified resolution, setting the block bin count and block column count
-map<int32_t, indexEntry>
-readMatrixZoomDataHttp(CURL *curl, int64_t &myFilePosition, const string &myunit, int32_t mybinsize,
-                       float &mySumCounts, int32_t &myBlockBinCount, int32_t &myBlockColumnCount,
-                       bool &found) {
-
+map<int32_t, indexEntry> readMatrixZoomDataHttp(CURL *curl, int64_t &myFilePosition, const string &myunit,
+                                                int32_t mybinsize, float &mySumCounts, int32_t &myBlockBinCount,
+                                                int32_t &myBlockColumnCount, bool &found) {
     map<int32_t, indexEntry> blockMap;
     int32_t header_size = 5 * sizeof(int32_t) + 4 * sizeof(float);
     char *first = getData(curl, myFilePosition, 1);
@@ -650,9 +645,8 @@ map<int32_t, indexEntry> readMatrix(istream &fin, int64_t myFilePosition, const 
 
 // gets the blocks that need to be read for this slice of the data.  needs blockbincount, blockcolumncount, and whether
 // or not this is intrachromosomal.
-set<int32_t>
-getBlockNumbersForRegionFromBinPosition(const int64_t *regionIndices, int32_t blockBinCount, int32_t blockColumnCount,
-                                        bool intra) {
+set<int32_t> getBlockNumbersForRegionFromBinPosition(const int64_t *regionIndices, int32_t blockBinCount,
+                                                     int32_t blockColumnCount, bool intra) {
     int32_t col1, col2, row1, row2;
     col1 = static_cast<int32_t>(regionIndices[0] / blockBinCount);
     col2 = static_cast<int32_t>((regionIndices[1] + 1) / blockBinCount);
@@ -1224,9 +1218,8 @@ public:
         return chromosomes;
     }
 
-    MatrixZoomData *
-    getMatrixZoomData(const string &chr1, const string &chr2, const string &matrixType, const string &norm,
-                      const string &unit, int32_t resolution) {
+    MatrixZoomData * getMatrixZoomData(const string &chr1, const string &chr2, const string &matrixType,
+                                       const string &norm, const string &unit, int32_t resolution) {
         chromosome chrom1 = chromosomeMap[chr1];
         chromosome chrom2 = chromosomeMap[chr2];
         return new MatrixZoomData(chrom1, chrom2, (matrixType), (norm), (unit),
@@ -1254,8 +1247,7 @@ void parsePositions(const string &chrLoc, string &chrom, int64_t &pos1, int64_t 
     }
 }
 
-vector<contactRecord>
-straw(const string &matrixType, const string &norm, const string &fileName, const string &chr1loc,
+vector<contactRecord> straw(const string &matrixType, const string &norm, const string &fileName, const string &chr1loc,
       const string &chr2loc, const string &unit, int32_t binsize) {
     if (!(unit == "BP" || unit == "FRAG")) {
         cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl;
