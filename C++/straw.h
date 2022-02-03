@@ -101,4 +101,6 @@ std::vector<contactRecord>
 straw(const std::string& matrixType, const std::string& norm, const std::string& fname, const std::string& chr1loc, const std::string& chr2loc,
       const std::string &unit, int32_t binsize);
 
+int64_t getNumRecordsForFile(const std::string& filename, int32_t binsize);
+
 #endif
