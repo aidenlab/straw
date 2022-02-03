@@ -711,17 +711,7 @@ void appendRecord(vector<contactRecord> &vector, int32_t index, int32_t binX, in
     vector[index] = record;
 }
 
-// this is the meat of reading the data.  takes in the block number and returns the set of contact records corresponding to
-// that block.  the block data is compressed and must be decompressed using the zlib library functions
-vector<contactRecord> readBlock(const string &fileName, indexEntry idx, int32_t version) {
-    if (idx.size <= 0) {
-        vector<contactRecord> v;
-        return v;
-    }
-    char *compressedBytes = readCompressedBytesFromFile(fileName, idx);
-    char *uncompressedBytes = new char[idx.size * 10]; //biggest seen so far is 3
-    // Decompress the block
-    // zlib struct
+int32_t decompressBlock(indexEntry idx, char *compressedBytes, char *uncompressedBytes) {
     z_stream infstream;
     infstream.zalloc = Z_NULL;
     infstream.zfree = Z_NULL;
@@ -734,8 +724,37 @@ vector<contactRecord> readBlock(const string &fileName, indexEntry idx, int32_t 
     inflateInit(&infstream);
     inflate(&infstream, Z_NO_FLUSH);
     inflateEnd(&infstream);
-    int32_t uncompressedSize;
-    uncompressedSize = static_cast<int32_t>(infstream.total_out);
+    int32_t uncompressedSize = static_cast<int32_t>(infstream.total_out);
+    return uncompressedSize;
+}
+
+long getNumRecordsInBlock(const string &fileName, indexEntry idx, int32_t version){
+    if (idx.size <= 0) {
+        return 0;
+    }
+    char *compressedBytes = readCompressedBytesFromFile(fileName, idx);
+    char *uncompressedBytes = new char[idx.size * 10]; //biggest seen so far is 3
+    int32_t uncompressedSize = decompressBlock(idx, compressedBytes, uncompressedBytes);
+
+    // create stream from buffer for ease of use
+    memstream bufferin(uncompressedBytes, uncompressedSize);
+    uint64_t nRecords;
+    nRecords = static_cast<uint64_t>(readInt32FromFile(bufferin));
+    delete[] compressedBytes;
+    delete[] uncompressedBytes; // don't forget to delete your heap arrays in C++!
+    return nRecords;
+}
+
+// this is the meat of reading the data.  takes in the block number and returns the set of contact records corresponding to
+// that block.  the block data is compressed and must be decompressed using the zlib library functions
+vector<contactRecord> readBlock(const string &fileName, indexEntry idx, int32_t version) {
+    if (idx.size <= 0) {
+        vector<contactRecord> v;
+        return v;
+    }
+    char *compressedBytes = readCompressedBytesFromFile(fileName, idx);
+    char *uncompressedBytes = new char[idx.size * 10]; //biggest seen so far is 3
+    int32_t uncompressedSize = decompressBlock(idx, compressedBytes, uncompressedBytes);
 
     // create stream from buffer for ease of use
     memstream bufferin(uncompressedBytes, uncompressedSize);
@@ -1128,6 +1147,19 @@ public:
         }
         return finalMatrix;
     }
+
+    int64_t getNumberOfTotalRecords() {
+        if (!foundFooter) {
+            return 0;
+        }
+        int64_t regionIndices[4] = {0, numBins1, 0, numBins2};
+        set<int32_t> blockNumbers = getBlockNumbers(regionIndices);
+        int64_t total = 0;
+        for (int32_t blockNumber : blockNumbers) {
+            total += getNumRecordsInBlock(fileName, blockMap[blockNumber], version);
+        }
+        return total;
+    }
 };
 
 class HiCFile {
@@ -1270,4 +1302,26 @@ vector<contactRecord> straw(const string &matrixType, const string &norm, const 
 
     MatrixZoomData *mzd = hiCFile->getMatrixZoomData(chr1, chr2, matrixType, norm, unit, binsize);
     return mzd->getRecords(origRegionIndices[0], origRegionIndices[1], origRegionIndices[2], origRegionIndices[3]);
+}
+
+int64_t getNumRecordsForFile(const string &fileName, int32_t binsize) {
+    HiCFile *hiCFile = new HiCFile(fileName);
+    int64_t totalNumRecords = 0;
+
+    vector<chromosome> chromosomes = hiCFile->getChromosomes();
+    for(int32_t i = 0; i < chromosomes.size(); i++){
+        if(chromosomes[i].index <= 0) continue;
+        for(int32_t j = i; j < chromosomes.size(); j++){
+            if(chromosomes[j].index <= 0) continue;
+            MatrixZoomData *mzd;
+            if(chromosomes[i].index > chromosomes[j].index){
+                mzd = hiCFile->getMatrixZoomData(chromosomes[j].name, chromosomes[i].name, "observed", "NONE", "BP", binsize);
+            } else {
+                mzd = hiCFile->getMatrixZoomData(chromosomes[i].name, chromosomes[j].name, "observed", "NONE", "BP", binsize);
+            }
+            totalNumRecords += mzd->getNumberOfTotalRecords();
+        }
+    }
+
+    return totalNumRecords;
 }
