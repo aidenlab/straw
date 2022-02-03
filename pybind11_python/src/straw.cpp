@@ -54,8 +54,7 @@ namespace py = pybind11;
  */
 
 // callback for libcurl. data written to this buffer
-static size_t
-WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
+static size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
     size_t realsize = size * nmemb;
     struct MemoryStruct *mem;
     mem = (struct MemoryStruct *) userp;
@@ -382,8 +381,7 @@ void readThroughNormalizationFactors(istream &fin, int32_t version, bool store, 
 // position of the matrix and the normalization vectors for those chromosomes
 // at the given normalization and resolution
 bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32_t c2, const string &matrixType,
-                const string &norm,
-                const string &unit, int32_t resolution, int64_t &myFilePos,
+                const string &norm, const string &unit, int32_t resolution, int64_t &myFilePos,
                 indexEntry &c1NormEntry, indexEntry &c2NormEntry, vector<double> &expectedValues) {
 
     if (version > 8) {
@@ -566,7 +564,6 @@ map<int32_t, indexEntry> readMatrixZoomData(istream &fin, const string &myunit, 
 map<int32_t, indexEntry> readMatrixZoomDataHttp(CURL *curl, int64_t &myFilePosition, const string &myunit,
                                                 int32_t mybinsize, float &mySumCounts, int32_t &myBlockBinCount,
                                                 int32_t &myBlockColumnCount, bool &found) {
-
     map<int32_t, indexEntry> blockMap;
     int32_t header_size = 5 * sizeof(int32_t) + 4 * sizeof(float);
     char *first = getData(curl, myFilePosition, 1);
@@ -592,7 +589,8 @@ map<int32_t, indexEntry> readMatrixZoomDataHttp(CURL *curl, int64_t &myFilePosit
         populateBlockMap(fin2, nBlocks, blockMap);
         delete buffer;
     } else {
-        myFilePosition = myFilePosition + header_size + (nBlocks * (sizeof(int32_t) + sizeof(int64_t) + sizeof(int32_t)));
+        myFilePosition = myFilePosition + header_size
+                + (nBlocks * (sizeof(int32_t) + sizeof(int64_t) + sizeof(int32_t)));
     }
     return blockMap;
 }
@@ -1223,9 +1221,8 @@ public:
         return chromosomes;
     }
 
-    MatrixZoomData *
-    getMatrixZoomData(const string &chr1, const string &chr2, const string &matrixType, const string &norm,
-                      const string &unit, int32_t resolution) {
+    MatrixZoomData * getMatrixZoomData(const string &chr1, const string &chr2, const string &matrixType,
+                                       const string &norm, const string &unit, int32_t resolution) {
         chromosome chrom1 = chromosomeMap[chr1];
         chromosome chrom2 = chromosomeMap[chr2];
         return new MatrixZoomData(chrom1, chrom2, (matrixType), (norm), (unit),
@@ -1253,9 +1250,8 @@ void parsePositions(const string &chrLoc, string &chrom, int64_t &pos1, int64_t 
     }
 }
 
-vector<contactRecord>
-straw(const string &matrixType, const string &norm, const string &fileName, const string &chr1loc,
-      const string &chr2loc, const string &unit, int32_t binsize) {
+vector<contactRecord> straw(const string &matrixType, const string &norm, const string &fileName, const string &chr1loc,
+                            const string &chr2loc, const string &unit, int32_t binsize) {
     if (!(unit == "BP" || unit == "FRAG")) {
         cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl;
         cerr << "Usage: straw [observed/oe/expected] <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>"
@@ -1278,9 +1274,6 @@ straw(const string &matrixType, const string &norm, const string &fileName, cons
     MatrixZoomData *mzd = hiCFile->getMatrixZoomData(chr1, chr2, matrixType, norm, unit, binsize);
     return mzd->getRecords(origRegionIndices[0], origRegionIndices[1], origRegionIndices[2], origRegionIndices[3]);
 }
-
-
-//namespace py = pybind11;
 
 PYBIND11_MODULE(strawC, m) {
 m.doc() = "Fast hybrid tool for reading .hic files; see https://github.com/aidenlab/straw for documentation";
