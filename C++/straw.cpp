@@ -711,14 +711,7 @@ void appendRecord(vector<contactRecord> &vector, int32_t index, int32_t binX, in
     vector[index] = record;
 }
 
-long getNumRecordsInBlock(const string &fileName, indexEntry idx, int32_t version){
-    if (idx.size <= 0) {
-        return 0;
-    }
-    char *compressedBytes = readCompressedBytesFromFile(fileName, idx);
-    char *uncompressedBytes = new char[idx.size * 10]; //biggest seen so far is 3
-    // Decompress the block
-    // zlib struct
+int32_t decompressBlock(indexEntry idx, char *compressedBytes, char *uncompressedBytes) {
     z_stream infstream;
     infstream.zalloc = Z_NULL;
     infstream.zfree = Z_NULL;
@@ -731,8 +724,17 @@ long getNumRecordsInBlock(const string &fileName, indexEntry idx, int32_t versio
     inflateInit(&infstream);
     inflate(&infstream, Z_NO_FLUSH);
     inflateEnd(&infstream);
-    int32_t uncompressedSize;
-    uncompressedSize = static_cast<int32_t>(infstream.total_out);
+    int32_t uncompressedSize = static_cast<int32_t>(infstream.total_out);
+    return uncompressedSize;
+}
+
+long getNumRecordsInBlock(const string &fileName, indexEntry idx, int32_t version){
+    if (idx.size <= 0) {
+        return 0;
+    }
+    char *compressedBytes = readCompressedBytesFromFile(fileName, idx);
+    char *uncompressedBytes = new char[idx.size * 10]; //biggest seen so far is 3
+    int32_t uncompressedSize = decompressBlock(idx, compressedBytes, uncompressedBytes);
 
     // create stream from buffer for ease of use
     memstream bufferin(uncompressedBytes, uncompressedSize);
@@ -752,22 +754,7 @@ vector<contactRecord> readBlock(const string &fileName, indexEntry idx, int32_t 
     }
     char *compressedBytes = readCompressedBytesFromFile(fileName, idx);
     char *uncompressedBytes = new char[idx.size * 10]; //biggest seen so far is 3
-    // Decompress the block
-    // zlib struct
-    z_stream infstream;
-    infstream.zalloc = Z_NULL;
-    infstream.zfree = Z_NULL;
-    infstream.opaque = Z_NULL;
-    infstream.avail_in = static_cast<uInt>(idx.size); // size of input
-    infstream.next_in = (Bytef *) compressedBytes; // input char array
-    infstream.avail_out = static_cast<uInt>(idx.size * 10); // size of output
-    infstream.next_out = (Bytef *) uncompressedBytes; // output char array
-    // the actual decompression work.
-    inflateInit(&infstream);
-    inflate(&infstream, Z_NO_FLUSH);
-    inflateEnd(&infstream);
-    int32_t uncompressedSize;
-    uncompressedSize = static_cast<int32_t>(infstream.total_out);
+    int32_t uncompressedSize = decompressBlock(idx, compressedBytes, uncompressedBytes);
 
     // create stream from buffer for ease of use
     memstream bufferin(uncompressedBytes, uncompressedSize);
