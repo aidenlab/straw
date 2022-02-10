@@ -52,13 +52,4 @@ int main(int argc, char *argv[])
     for (int i = 0; i < length; i++) {
         printf("%d\t%d\t%.14g\n", records[i].binX, records[i].binY, records[i].counts);
     }
-
-    /*
-    cout << getNumRecordsForFile(fname, 100000) << endl;
-    cout << getNumRecordsForFile(fname, 50000) << endl;
-    cout << getNumRecordsForFile(fname, 25000) << endl;
-    cout << getNumRecordsForFile(fname, 10000) << endl;
-    cout << getNumRecordsForFile(fname, 5000) << endl;
-     */
-
 }
