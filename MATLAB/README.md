@@ -12,12 +12,12 @@ and normalization vector, and stores as [x, y, count]
 
 `Usage: straw <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>`
 
-See https://github.com/theaidenlab/straw/wiki/Python for more documentation
+See https://github.com/aidenlab/straw/ for more documentation
 
 # Install the Python Module
-Straw uses the [requests library](http://docs.python-requests.org/en/master/user/install/#install) for support of URLs.  Be sure it is installed.
 
-# Select MATLAB's Python Enviorment and Load Straw
+
+# Select MATLAB's Python Environment and Load Straw
 
    ```matlab 
    pyversion /Users/aidenlab/anaconda3/bin/python

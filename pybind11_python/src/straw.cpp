@@ -1275,10 +1275,11 @@ vector<contactRecord> straw(const string &matrixType, const string &norm, const 
     return mzd->getRecords(origRegionIndices[0], origRegionIndices[1], origRegionIndices[2], origRegionIndices[3]);
 }
 
-PYBIND11_MODULE(strawC, m) {
+PYBIND11_MODULE(hicstraw, m) {
 m.doc() = "Fast hybrid tool for reading .hic files; see https://github.com/aidenlab/straw for documentation";
 
 m.def("strawC", &straw, "get contact records");
+m.def("straw", &straw, "get contact records");
 
 py::class_<contactRecord>(m, "contactRecord")
 .def(py::init<>())
