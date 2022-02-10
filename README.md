@@ -31,6 +31,7 @@ For questions, please use
 [the Google Group](https://groups.google.com/forum/#!forum/3d-genomics).
 
 Ongoing development work is carried out by <a href="http://mshamim.com">Muhammad S. Shamim</a>.
+Past contributors include <a href="http://www.cherniavsky.net/neva/">Neva C. Durand</a> and many others.
 
 If you use this tool in your work, please cite 
 
