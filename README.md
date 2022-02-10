@@ -18,7 +18,7 @@ Use `pip install hic-straw`.
 If you want to build from the source code, you must have pybind11 installed. 
 Clone the library and `cd` into the `straw/` directory. Then `pip install ./pybind11_python`.
 
-## Compile C++ code for python
+## Compile straw for C++
 
 ```bash
 g++ -std=c++0x -o straw main.cpp straw.cpp -lcurl -lz
