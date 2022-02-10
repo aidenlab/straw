@@ -100,7 +100,7 @@ class BuildExt(build_ext):
 setup(
     name='hicstraw',
     version=__version__,
-    author='Neva C. Durand',
+    author='Neva C. Durand, Muhammad S Shamim',
     author_email='neva@broadinstitute.org',
     url='https://github.com/aidenlab/straw',
     description='Straw bound with pybind11',
