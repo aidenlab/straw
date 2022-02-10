@@ -113,6 +113,7 @@ setup(
     url='https://github.com/aidenlab/straw',
     description='Straw bound with pybind11',
     long_description=read('README.md'),
+    long_description_content_type='text/markdown',
     ext_modules=ext_modules,
     install_requires=['pybind11>=2.4'],
     setup_requires=['pybind11>=2.4'],
