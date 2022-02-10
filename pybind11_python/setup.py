@@ -2,11 +2,16 @@ from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 import sys
 import setuptools
+import os
 
 __version__ = '1.1.0'
 
 
-class get_pybind_include(object):
+def read(fname):
+    return open(os.path.join(os.path.dirname(__file__), fname)).read()
+
+
+class GetPybindInclude(object):
     """Helper class to determine the pybind11 include path
 
     The purpose of this class is to postpone importing pybind11
@@ -27,8 +32,8 @@ ext_modules = [
         ['src/straw.cpp'],
         include_dirs=[
             # Path to pybind11 headers
-            get_pybind_include(),
-            get_pybind_include(user=True)
+            GetPybindInclude(),
+            GetPybindInclude(user=True)
         ],
         language='c++'
     ),
@@ -97,14 +102,17 @@ class BuildExt(build_ext):
             ext.extra_link_args = link_opts
         build_ext.build_extensions(self)
 
+
 setup(
     name='hicstraw',
     version=__version__,
     author='Neva C. Durand, Muhammad S Shamim',
     author_email='neva@broadinstitute.org',
+    license='MIT',
+    keywords=['Hi-C', '3D Genomics', 'Chromatin', 'ML'],
     url='https://github.com/aidenlab/straw',
     description='Straw bound with pybind11',
-    long_description='',
+    long_description=read('README.md'),
     ext_modules=ext_modules,
     install_requires=['pybind11>=2.4'],
     setup_requires=['pybind11>=2.4'],
@@ -112,4 +120,3 @@ setup(
     cmdclass={'build_ext': BuildExt},
     zip_safe=False,
 )
-
