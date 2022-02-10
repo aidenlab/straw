@@ -5,7 +5,7 @@ To learn more about Hi-C data and 3D genomics, visit https://aidenlab.gitbook.io
 
 Once you've installed the library with `pip install hic-straw`, you can import your code with `import hicstraw`. 
 
-## Legacy usage to fetch list of contacts
+## New usage to directly get numpy matrix
 
 The new usage for straw allows you to create objects and retain intermediate variables.
 This can speed up your code significantly when querying hundreds or thousands of regions
