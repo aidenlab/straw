@@ -23,7 +23,7 @@ class get_pybind_include(object):
 
 ext_modules = [
     Extension(
-        'strawC',
+        'hicstraw',
         ['src/straw.cpp'],
         include_dirs=[
             # Path to pybind11 headers
@@ -98,7 +98,7 @@ class BuildExt(build_ext):
         build_ext.build_extensions(self)
 
 setup(
-    name='strawC',
+    name='hicstraw',
     version=__version__,
     author='Neva C. Durand',
     author_email='neva@broadinstitute.org',
