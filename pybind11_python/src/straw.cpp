@@ -1301,6 +1301,8 @@ py::class_<MatrixZoomData>(m, "MatrixZoomData")
 .def(py::init<chromosome &, chromosome &, string &, string &, string &, int32_t, int32_t &, int64_t &, int64_t &, string &>())
 .def("getRecords", &MatrixZoomData::getRecords)
 .def("getRecordsAsMatrix", &MatrixZoomData::getRecordsAsMatrix)
+.def("getNormVector", &MatrixZoomData::getNormVector)
+.def("getExpectedValues", &MatrixZoomData::getExpectedValues)
 ;
 
 
