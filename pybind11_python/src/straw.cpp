@@ -1011,20 +1011,20 @@ public:
         }
     }
 
-    vector<double> getNormVector(int32_t index) {
+    auto getNormVector(int32_t index) {
         if (index == c1) {
-            return c1Norm;
+            return py::array(py::cast(c1Norm));
         } else if (index == c2) {
-            return c2Norm;
+            return py::array(py::cast(c2Norm));
         }
         cerr << "Invalid index provided: " << index << endl;
         cerr << "Should be either " << c1 << " or " << c2 << endl;
         vector<double> v;
-        return v;
+        return py::array(py::cast(v));
     }
 
-    vector<double> getExpectedValues() {
-        return expectedValues;
+    auto getExpectedValues() {
+        return py::array(py::cast(expectedValues));
     }
 
     vector<contactRecord> getRecords(int64_t gx0, int64_t gx1, int64_t gy0, int64_t gy1) {
