@@ -104,7 +104,7 @@ class BuildExt(build_ext):
 
 
 setup(
-    name='hicstraw',
+    name='hic-straw',
     version=__version__,
     author='Neva C. Durand, Muhammad S Shamim',
     author_email='neva@broadinstitute.org',
