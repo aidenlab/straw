@@ -1123,6 +1123,12 @@ public:
         int32_t numCols = endC - originC + 1;
         float matrix[numRows][numCols];
 
+        for(int32_t r = 0; r < numRows; r++){
+            for(int32_t c = 0; c < numCols; c++){
+                matrix[r][c] = 0;
+            }
+        }
+
         for (contactRecord cr : records) {
             if (isnan(cr.counts) || isinf(cr.counts)) continue;
             int32_t r = cr.binX / resolution - originR;
