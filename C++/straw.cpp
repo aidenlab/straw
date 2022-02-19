@@ -1015,7 +1015,7 @@ public:
         return cNorm;
     }
 
-    bool isInRange(int32_t r, int32_t c, int32_t numRows, int32_t numCols) {
+    static bool isInRange(int32_t r, int32_t c, int32_t numRows, int32_t numCols) {
         return 0 <= r && r < numRows && 0 <= c && c < numCols;
     }
 
@@ -1106,10 +1106,7 @@ public:
 
     vector<vector<float>> getRecordsAsMatrix(int64_t gx0, int64_t gx1, int64_t gy0, int64_t gy1) {
         vector<contactRecord> records = this->getRecords(gx0, gx1, gy0, gy1);
-        if (records.empty()) {
-            auto res = vector<vector<float>>(1, vector<float>(1, 0));
-            return res;
-        }
+
 
         int64_t origRegionIndices[] = {gx0, gx1, gy0, gy1};
         int64_t regionIndices[4];
@@ -1129,18 +1126,20 @@ public:
             }
         }
 
-        for (contactRecord cr : records) {
-            if (isnan(cr.counts) || isinf(cr.counts)) continue;
-            int32_t r = cr.binX / resolution - originR;
-            int32_t c = cr.binY / resolution - originC;
-            if (isInRange(r, c, numRows, numCols)) {
-                matrix[r][c] = cr.counts;
-            }
-            if (isIntra) {
-                r = cr.binY / resolution - originR;
-                c = cr.binX / resolution - originC;
+        if (!records.empty()) {
+            for (contactRecord cr : records) {
+                if (isnan(cr.counts) || isinf(cr.counts)) continue;
+                int32_t r = cr.binX / resolution - originR;
+                int32_t c = cr.binY / resolution - originC;
                 if (isInRange(r, c, numRows, numCols)) {
                     matrix[r][c] = cr.counts;
+                }
+                if (isIntra) {
+                    r = cr.binY / resolution - originR;
+                    c = cr.binX / resolution - originC;
+                    if (isInRange(r, c, numRows, numCols)) {
+                        matrix[r][c] = cr.counts;
+                    }
                 }
             }
         }
@@ -1148,6 +1147,7 @@ public:
         vector<vector<float>> finalMatrix;
         for (int32_t i = 0; i < numRows; i++) {
             vector<float> row;
+            row.reserve(numCols);
             for (int32_t j = 0; j < numCols; j++) {
                 row.push_back(matrix[i][j]);
             }
