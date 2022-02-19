@@ -41,7 +41,7 @@ using namespace std;
 
 /*
   Straw: fast C++ implementation of dump. Not as fully featured as the
-  Java version. Reads the .hic file, finds the appropriate matrix and sliceVector
+  Java version. Reads the .hic file, finds the appropriate matrix and slice
   of data, and outputs as text in sparse upper triangular format.
 
   Currently only supporting matrices.
@@ -585,8 +585,8 @@ map<int32_t, indexEntry> readMatrixZoomDataHttp(CURL *curl, int64_t &myFilePosit
         populateBlockMap(fin2, nBlocks, blockMap);
         delete buffer;
     } else {
-        myFilePosition =
-                myFilePosition + header_size + (nBlocks * (sizeof(int32_t) + sizeof(int64_t) + sizeof(int32_t)));
+        myFilePosition = myFilePosition + header_size
+                         + (nBlocks * (sizeof(int32_t) + sizeof(int64_t) + sizeof(int32_t)));
     }
     return blockMap;
 }
@@ -611,8 +611,7 @@ map<int32_t, indexEntry> readMatrixHttp(CURL *curl, int64_t myFilePosition, cons
     while (i < nRes && !found) {
         // myFilePosition gets updated within call
         blockMap = readMatrixZoomDataHttp(curl, myFilePosition, unit, resolution, mySumCounts, myBlockBinCount,
-                                          myBlockColumnCount,
-                                          found);
+                                          myBlockColumnCount, found);
         i++;
     }
     if (!found) {
@@ -1006,8 +1005,8 @@ public:
         }
     }
 
-    static vector<double>
-    readNormalizationVectorFromFooter(indexEntry cNormEntry, int32_t &version, const string &fileName) {
+    static vector<double> readNormalizationVectorFromFooter(indexEntry cNormEntry, int32_t &version,
+                                                            const string &fileName) {
         char *buffer = readCompressedBytesFromFile(fileName, cNormEntry);
         memstream bufferin(buffer, cNormEntry.size);
         vector<double> cNorm = readNormalizationVector(bufferin, version);
@@ -1027,7 +1026,7 @@ public:
         }
     }
 
-    vector<double> getNormVector(int32_t index) {
+    auto getNormVector(int32_t index) {
         if (index == c1) {
             return c1Norm;
         } else if (index == c2) {
@@ -1039,7 +1038,7 @@ public:
         return v;
     }
 
-    vector<double> getExpectedValues() {
+    auto getExpectedValues() {
         return expectedValues;
     }
 
@@ -1104,9 +1103,8 @@ public:
         return records;
     }
 
-    vector<vector<float>> getRecordsAsMatrix(int64_t gx0, int64_t gx1, int64_t gy0, int64_t gy1) {
+    auto getRecordsAsMatrix(int64_t gx0, int64_t gx1, int64_t gy0, int64_t gy1) {
         vector<contactRecord> records = this->getRecords(gx0, gx1, gy0, gy1);
-
 
         int64_t origRegionIndices[] = {gx0, gx1, gy0, gy1};
         int64_t regionIndices[4];
@@ -1119,7 +1117,6 @@ public:
         int32_t numRows = endR - originR + 1;
         int32_t numCols = endC - originC + 1;
         float matrix[numRows][numCols];
-
         for(int32_t r = 0; r < numRows; r++){
             for(int32_t c = 0; c < numCols; c++){
                 matrix[r][c] = 0;
@@ -1288,11 +1285,11 @@ void parsePositions(const string &chrLoc, string &chrom, int64_t &pos1, int64_t 
 }
 
 vector<contactRecord> straw(const string &matrixType, const string &norm, const string &fileName, const string &chr1loc,
-      const string &chr2loc, const string &unit, int32_t binsize) {
+                            const string &chr2loc, const string &unit, int32_t binsize) {
     if (!(unit == "BP" || unit == "FRAG")) {
         cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl;
         cerr << "Usage: straw [observed/oe/expected] <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>"
-                << endl;
+             << endl;
         vector<contactRecord> v;
         return v;
     }

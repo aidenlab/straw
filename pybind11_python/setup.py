@@ -4,7 +4,7 @@ import sys
 import setuptools
 import os
 
-__version__ = '1.1.3'
+__version__ = '1.1.5'
 
 
 def read(fname):
