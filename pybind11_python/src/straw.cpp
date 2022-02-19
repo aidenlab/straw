@@ -1109,6 +1109,10 @@ public:
 
     auto getRecordsAsMatrix(int64_t gx0, int64_t gx1, int64_t gy0, int64_t gy1) {
         vector<contactRecord> records = this->getRecords(gx0, gx1, gy0, gy1);
+        if (records.empty()) {
+            auto res = vector<vector<float>>(1, vector<float>(1, 0));
+            return py::array(py::cast(res));
+        }
 
         int64_t origRegionIndices[] = {gx0, gx1, gy0, gy1};
         int64_t regionIndices[4];
@@ -1127,20 +1131,18 @@ public:
             }
         }
 
-        if (!records.empty()) {
-            for (contactRecord cr : records) {
-                if (isnan(cr.counts) || isinf(cr.counts)) continue;
-                int32_t r = cr.binX / resolution - originR;
-                int32_t c = cr.binY / resolution - originC;
+        for (contactRecord cr : records) {
+            if (isnan(cr.counts) || isinf(cr.counts)) continue;
+            int32_t r = cr.binX / resolution - originR;
+            int32_t c = cr.binY / resolution - originC;
+            if (isInRange(r, c, numRows, numCols)) {
+                matrix[r][c] = cr.counts;
+            }
+            if (isIntra) {
+                r = cr.binY / resolution - originR;
+                c = cr.binX / resolution - originC;
                 if (isInRange(r, c, numRows, numCols)) {
                     matrix[r][c] = cr.counts;
-                }
-                if (isIntra) {
-                    r = cr.binY / resolution - originR;
-                    c = cr.binX / resolution - originC;
-                    if (isInRange(r, c, numRows, numCols)) {
-                        matrix[r][c] = cr.counts;
-                    }
                 }
             }
         }
