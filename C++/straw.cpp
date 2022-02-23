@@ -1311,14 +1311,19 @@ vector<contactRecord> straw(const string &matrixType, const string &norm, const 
     return mzd->getRecords(origRegionIndices[0], origRegionIndices[1], origRegionIndices[2], origRegionIndices[3]);
 }
 
-int64_t getNumRecordsForFile(const string &fileName, int32_t binsize) {
+int64_t getNumRecordsForFile(const string &fileName, int32_t binsize, bool interOnly) {
     HiCFile *hiCFile = new HiCFile(fileName);
     int64_t totalNumRecords = 0;
+
+    int32_t indexOffset = 0;
+    if (interOnly){
+        indexOffset = 1;
+    }
 
     vector<chromosome> chromosomes = hiCFile->getChromosomes();
     for(int32_t i = 0; i < chromosomes.size(); i++){
         if(chromosomes[i].index <= 0) continue;
-        for(int32_t j = i; j < chromosomes.size(); j++){
+        for(int32_t j = i + indexOffset; j < chromosomes.size(); j++){
             if(chromosomes[j].index <= 0) continue;
             MatrixZoomData *mzd;
             if(chromosomes[i].index > chromosomes[j].index){
