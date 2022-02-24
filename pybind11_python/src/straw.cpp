@@ -1156,7 +1156,7 @@ public:
             }
             finalMatrix.push_back(row);
         }
-        return finalMatrix;
+        return py::array(py::cast(finalMatrix));;
     }
 
     int64_t getNumberOfTotalRecords() {
