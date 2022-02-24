@@ -590,7 +590,7 @@ map<int32_t, indexEntry> readMatrixZoomDataHttp(CURL *curl, int64_t &myFilePosit
         delete buffer;
     } else {
         myFilePosition = myFilePosition + header_size
-                + (nBlocks * (sizeof(int32_t) + sizeof(int64_t) + sizeof(int32_t)));
+                         + (nBlocks * (sizeof(int32_t) + sizeof(int64_t) + sizeof(int32_t)));
     }
     return blockMap;
 }
@@ -1303,26 +1303,31 @@ vector<contactRecord> straw(const string &matrixType, const string &norm, const 
     HiCFile *hiCFile = new HiCFile(fileName);
     string chr1, chr2;
     int64_t origRegionIndices[4] = {-100LL, -100LL, -100LL, -100LL};
-    if (hiCFile->chromosomeMap[chr1].index > hiCFile->chromosomeMap[chr2].index) {
-        parsePositions((chr1loc), chr1, origRegionIndices[2], origRegionIndices[3], hiCFile->chromosomeMap);
-        parsePositions((chr2loc), chr2, origRegionIndices[0], origRegionIndices[1], hiCFile->chromosomeMap);
-    } else {
-        parsePositions((chr1loc), chr1, origRegionIndices[0], origRegionIndices[1], hiCFile->chromosomeMap);
-        parsePositions((chr2loc), chr2, origRegionIndices[2], origRegionIndices[3], hiCFile->chromosomeMap);
-    }
+    parsePositions((chr1loc), chr1, origRegionIndices[0], origRegionIndices[1], hiCFile->chromosomeMap);
+    parsePositions((chr2loc), chr2, origRegionIndices[2], origRegionIndices[3], hiCFile->chromosomeMap);
 
-    MatrixZoomData *mzd = hiCFile->getMatrixZoomData(chr1, chr2, matrixType, norm, unit, binsize);
-    return mzd->getRecords(origRegionIndices[0], origRegionIndices[1], origRegionIndices[2], origRegionIndices[3]);
+    if (hiCFile->chromosomeMap[chr1].index > hiCFile->chromosomeMap[chr2].index) {
+        MatrixZoomData *mzd = hiCFile->getMatrixZoomData(chr2, chr1, matrixType, norm, unit, binsize);
+        return mzd->getRecords(origRegionIndices[2], origRegionIndices[3], origRegionIndices[0], origRegionIndices[1]);
+    } else {
+        MatrixZoomData *mzd = hiCFile->getMatrixZoomData(chr1, chr2, matrixType, norm, unit, binsize);
+        return mzd->getRecords(origRegionIndices[0], origRegionIndices[1], origRegionIndices[2], origRegionIndices[3]);
+    }
 }
 
-int64_t getNumRecordsForFile(const string &fileName, int32_t binsize) {
+int64_t getNumRecordsForFile(const string &fileName, int32_t binsize, bool interOnly) {
     HiCFile *hiCFile = new HiCFile(fileName);
     int64_t totalNumRecords = 0;
+
+    int32_t indexOffset = 0;
+    if (interOnly){
+        indexOffset = 1;
+    }
 
     vector<chromosome> chromosomes = hiCFile->getChromosomes();
     for(int32_t i = 0; i < chromosomes.size(); i++){
         if(chromosomes[i].index <= 0) continue;
-        for(int32_t j = i; j < chromosomes.size(); j++){
+        for(int32_t j = i + indexOffset; j < chromosomes.size(); j++){
             if(chromosomes[j].index <= 0) continue;
             MatrixZoomData *mzd;
             if(chromosomes[i].index > chromosomes[j].index){
