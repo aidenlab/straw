@@ -1248,13 +1248,21 @@ public:
     }
 
     vector<chromosome> getChromosomes() {
-        vector<chromosome> chromosomes;
+
+        chromosome chromosomes[chromosomeMap.size()];
         auto iter = chromosomeMap.begin();
         while (iter != chromosomeMap.end()) {
-            chromosomes.push_back(static_cast<chromosome>(iter->second));
+            chromosome chrom = static_cast<chromosome>(iter->second);
+            chromosomes[chrom.index] = chrom;
             iter++;
         }
-        return chromosomes;
+
+        vector<chromosome> final_chromosomes;
+        final_chromosomes.reserve(chromosomeMap.size());
+        for(int32_t i = 0; i < chromosomeMap.size(); i++){
+            final_chromosomes.push_back(chromosomes[i]);
+        }
+        return final_chromosomes;
     }
 
     MatrixZoomData * getMatrixZoomData(const string &chr1, const string &chr2, const string &matrixType,
