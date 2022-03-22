@@ -450,8 +450,8 @@ bool readFooterURL(CURL *curl, int64_t master, int32_t version, int32_t c1, int3
 
     int64_t currentPointer = master;
 
-    char *buffer = getData(curl, currentPointer, 1000);
-    memstream fin(buffer, 1000);
+    char *buffer = getData(curl, currentPointer, 100);
+    memstream fin(buffer, 100);
 
     if (version > 8) {
         int64_t nBytes = readInt64FromFile(fin);
@@ -469,7 +469,7 @@ bool readFooterURL(CURL *curl, int64_t master, int32_t version, int32_t c1, int3
     currentPointer += 4;
     delete buffer;
 
-    int32_t bufferSize0 = nEntries * 200;
+    int32_t bufferSize0 = nEntries * 50;
     buffer = getData(curl, currentPointer, bufferSize0);
     fin = memstream(buffer, bufferSize0);
 
