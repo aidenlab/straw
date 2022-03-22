@@ -1319,6 +1319,31 @@ vector<contactRecord> straw(const string &matrixType, const string &norm, const 
     }
 }
 
+vector<vector<float>> strawAsMatrix(const string &matrixType, const string &norm, const string &fileName, const string &chr1loc,
+                            const string &chr2loc, const string &unit, int32_t binsize) {
+    if (!(unit == "BP" || unit == "FRAG")) {
+        cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl;
+        cerr << "Usage: straw [observed/oe/expected] <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>"
+             << endl;
+        auto res = vector<vector<float>>(1, vector<float>(1, 0));
+        return res;
+    }
+
+    HiCFile *hiCFile = new HiCFile(fileName);
+    string chr1, chr2;
+    int64_t origRegionIndices[4] = {-100LL, -100LL, -100LL, -100LL};
+    parsePositions((chr1loc), chr1, origRegionIndices[0], origRegionIndices[1], hiCFile->chromosomeMap);
+    parsePositions((chr2loc), chr2, origRegionIndices[2], origRegionIndices[3], hiCFile->chromosomeMap);
+
+    if (hiCFile->chromosomeMap[chr1].index > hiCFile->chromosomeMap[chr2].index) {
+        MatrixZoomData *mzd = hiCFile->getMatrixZoomData(chr2, chr1, matrixType, norm, unit, binsize);
+        return mzd->getRecordsAsMatrix(origRegionIndices[2], origRegionIndices[3], origRegionIndices[0], origRegionIndices[1]);
+    } else {
+        MatrixZoomData *mzd = hiCFile->getMatrixZoomData(chr1, chr2, matrixType, norm, unit, binsize);
+        return mzd->getRecordsAsMatrix(origRegionIndices[0], origRegionIndices[1], origRegionIndices[2], origRegionIndices[3]);
+    }
+}
+
 int64_t getNumRecordsForFile(const string &fileName, int32_t binsize, bool interOnly) {
     HiCFile *hiCFile = new HiCFile(fileName);
     int64_t totalNumRecords = 0;
