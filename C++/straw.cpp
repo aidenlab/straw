@@ -1248,7 +1248,6 @@ public:
     }
 
     vector<chromosome> getChromosomes() {
-
         chromosome chromosomes[chromosomeMap.size()];
         auto iter = chromosomeMap.begin();
         while (iter != chromosomeMap.end()) {
@@ -1319,8 +1318,8 @@ vector<contactRecord> straw(const string &matrixType, const string &norm, const 
     }
 }
 
-vector<vector<float>> strawAsMatrix(const string &matrixType, const string &norm, const string &fileName, const string &chr1loc,
-                            const string &chr2loc, const string &unit, int32_t binsize) {
+auto strawAsMatrix(const string &matrixType, const string &norm, const string &fileName, const string &chr1loc,
+                   const string &chr2loc, const string &unit, int32_t binsize) {
     if (!(unit == "BP" || unit == "FRAG")) {
         cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl;
         cerr << "Usage: straw [observed/oe/expected] <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>"
