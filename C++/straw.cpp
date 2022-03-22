@@ -957,6 +957,10 @@ public:
 
         if (stream->isHttp) {
             int64_t bytes_to_read = totalFileSize - master;
+            if(bytes_to_read > 2097152){
+                bytes_to_read = 2097152;
+            }
+            cerr << "num bytes to read " << bytes_to_read << endl;
             char *buffer = getData(stream->curl, master, bytes_to_read);
             memstream bufin2(buffer, bytes_to_read);
             foundFooter = readFooter(bufin2, master, version, c1, c2, matrixType, norm, unit,
