@@ -329,6 +329,34 @@ void populateVectorWithDoubles(istream &fin, vector<double> &vector, int64_t nVa
     }
 }
 
+int64_t readThroughExpectedVectorURL(CURL *curl, int64_t currentPointer, int32_t version, vector<double> &expectedValues, int64_t nValues,
+                                     bool store, int32_t resolution) {
+    if (store) {
+        int32_t bufferSize = nValues * sizeof(double) + 10000;
+        if (version > 8) {
+            bufferSize = nValues * sizeof(float) + 10000;
+        }
+        char *buffer = getData(curl, currentPointer, bufferSize);
+        memstream fin(buffer, bufferSize);
+
+        vector<double> initialExpectedValues;
+        if (version > 8) {
+            populateVectorWithFloats(fin, initialExpectedValues, nValues);
+        } else {
+            populateVectorWithDoubles(fin, initialExpectedValues, nValues);
+        }
+        int32_t window = 5000000 / resolution;
+        rollingMedian(initialExpectedValues, expectedValues, window);
+        delete buffer;
+    }
+
+    if (version > 8) {
+        return nValues * sizeof(float);
+    } else {
+        return nValues * sizeof(double);
+    }
+}
+
 void readThroughExpectedVector(int32_t version, istream &fin, vector<double> &expectedValues, int64_t nValues,
                                bool store, int32_t resolution) {
     if (store) {
@@ -346,6 +374,41 @@ void readThroughExpectedVector(int32_t version, istream &fin, vector<double> &ex
         } else {
             fin.seekg(nValues * sizeof(double), ios_base::cur);
         }
+    }
+}
+
+int64_t readThroughNormalizationFactorsURL(CURL *curl, int64_t currentPointer, int32_t version, bool store, vector<double> &expectedValues,
+                                           int32_t c1, int32_t nNormalizationFactors) {
+
+    if (store) {
+        int32_t bufferSize = nNormalizationFactors * (sizeof(int32_t) + sizeof(double)) + 10000;
+        if (version > 8) {
+            bufferSize = nNormalizationFactors * (sizeof(int32_t) + sizeof(float )) + 10000;
+        }
+        char *buffer = getData(curl, currentPointer, bufferSize);
+        memstream fin(buffer, bufferSize);
+
+        for (int j = 0; j < nNormalizationFactors; j++) {
+            int32_t chrIdx = readInt32FromFile(fin);
+            double v;
+            if (version > 8) {
+                v = readFloatFromFile(fin);
+            } else {
+                v = readDoubleFromFile(fin);
+            }
+            if (chrIdx == c1) {
+                for (double &expectedValue : expectedValues) {
+                    expectedValue = expectedValue / v;
+                }
+            }
+        }
+        delete buffer;
+    }
+
+    if (version > 8) {
+        return nNormalizationFactors * (sizeof(int32_t) + sizeof(float));
+    } else {
+        return nNormalizationFactors * (sizeof(int32_t) + sizeof(double));
     }
 }
 
@@ -376,10 +439,219 @@ void readThroughNormalizationFactors(istream &fin, int32_t version, bool store, 
     }
 }
 
+int64_t readStringFromURL(istream &fin, string &basicString) {
+    getline(fin, basicString, '\0');
+    return (basicString.length() + 1);
+}
+
 // reads the footer from the master pointer location. takes in the chromosomes,
 // norm, unit (BP or FRAG) and resolution or binsize, and sets the file
 // position of the matrix and the normalization vectors for those chromosomes
 // at the given normalization and resolution
+bool readFooterURL(CURL *curl, int64_t master, int32_t version, int32_t c1, int32_t c2, const string &matrixType,
+                   const string &norm, const string &unit, int32_t resolution, int64_t &myFilePos,
+                   indexEntry &c1NormEntry, indexEntry &c2NormEntry, vector<double> &expectedValues) {
+
+    int64_t currentPointer = master;
+
+    char *buffer = getData(curl, currentPointer, 100);
+    memstream fin(buffer, 100);
+
+    if (version > 8) {
+        int64_t nBytes = readInt64FromFile(fin);
+        currentPointer += 8;
+    } else {
+        int32_t nBytes = readInt32FromFile(fin);
+        currentPointer += 4;
+    }
+
+    stringstream ss;
+    ss << c1 << "_" << c2;
+    string key = ss.str();
+
+    int32_t nEntries = readInt32FromFile(fin);
+    currentPointer += 4;
+    delete buffer;
+
+    int32_t bufferSize0 = nEntries * 50;
+    buffer = getData(curl, currentPointer, bufferSize0);
+    fin = memstream(buffer, bufferSize0);
+
+    bool found = false;
+    for (int i = 0; i < nEntries; i++) {
+        string keyStr;
+        currentPointer += readStringFromURL(fin, keyStr);
+
+        int64_t fpos = readInt64FromFile(fin);
+        int32_t sizeinbytes = readInt32FromFile(fin);
+        currentPointer += 12;
+        if (keyStr == key) {
+            myFilePos = fpos;
+            found = true;
+        }
+    }
+    delete buffer;
+    if (!found) {
+        cerr << "Remote file doesn't have the given chr_chr map " << key << endl;
+        return false;
+    }
+
+    if ((matrixType == "observed" && norm == "NONE") ||
+        ((matrixType == "oe" || matrixType == "expected") && norm == "NONE" && c1 != c2))
+        return true; // no need to read norm vector index
+
+    // read in and ignore expected value maps; don't store; reading these to
+    // get to norm vector index
+    buffer = getData(curl, currentPointer, 100);
+    fin = memstream(buffer, 100);
+
+    int32_t nExpectedValues = readInt32FromFile(fin);
+    currentPointer += 4;
+    delete buffer;
+    for (int i = 0; i < nExpectedValues; i++) {
+
+        buffer = getData(curl, currentPointer, 1000);
+        fin = memstream(buffer, 1000);
+
+        string unit0;
+        currentPointer += readStringFromURL(fin, unit0);
+
+        int32_t binSize = readInt32FromFile(fin);
+        currentPointer += 4;
+
+        int64_t nValues;
+        if (version > 8) {
+            nValues = readInt64FromFile(fin);
+            currentPointer += 8;
+        } else {
+            nValues = (int64_t) readInt32FromFile(fin);
+            currentPointer += 4;
+        }
+
+        delete buffer;
+
+        bool store = c1 == c2 && (matrixType == "oe" || matrixType == "expected") && norm == "NONE" && unit0 == unit &&
+                     binSize == resolution;
+
+        currentPointer += readThroughExpectedVectorURL(curl, currentPointer, version, expectedValues, nValues, store, resolution);
+
+        buffer = getData(curl, currentPointer, 100);
+        fin = memstream(buffer, 100);
+        int32_t nNormalizationFactors = readInt32FromFile(fin);
+        currentPointer += 4;
+        delete buffer;
+
+        currentPointer += readThroughNormalizationFactorsURL(curl, currentPointer, version, store, expectedValues, c1, nNormalizationFactors);
+    }
+
+    if (c1 == c2 && (matrixType == "oe" || matrixType == "expected") && norm == "NONE") {
+        if (expectedValues.empty()) {
+            cerr << "Remote file did not contain expected values vectors at " << resolution << " " << unit << endl;
+            return false;
+        }
+        return true;
+    }
+
+    buffer = getData(curl, currentPointer, 100);
+    fin = memstream(buffer, 100);
+    nExpectedValues = readInt32FromFile(fin);
+    currentPointer += 4;
+    delete buffer;
+    for (int i = 0; i < nExpectedValues; i++) {
+        buffer = getData(curl, currentPointer, 1000);
+        fin = memstream(buffer, 1000);
+
+        string nType, unit0;
+        currentPointer += readStringFromURL(fin, nType);
+        currentPointer += readStringFromURL(fin, unit0);
+
+        int32_t binSize = readInt32FromFile(fin);
+        currentPointer += 4;
+
+        int64_t nValues;
+        if (version > 8) {
+            nValues = readInt64FromFile(fin);
+            currentPointer += 8;
+        } else {
+            nValues = (int64_t) readInt32FromFile(fin);
+            currentPointer += 4;
+        }
+        bool store = c1 == c2 && (matrixType == "oe" || matrixType == "expected") && nType == norm && unit0 == unit &&
+                     binSize == resolution;
+
+        delete buffer;
+
+        currentPointer += readThroughExpectedVectorURL(curl, currentPointer, version, expectedValues, nValues, store, resolution);
+
+        buffer = getData(curl, currentPointer, 100);
+        fin = memstream(buffer, 100);
+        int32_t nNormalizationFactors = readInt32FromFile(fin);
+        currentPointer += 4;
+        delete buffer;
+
+        currentPointer += readThroughNormalizationFactorsURL(curl, currentPointer, version, store, expectedValues, c1, nNormalizationFactors);
+    }
+
+    if (c1 == c2 && (matrixType == "oe" || matrixType == "expected") && norm != "NONE") {
+        if (expectedValues.empty()) {
+            cerr << "Remote file did not contain normalized expected values vectors at " << resolution << " " << unit << endl;
+            return false;
+        }
+    }
+
+    buffer = getData(curl, currentPointer, 100);
+    fin = memstream(buffer, 100);
+    nEntries = readInt32FromFile(fin);
+    currentPointer += 4;
+    delete buffer;
+
+    bool found1 = false;
+    bool found2 = false;
+    int32_t bufferSize2 = nEntries*60;
+    buffer = getData(curl, currentPointer, bufferSize2);
+    fin = memstream(buffer, bufferSize2);
+
+    for (int i = 0; i < nEntries; i++) {
+        string normtype;
+        currentPointer += readStringFromURL(fin, normtype);
+
+        int32_t chrIdx = readInt32FromFile(fin);
+        currentPointer += 4;
+        string unit1;
+        currentPointer += readStringFromURL(fin, unit1);
+
+        int32_t resolution1 = readInt32FromFile(fin);
+        int64_t filePosition = readInt64FromFile(fin);
+        currentPointer += 12;
+
+        int64_t sizeInBytes;
+        if (version > 8) {
+            sizeInBytes = readInt64FromFile(fin);
+            currentPointer += 8;
+        } else {
+            sizeInBytes = (int64_t) readInt32FromFile(fin);
+            currentPointer += 4;
+        }
+
+        if (chrIdx == c1 && normtype == norm && unit1 == unit && resolution1 == resolution) {
+            c1NormEntry.position = filePosition;
+            c1NormEntry.size = sizeInBytes;
+            found1 = true;
+        }
+        if (chrIdx == c2 && normtype == norm && unit1 == unit && resolution1 == resolution) {
+            c2NormEntry.position = filePosition;
+            c2NormEntry.size = sizeInBytes;
+            found2 = true;
+        }
+    }
+    delete buffer;
+    if (!found1 || !found2) {
+        cerr << "Remote file did not contain " << norm << " normalization vectors for one or both chromosomes at "
+             << resolution << " " << unit << endl;
+    }
+    return true;
+}
+
 bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32_t c2, const string &matrixType,
                 const string &norm, const string &unit, int32_t resolution, int64_t &myFilePos,
                 indexEntry &c1NormEntry, indexEntry &c2NormEntry, vector<double> &expectedValues) {
@@ -397,11 +669,11 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
     int32_t nEntries = readInt32FromFile(fin);
     bool found = false;
     for (int i = 0; i < nEntries; i++) {
-        string str;
-        getline(fin, str, '\0');
+        string keyStr;
+        getline(fin, keyStr, '\0');
         int64_t fpos = readInt64FromFile(fin);
         int32_t sizeinbytes = readInt32FromFile(fin);
-        if (str == key) {
+        if (keyStr == key) {
             myFilePos = fpos;
             found = true;
         }
@@ -446,8 +718,8 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
 
     nExpectedValues = readInt32FromFile(fin);
     for (int i = 0; i < nExpectedValues; i++) {
-        string type, unit0;
-        getline(fin, type, '\0'); //typeString
+        string nType, unit0;
+        getline(fin, nType, '\0'); //typeString
         getline(fin, unit0, '\0'); //unit
         int32_t binSize = readInt32FromFile(fin);
 
@@ -457,7 +729,7 @@ bool readFooter(istream &fin, int64_t master, int32_t version, int32_t c1, int32
         } else {
             nValues = (int64_t) readInt32FromFile(fin);
         }
-        bool store = c1 == c2 && (matrixType == "oe" || matrixType == "expected") && type == norm && unit0 == unit &&
+        bool store = c1 == c2 && (matrixType == "oe" || matrixType == "expected") && nType == norm && unit0 == unit &&
                      binSize == resolution;
         readThroughExpectedVector(version, fin, expectedValues, nValues, store, resolution);
         readThroughNormalizationFactors(fin, version, store, expectedValues, c1);
@@ -960,14 +1232,10 @@ public:
         indexEntry c1NormEntry{}, c2NormEntry{};
 
         if (stream->isHttp) {
-            int64_t bytes_to_read = totalFileSize - master;
-            char *buffer = getData(stream->curl, master, bytes_to_read);
-            memstream bufin2(buffer, bytes_to_read);
-            foundFooter = readFooter(bufin2, master, version, c1, c2, matrixType, norm, unit,
-                                     resolution,
-                                     myFilePos,
-                                     c1NormEntry, c2NormEntry, expectedValues);
-            delete buffer;
+            foundFooter = readFooterURL(stream->curl, master, version, c1, c2, matrixType, norm, unit,
+                                        resolution,
+                                        myFilePos,
+                                        c1NormEntry, c2NormEntry, expectedValues);
         } else {
             stream->fin.seekg(master, ios::beg);
             foundFooter = readFooter(stream->fin, master, version, c1, c2, matrixType, norm,
@@ -1323,7 +1591,7 @@ vector<contactRecord> straw(const string &matrixType, const string &norm, const 
 }
 
 auto strawAsMatrix(const string &matrixType, const string &norm, const string &fileName, const string &chr1loc,
-                                    const string &chr2loc, const string &unit, int32_t binsize) {
+                   const string &chr2loc, const string &unit, int32_t binsize) {
     if (!(unit == "BP" || unit == "FRAG")) {
         cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl;
         cerr << "Usage: straw [observed/oe/expected] <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>"
