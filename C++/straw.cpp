@@ -952,37 +952,38 @@ public:
         this->norm = norm;
         this->resolution = resolution;
 
-        HiCFileStream *stream = new HiCFileStream(fileName);
-        indexEntry c1NormEntry{}, c2NormEntry{};
-
-        if (stream->isHttp) {
-            int64_t bytes_to_read = totalFileSize - master;
-            char *buffer = getData(stream->curl, master, bytes_to_read);
-            memstream bufin2(buffer, bytes_to_read);
-            foundFooter = readFooter(bufin2, master, version, c1, c2, matrixType, norm, unit,
-                                     resolution,
-                                     myFilePos,
-                                     c1NormEntry, c2NormEntry, expectedValues);
-            delete buffer;
-        } else {
-            stream->fin.seekg(master, ios::beg);
-            foundFooter = readFooter(stream->fin, master, version, c1, c2, matrixType, norm,
-                                     unit,
-                                     resolution, myFilePos,
-                                     c1NormEntry, c2NormEntry, expectedValues);
-        }
-
-        if (!foundFooter) {
-            return;
-        }
-        stream->close();
-
-        if (norm != "NONE") {
-            c1Norm = readNormalizationVectorFromFooter(c1NormEntry, version, fileName);
-            if (isIntra) {
-                c2Norm = c1Norm;
+        if(norm != "NONE" || matrixType == "oe" || matrixType == "expected") {
+            HiCFileStream *stream = new HiCFileStream(fileName);
+            indexEntry c1NormEntry{}, c2NormEntry{};
+            if (stream->isHttp) {
+                int64_t bytes_to_read = totalFileSize - master;
+                char *buffer = getData(stream->curl, master, bytes_to_read);
+                memstream bufin2(buffer, bytes_to_read);
+                foundFooter = readFooter(bufin2, master, version, c1, c2, matrixType, norm, unit,
+                                         resolution,
+                                         myFilePos,
+                                         c1NormEntry, c2NormEntry, expectedValues);
+                delete buffer;
             } else {
-                c2Norm = readNormalizationVectorFromFooter(c2NormEntry, version, fileName);
+                stream->fin.seekg(master, ios::beg);
+                foundFooter = readFooter(stream->fin, master, version, c1, c2, matrixType, norm,
+                                         unit,
+                                         resolution, myFilePos,
+                                         c1NormEntry, c2NormEntry, expectedValues);
+            }
+
+            if (!foundFooter) {
+                return;
+            }
+            stream->close();
+
+            if (norm != "NONE") {
+                c1Norm = readNormalizationVectorFromFooter(c1NormEntry, version, fileName);
+                if (isIntra) {
+                    c2Norm = c1Norm;
+                } else {
+                    c2Norm = readNormalizationVectorFromFooter(c2NormEntry, version, fileName);
+                }
             }
         }
 
