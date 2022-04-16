@@ -1294,7 +1294,7 @@ public:
         }
     }
 
-    auto getNormVector(int32_t index) {
+    vector<double> getNormVector(int32_t index) {
         if (index == c1) {
             return c1Norm;
         } else if (index == c2) {
@@ -1306,7 +1306,7 @@ public:
         return v;
     }
 
-    auto getExpectedValues() {
+    vector<double> getExpectedValues() {
         return expectedValues;
     }
 
@@ -1371,10 +1371,10 @@ public:
         return records;
     }
 
-    auto getRecordsAsMatrix(int64_t gx0, int64_t gx1, int64_t gy0, int64_t gy1) {
+    vector<vector<float> > getRecordsAsMatrix(int64_t gx0, int64_t gx1, int64_t gy0, int64_t gy1) {
         vector<contactRecord> records = this->getRecords(gx0, gx1, gy0, gy1);
         if (records.empty()) {
-            auto res = vector<vector<float>>(1, vector<float>(1, 0));
+            vector<vector<float> > res = vector<vector<float> >(1, vector<float>(1, 0));
             return res;
         }
 
@@ -1411,7 +1411,7 @@ public:
             }
         }
 
-        vector<vector<float>> finalMatrix;
+        vector<vector<float> > finalMatrix;
         for (int32_t i = 0; i < numRows; i++) {
             vector<float> row;
             row.reserve(numCols);
@@ -1517,7 +1517,7 @@ public:
 
     vector<chromosome> getChromosomes() {
         chromosome chromosomes[chromosomeMap.size()];
-        auto iter = chromosomeMap.begin();
+        map<string, chromosome>::iterator iter = chromosomeMap.begin();
         while (iter != chromosomeMap.end()) {
             chromosome chrom = static_cast<chromosome>(iter->second);
             chromosomes[chrom.index] = chrom;
@@ -1586,13 +1586,13 @@ vector<contactRecord> straw(const string &matrixType, const string &norm, const 
     }
 }
 
-auto strawAsMatrix(const string &matrixType, const string &norm, const string &fileName, const string &chr1loc,
+vector<vector<float> > strawAsMatrix(const string &matrixType, const string &norm, const string &fileName, const string &chr1loc,
                    const string &chr2loc, const string &unit, int32_t binsize) {
     if (!(unit == "BP" || unit == "FRAG")) {
         cerr << "Norm specified incorrectly, must be one of <BP/FRAG>" << endl;
         cerr << "Usage: straw [observed/oe/expected] <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG> <binsize>"
              << endl;
-        auto res = vector<vector<float>>(1, vector<float>(1, 0));
+        vector<vector<float> > res = vector<vector<float> >(1, vector<float>(1, 0));
         return res;
     }
 
