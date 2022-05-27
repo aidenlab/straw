@@ -293,6 +293,7 @@ void rollingMedian(vector<double> &initialValues, vector<double> &finalResult, i
         return;
     }
 
+    /*
     finalResult.push_back(initialValues[0]);
     int64_t length = initialValues.size();
     for (int64_t index = 1; index < length; index++) {
@@ -313,6 +314,8 @@ void rollingMedian(vector<double> &initialValues, vector<double> &finalResult, i
         vector<double> subVector = sliceVector(initialValues, initialIndex, finalIndex);
         finalResult.push_back(getMedian(subVector));
     }
+    */
+    finalResult = initialValues;
 }
 
 void populateVectorWithFloats(istream &fin, vector<double> &vector, int64_t nValues) {
