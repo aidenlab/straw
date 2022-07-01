@@ -103,4 +103,6 @@ straw(const std::string& matrixType, const std::string& norm, const std::string&
 
 int64_t getNumRecordsForFile(const std::string& filename, int32_t binsize, bool interOnly);
 
+int64_t getNumRecordsForChromosomes(const std::string& filename, int32_t binsize, bool interOnly);
+
 #endif

@@ -1640,3 +1640,16 @@ int64_t getNumRecordsForFile(const string &fileName, int32_t binsize, bool inter
 
     return totalNumRecords;
 }
+
+int64_t getNumRecordsForChromosomes(const string &fileName, int32_t binsize, bool interOnly) {
+    HiCFile *hiCFile = new HiCFile(fileName);
+    vector<chromosome> chromosomes = hiCFile->getChromosomes();
+    for(int32_t i = 0; i < chromosomes.size(); i++){
+        if(chromosomes[i].index <= 0) continue;
+        MatrixZoomData *mzd = hiCFile->getMatrixZoomData(chromosomes[i].name, chromosomes[i].name, "observed", "NONE", "BP", binsize);
+        int64_t totalNumRecords = mzd->getNumberOfTotalRecords();
+        cout << chromosomes[i].name << " " << totalNumRecords << " ";
+        cout << totalNumRecords*12/1000/1000/1000 << " GB" << endl;
+    }
+    return 0;
+}
