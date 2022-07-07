@@ -2,6 +2,7 @@
 
 export(readHicBpResolutions)
 export(readHicChroms)
+export(readHicNormTypes)
 export(straw)
 import(Rcpp)
 useDynLib(strawr)
