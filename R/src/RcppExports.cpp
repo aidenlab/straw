@@ -5,6 +5,11 @@
 
 using namespace Rcpp;
 
+#ifdef RCPP_USE_GLOBAL_ROSTREAM
+Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
+Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
+#endif
+
 // straw
 Rcpp::DataFrame straw(std::string norm, std::string fname, std::string chr1loc, std::string chr2loc, const std::string& unit, int32_t binsize, std::string matrix);
 RcppExport SEXP _strawr_straw(SEXP normSEXP, SEXP fnameSEXP, SEXP chr1locSEXP, SEXP chr2locSEXP, SEXP unitSEXP, SEXP binsizeSEXP, SEXP matrixSEXP) {
@@ -22,17 +27,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// readHicBpResolutions
-Rcpp::NumericVector readHicBpResolutions(std::string fname);
-RcppExport SEXP _strawr_readHicBpResolutions(SEXP fnameSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< std::string >::type fname(fnameSEXP);
-    rcpp_result_gen = Rcpp::wrap(readHicBpResolutions(fname));
-    return rcpp_result_gen;
-END_RCPP
-}
 // readHicChroms
 Rcpp::DataFrame readHicChroms(std::string fname);
 RcppExport SEXP _strawr_readHicChroms(SEXP fnameSEXP) {
@@ -44,11 +38,34 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// readHicBpResolutions
+Rcpp::NumericVector readHicBpResolutions(std::string fname);
+RcppExport SEXP _strawr_readHicBpResolutions(SEXP fnameSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< std::string >::type fname(fnameSEXP);
+    rcpp_result_gen = Rcpp::wrap(readHicBpResolutions(fname));
+    return rcpp_result_gen;
+END_RCPP
+}
+// readHicNormTypes
+Rcpp::CharacterVector readHicNormTypes(std::string fname);
+RcppExport SEXP _strawr_readHicNormTypes(SEXP fnameSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< std::string >::type fname(fnameSEXP);
+    rcpp_result_gen = Rcpp::wrap(readHicNormTypes(fname));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_strawr_straw", (DL_FUNC) &_strawr_straw, 7},
-    {"_strawr_readHicBpResolutions", (DL_FUNC) &_strawr_readHicBpResolutions, 1},
     {"_strawr_readHicChroms", (DL_FUNC) &_strawr_readHicChroms, 1},
+    {"_strawr_readHicBpResolutions", (DL_FUNC) &_strawr_readHicBpResolutions, 1},
+    {"_strawr_readHicNormTypes", (DL_FUNC) &_strawr_readHicNormTypes, 1},
     {NULL, NULL, 0}
 };
 

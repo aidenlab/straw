@@ -1291,7 +1291,7 @@ vector<chromosome> getChromosomes(string fname){
 //' Function for reading chromosomes from .hic file
 //'
 //' @param fname path to .hic file
-//' @return Data frame of chromosome names and lengths
+//' @return Data frame of chromosome indices, names and lengths
 //' @examples
 //' readHicChroms(system.file("extdata", "test.hic", package = "strawr"))
 //' @export
@@ -1299,13 +1299,15 @@ vector<chromosome> getChromosomes(string fname){
 Rcpp::DataFrame readHicChroms(std::string fname)
 {
   vector<chromosome> chroms = getChromosomes(std::move(fname));
+  Rcpp::NumericVector indices;
   Rcpp::StringVector names;
   Rcpp::NumericVector lengths;
   for (std::vector<chromosome>::iterator it = chroms.begin(); it != chroms.end(); ++it) {
+    indices.push_back(it->index);
     names.push_back(it->name);
     lengths.push_back(it->length);
   }
-  return Rcpp::DataFrame::create(Rcpp::Named("name") = names, Rcpp::Named("length") = lengths);
+  return Rcpp::DataFrame::create(Rcpp::Named("index") = indices, Rcpp::Named("name") = names, Rcpp::Named("length") = lengths);
 }
 
 //' Function for reading basepair resolutions from .hic file
@@ -1325,4 +1327,124 @@ Rcpp::NumericVector readHicBpResolutions(std::string fname)
   }
   hiCFile->close();
   return bpResolutions;
+}
+
+// Reads all normalizations from the footer
+Rcpp::CharacterVector readNormsFromFooter(istream &fin, int64_t master, int32_t version) {
+    
+    // Initialize variable to store norm types
+    Rcpp::CharacterVector normTypes;
+    
+    // Read through the footer section
+    //nBytes
+    if (version > 8) {
+        readInt64FromFile(fin);
+    } else {
+        readInt32FromFile(fin);
+    }
+    
+    // nEntries
+    int32_t nEntries = readInt32FromFile(fin);
+    for (int i = 0; i < nEntries; i++) {
+        string str;
+        getline(fin, str, '\0');
+        readInt64FromFile(fin); //fpos
+        readInt32FromFile(fin); //sizeInBytes
+    }
+
+    // nExpectedValues
+    int32_t nExpectedValues = readInt32FromFile(fin);
+    for (int i = 0; i < nExpectedValues; i++) {
+        string unit0;
+        getline(fin, unit0, '\0'); //unit
+        readInt32FromFile(fin);
+
+        int64_t nValues;
+        if (version > 8) {
+            nValues = readInt64FromFile(fin);
+            for (int j = 0; j < nValues; j++) {
+                readFloatFromFile(fin);
+            }
+        } else {
+            nValues = (int64_t) readInt32FromFile(fin);
+            for (int j = 0; j < nValues; j++) {
+                readDoubleFromFile(fin);
+            }
+        }
+
+        int32_t nNormalizationFactors = readInt32FromFile(fin);
+        for (int j = 0; j < nNormalizationFactors; j++) {
+            readInt32FromFile(fin); //chrIdx
+            if (version > 8) {
+                readFloatFromFile(fin); //v
+            } else {
+                readDoubleFromFile(fin);//v
+            }
+        }
+    }
+
+    // Needs to be read like this (readInt32FromFile doesn't work)
+    fin.read((char*)&nExpectedValues, sizeof(int32_t));
+    for (int i = 0; i < nExpectedValues; i++) {
+        //Record available norm types (handling empty strings as NONE)
+        string type;
+        getline(fin, type, '\0'); //typeString
+        if (type == "") {
+            type = "NONE";
+        }
+        normTypes.push_back(type);
+
+        string unit0;
+        getline(fin, unit0, '\0'); //unit
+        readInt32FromFile(fin);
+
+        int64_t nValues;
+        if (version > 8) {
+            nValues = readInt64FromFile(fin);
+            for (int j = 0; j < nValues; j++) {
+                readFloatFromFile(fin); //v
+            }
+        } else {
+            nValues = (int64_t) readInt32FromFile(fin);
+            for (int j = 0; j < nValues; j++) {
+                readDoubleFromFile(fin); //v
+            }
+        }
+
+        int32_t nNormalizationFactors = readInt32FromFile(fin);
+        for (int j = 0; j < nNormalizationFactors; j++) {
+            readInt32FromFile(fin); //chrIdx
+            if (version > 8) {
+                readFloatFromFile(fin); //v
+            } else {
+                readDoubleFromFile(fin); //v
+            }
+        }
+    }
+    
+    // Include "NONE"
+    normTypes.push_back("NONE");
+    
+    // Return unique norms
+    return unique(normTypes);
+}
+
+//' Function for reading available normalizations from .hic file
+//' 
+//' @param fname path to .hic file
+//' @return Vector of available normalizations
+//' @examples
+//' readHicNormTypes(system.file("extdata", "test.hic", package = "strawr"))
+//' @export
+// [[Rcpp::export]]
+Rcpp::CharacterVector readHicNormTypes(std::string fname)
+{
+    HiCFile *hiCFile = new HiCFile(std::move(fname));
+    Rcpp::CharacterVector normTypes;
+    hiCFile->fin.seekg(hiCFile->master, ios::beg);
+    normTypes = readNormsFromFooter(hiCFile->fin,
+                                    hiCFile->master,
+                                    hiCFile->version);
+    hiCFile->close();
+    return normTypes;
 }

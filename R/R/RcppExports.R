@@ -30,6 +30,17 @@ straw <- function(norm, fname, chr1loc, chr2loc, unit, binsize, matrix = "observ
     .Call('_strawr_straw', PACKAGE = 'strawr', norm, fname, chr1loc, chr2loc, unit, binsize, matrix)
 }
 
+#' Function for reading chromosomes from .hic file
+#'
+#' @param fname path to .hic file
+#' @return Data frame of chromosome names and lengths
+#' @examples
+#' readHicChroms(system.file("extdata", "test.hic", package = "strawr"))
+#' @export
+readHicChroms <- function(fname) {
+    .Call('_strawr_readHicChroms', PACKAGE = 'strawr', fname)
+}
+
 #' Function for reading basepair resolutions from .hic file
 #'
 #' @param fname path to .hic file
@@ -41,14 +52,14 @@ readHicBpResolutions <- function(fname) {
     .Call('_strawr_readHicBpResolutions', PACKAGE = 'strawr', fname)
 }
 
-#' Function for reading chromosomes from .hic file
-#'
+#' Function for reading available normalizations from .hic file
+#' 
 #' @param fname path to .hic file
-#' @return Data frame of chromosome names and lengths
+#' @return Vector of available normalizations
 #' @examples
-#' readHicChroms(system.file("extdata", "test.hic", package = "strawr"))
+#' readHicNormTypes(system.file("extdata", "test.hic", package = "strawr"))
 #' @export
-readHicChroms <- function(fname) {
-    .Call('_strawr_readHicChroms', PACKAGE = 'strawr', fname)
+readHicNormTypes <- function(fname) {
+    .Call('_strawr_readHicNormTypes', PACKAGE = 'strawr', fname)
 }
 
