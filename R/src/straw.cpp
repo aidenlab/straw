@@ -1291,7 +1291,7 @@ vector<chromosome> getChromosomes(string fname){
 //' Function for reading chromosomes from .hic file
 //'
 //' @param fname path to .hic file
-//' @return Data frame of chromosome names and lengths
+//' @return Data frame of chromosome indices, names and lengths
 //' @examples
 //' readHicChroms(system.file("extdata", "test.hic", package = "strawr"))
 //' @export
@@ -1299,13 +1299,15 @@ vector<chromosome> getChromosomes(string fname){
 Rcpp::DataFrame readHicChroms(std::string fname)
 {
   vector<chromosome> chroms = getChromosomes(std::move(fname));
+  Rcpp::NumericVector indices;
   Rcpp::StringVector names;
   Rcpp::NumericVector lengths;
   for (std::vector<chromosome>::iterator it = chroms.begin(); it != chroms.end(); ++it) {
+    indices.push_back(it->index);
     names.push_back(it->name);
     lengths.push_back(it->length);
   }
-  return Rcpp::DataFrame::create(Rcpp::Named("name") = names, Rcpp::Named("length") = lengths);
+  return Rcpp::DataFrame::create(Rcpp::Named("index") = indices, Rcpp::Named("name") = names, Rcpp::Named("length") = lengths);
 }
 
 //' Function for reading basepair resolutions from .hic file
