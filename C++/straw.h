@@ -98,8 +98,12 @@ readMatrix(std::istream &fin, int32_t myFilePosition, std::string unit, int32_t 
 std::vector<double> readNormalizationVector(std::istream &fin, indexEntry entry);
 
 std::vector<contactRecord>
-straw(const std::string& matrixType, const std::string& norm, const std::string& fname, const std::string& chr1loc, const std::string& chr2loc,
-      const std::string &unit, int32_t binsize);
+straw(const std::string& matrixType, const std::string& norm, const std::string& fname, const std::string& chr1loc,
+      const std::string& chr2loc, const std::string &unit, int32_t binsize);
+
+std::vector<std::vector<float>>
+strawAsMatrix(const std::string &matrixType, const std::string &norm, const std::string &fileName,
+              const std::string &chr1loc, const std::string &chr2loc, const std::string &unit, int32_t binsize);
 
 int64_t getNumRecordsForFile(const std::string& filename, int32_t binsize, bool interOnly);
 
