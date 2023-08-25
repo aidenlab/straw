@@ -1551,7 +1551,7 @@ void parsePositions(const string &chrLoc, string &chrom, int64_t &pos1, int64_t 
     stringstream ss(chrLoc);
     getline(ss, chrom, ':');
     if (map.count(chrom) == 0) {
-        cerr << chrom << " not found in the file." << endl;
+        cerr << "chromosome " << chrom << " not found in the file." << endl;
         exit(7);
     }
 
