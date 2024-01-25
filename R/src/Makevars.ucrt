@@ -1,2 +1,9 @@
-CRT=-ucrt
-include Makevars.win
+# Used on rtools43 and up
+PKG_CPPFLAGS = -DCURL_STATICLIB
+PKG_LIBS = $(shell pkg-config --libs libcurl)
+
+# Fallback for older rtools without pkgconfig
+ifeq (,$(PKG_LIBS))
+  CRT=-ucrt
+  include Makevars.win
+endif
