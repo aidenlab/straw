@@ -1,2 +1,21 @@
-CRT=-ucrt
-include Makevars.win
+
+ifeq (,$(shell pkg-config --version 2>/dev/null))
+  PKG_LIBS= \
+	-lwinhttp -lcurl -lssh2 -lz -lssl -lcrypto -lgdi32 -lcrypt32 -lwldap32 \
+        -lzstd -lgcrypt -lgpg-error -lidn2 -lbcrypt -lunistring -liconv -lws2_32
+else
+  PKG_LIBS=$(shell pkg-config --libs libcurl)
+endif
+
+PKG_CPPFLAGS= \
+	-DCURL_STATICLIB -DSTRICT_R_HEADERS
+
+all: clean winlibs
+
+clean:
+	rm -f $(SHLIB) $(OBJECTS)
+
+winlibs: clean
+	echo '#include <curl/curl.h>' | $(CC) $(PKG_CPPFLAGS) -std=gnu99 -E -xc - | grep "^[ \t]*CURLOPT_.*," | sed s/,// > ../tools/option_table.txt
+
+.PHONY: all winlibs clean
