@@ -1863,15 +1863,13 @@ void dumpGenomeWideDataAtResolution(const std::string& matrixType,
             
             if (!mzd->foundFooter) continue;
 
-            // Get block numbers for the entire chromosome pair
-            int64_t regionIndices[4] = {0, chromosomes[i].length/resolution, 
-                                      0, chromosomes[j].length/resolution};
-            std::set<int32_t> blockNumbers = mzd->getBlockNumbers(regionIndices);
-
-            // Process each block
-            for (int32_t blockNumber : blockNumbers) {
+            // Process each block in the blockMap
+            for (const auto& blockMapEntry : mzd->blockMap) {
+                int64_t regionIndices[4] = {0, chromosomes[i].length/resolution, 
+                                          0, chromosomes[j].length/resolution};
+                
                 BlockResult result = processBlock(
-                    mzd->fileName, mzd->blockMap[blockNumber], mzd->version,
+                    mzd->fileName, blockMapEntry.second, mzd->version,
                     regionIndices, resolution,
                     mzd->norm, mzd->c1Norm, mzd->c2Norm, mzd->isIntra,
                     mzd->matrixType, mzd->expectedValues, mzd->avgCount
