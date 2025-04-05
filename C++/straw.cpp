@@ -1845,50 +1845,52 @@ void dumpGenomeWideDataAtResolution(const std::string& matrixType,
     writeHeader(outFile, header);
     
     // Process each chromosome pair
-    for (size_t i = 0; i < chromosomes.size(); i++) {
-        if (chromosomes[i].index <= 0) continue;
+    for (const auto& chr1 : chromosomes) {
+        if (chr1.index <= 0) continue;
         
-        for (size_t j = i; j < chromosomes.size(); j++) {
-            if (chromosomes[j].index <= 0) continue;
+        for (const auto& chr2 : chromosomes) {
+            if (chr2.index <= 0 || chr2.index < chr1.index) continue;
             
-            // Get matrix data
-            MatrixZoomData* mzd = hicFile->getMatrixZoomData(
-                chromosomes[i].name, 
-                chromosomes[j].name, 
-                matrixType, 
-                norm, 
-                unit, 
-                resolution
-            );
-            
-            if (!mzd->foundFooter) continue;
-
-            // Process each block in the blockMap
-            for (const auto& blockMapEntry : mzd->blockMap) {
-                int64_t regionIndices[4] = {0, chromosomes[i].length/resolution, 
-                                          0, chromosomes[j].length/resolution};
-                
-                BlockResult result = processBlock(
-                    mzd->fileName, blockMapEntry.second, mzd->version,
-                    regionIndices, resolution,
-                    mzd->norm, mzd->c1Norm, mzd->c2Norm, mzd->isIntra,
-                    mzd->matrixType, mzd->expectedValues, mzd->avgCount
+            try {
+                MatrixZoomData* mzd = hicFile->getMatrixZoomData(
+                    chr1.name, chr2.name, matrixType, norm, unit, resolution
                 );
+                
+                if (mzd && mzd->foundFooter) {
+                    // Process each block in the blockMap
+                    for (const auto& blockMapEntry : mzd->blockMap) {
+                        BlockResult result = processBlock(
+                            mzd->fileName, blockMapEntry.second, mzd->version,
+                            nullptr, resolution,  // nullptr since we want all records
+                            mzd->norm, mzd->c1Norm, mzd->c2Norm, mzd->isIntra,
+                            mzd->matrixType, mzd->expectedValues, mzd->avgCount
+                        );
 
-                // Write records from this block directly to file
-                for (const auto& record : result.records) {
-                    CompressedContactRecord compressedRecord;
-                    compressedRecord.chr1Key = header.chromosomeKeys[chromosomes[i].name];
-                    compressedRecord.binX = record.binX;
-                    compressedRecord.chr2Key = header.chromosomeKeys[chromosomes[j].name];
-                    compressedRecord.binY = record.binY;
-                    compressedRecord.value = record.counts;
-                    
-                    writeContactRecord(outFile, compressedRecord);
+                        // Write records from this block directly to file
+                        for (const auto& record : result.records) {
+                            CompressedContactRecord compressedRecord;
+                            compressedRecord.chr1Key = header.chromosomeKeys[chr1.name];
+                            compressedRecord.binX = record.binX;
+                            compressedRecord.chr2Key = header.chromosomeKeys[chr2.name];
+                            compressedRecord.binY = record.binY;
+                            compressedRecord.value = record.counts;
+                            
+                            writeContactRecord(outFile, compressedRecord);
+                        }
+                    }
                 }
+                delete mzd;
+            } catch (const std::exception& e) {
+                std::cerr << "Skipping chromosome pair " << chr1.name << "-" << chr2.name 
+                         << " (indices " << chr1.index << "-" << chr2.index 
+                         << "): " << e.what() << std::endl;
+                continue;
+            } catch (...) {
+                std::cerr << "Skipping chromosome pair " << chr1.name << "-" << chr2.name 
+                         << " (indices " << chr1.index << "-" << chr2.index 
+                         << "): Unknown error" << std::endl;
+                continue;
             }
-            
-            delete mzd;
         }
     }
     
