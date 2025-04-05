@@ -1183,11 +1183,16 @@ vector<double> readNormalizationVector(istream &bufferin, int32_t version) {
     return values;
 }
 
-// Add this helper struct to store results from parallel processing
+// Modify the BlockResult struct to include block number for sorting
 struct BlockResult {
     vector<contactRecord> records;
     int32_t blockNumber;
 };
+
+// Add a comparison function for sorting BlockResults
+bool compareBlockResults(const BlockResult &a, const BlockResult &b) {
+    return a.blockNumber < b.blockNumber;
+}
 
 // Add this helper function that processes a single block
 BlockResult processBlock(const string &fileName, indexEntry idx, int32_t version,
@@ -1390,7 +1395,7 @@ public:
         convertGenomeToBinPos(origRegionIndices, regionIndices, resolution);
 
         set<int32_t> blockNumbers = getBlockNumbers(regionIndices);
-        vector<contactRecord> records;
+        vector<BlockResult> allResults;
         
         // Determine number of threads to use (leave one core free)
         unsigned int numThreads = max(1u, thread::hardware_concurrency() - 1);
@@ -1408,10 +1413,7 @@ public:
             if (futures.size() >= numThreads) {
                 // Wait for some threads to complete and add their results
                 for (auto &f : futures) {
-                    BlockResult result = f.get();
-                    records.insert(records.end(), 
-                                 result.records.begin(), 
-                                 result.records.end());
+                    allResults.push_back(f.get());
                 }
                 futures.clear();
             }
@@ -1419,10 +1421,16 @@ public:
         
         // Get remaining results
         for (auto &f : futures) {
-            BlockResult result = f.get();
-            records.insert(records.end(),
-                          result.records.begin(),
-                          result.records.end());
+            allResults.push_back(f.get());
+        }
+
+        // Sort results by block number to maintain consistent order
+        sort(allResults.begin(), allResults.end(), compareBlockResults);
+
+        // Combine all records in sorted order
+        vector<contactRecord> records;
+        for (const auto &result : allResults) {
+            records.insert(records.end(), result.records.begin(), result.records.end());
         }
 
         return records;
