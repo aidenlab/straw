@@ -1862,23 +1862,32 @@ void dumpGenomeWideDataAtResolution(const std::string& matrixType,
             );
             
             if (!mzd->foundFooter) continue;
-            
-            // Get records for entire chromosome pair
-            std::vector<contactRecord> records = mzd->getRecords(
-                0, chromosomes[i].length,
-                0, chromosomes[j].length
-            );
-            
-            // Write records
-            for (const auto& record : records) {
-                CompressedContactRecord compressedRecord;
-                compressedRecord.chr1Key = header.chromosomeKeys[chromosomes[i].name];
-                compressedRecord.binX = record.binX;
-                compressedRecord.chr2Key = header.chromosomeKeys[chromosomes[j].name];
-                compressedRecord.binY = record.binY;
-                compressedRecord.value = record.counts;
-                
-                writeContactRecord(outFile, compressedRecord);
+
+            // Get block numbers for the entire chromosome pair
+            int64_t regionIndices[4] = {0, chromosomes[i].length/resolution, 
+                                      0, chromosomes[j].length/resolution};
+            std::set<int32_t> blockNumbers = mzd->getBlockNumbers(regionIndices);
+
+            // Process each block
+            for (int32_t blockNumber : blockNumbers) {
+                BlockResult result = processBlock(
+                    mzd->fileName, mzd->blockMap[blockNumber], mzd->version,
+                    regionIndices, resolution,
+                    mzd->norm, mzd->c1Norm, mzd->c2Norm, mzd->isIntra,
+                    mzd->matrixType, mzd->expectedValues, mzd->avgCount
+                );
+
+                // Write records from this block directly to file
+                for (const auto& record : result.records) {
+                    CompressedContactRecord compressedRecord;
+                    compressedRecord.chr1Key = header.chromosomeKeys[chromosomes[i].name];
+                    compressedRecord.binX = record.binX;
+                    compressedRecord.chr2Key = header.chromosomeKeys[chromosomes[j].name];
+                    compressedRecord.binY = record.binY;
+                    compressedRecord.value = record.counts;
+                    
+                    writeContactRecord(outFile, compressedRecord);
+                }
             }
             
             delete mzd;
