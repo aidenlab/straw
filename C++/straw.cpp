@@ -1198,54 +1198,57 @@ bool compareBlockResults(const BlockResult &a, const BlockResult &b) {
 }
 
 // Add this helper function that processes a single block
-BlockResult processBlock(const string &fileName, indexEntry idx, int32_t version,
-                        int64_t *origRegionIndices, int32_t resolution, 
-                        const string &norm, const vector<double> &c1Norm,
-                        const vector<double> &c2Norm, bool isIntra,
-                        const string &matrixType, const vector<double> &expectedValues,
-                        double avgCount) {
-    
+BlockResult processBlock(const string &filename, indexEntry idx, int32_t version,
+                       int64_t *regionIndices, int32_t resolution,
+                       const string &norm, vector<double> &c1Norm, vector<double> &c2Norm,
+                       bool isIntra, const string &matrixType, vector<double> &expectedValues,
+                       double avgCount, bool ignoreRegionBounds = false) {
     BlockResult result;
-    vector<contactRecord> records = readBlock(fileName, idx, version);
+    vector<contactRecord> records = readBlock(filename, idx, version);
     vector<contactRecord> filteredRecords;
     
     for (contactRecord rec : records) {
         int64_t x = rec.binX * resolution;
         int64_t y = rec.binY * resolution;
 
-        if ((x >= origRegionIndices[0] && x <= origRegionIndices[1] &&
-             y >= origRegionIndices[2] && y <= origRegionIndices[3]) ||
-            (isIntra && y >= origRegionIndices[0] && y <= origRegionIndices[1] && 
-             x >= origRegionIndices[2] && x <= origRegionIndices[3])) {
+        if (ignoreRegionBounds) {
+            // Include all records regardless of position
+            filteredRecords.push_back(rec);
+        } else {
+            if ((x >= regionIndices[0] && x <= regionIndices[1] &&
+                 y >= regionIndices[2] && y <= regionIndices[3]) ||
+                (isIntra && y >= regionIndices[0] && y <= regionIndices[1] && 
+                 x >= regionIndices[2] && x <= regionIndices[3])) {
 
-            float c = rec.counts;
-            if (norm != "NONE") {
-                c = static_cast<float>(c / (c1Norm[rec.binX] * c2Norm[rec.binY]));
-            }
-            if (matrixType == "oe") {
-                if (isIntra) {
-                    c = static_cast<float>(c / expectedValues[min(expectedValues.size() - 1,
-                                                              (size_t) floor(abs(y - x) /
-                                                                         resolution))]);
-                } else {
-                    c = static_cast<float>(c / avgCount);
+                float c = rec.counts;
+                if (norm != "NONE") {
+                    c = static_cast<float>(c / (c1Norm[rec.binX] * c2Norm[rec.binY]));
                 }
-            } else if (matrixType == "expected") {
-                if (isIntra) {
-                    c = static_cast<float>(expectedValues[min(expectedValues.size() - 1,
-                                                          (size_t) floor(abs(y - x) /
-                                                                     resolution))]);
-                } else {
-                    c = static_cast<float>(avgCount);
+                if (matrixType == "oe") {
+                    if (isIntra) {
+                        c = static_cast<float>(c / expectedValues[min(expectedValues.size() - 1,
+                                                                  (size_t) floor(abs(y - x) /
+                                                                             resolution))]);
+                    } else {
+                        c = static_cast<float>(c / avgCount);
+                    }
+                } else if (matrixType == "expected") {
+                    if (isIntra) {
+                        c = static_cast<float>(expectedValues[min(expectedValues.size() - 1,
+                                                                  (size_t) floor(abs(y - x) /
+                                                                             resolution))]);
+                    } else {
+                        c = static_cast<float>(avgCount);
+                    }
                 }
-            }
 
-            if (!isnan(c) && !isinf(c)) {
-                contactRecord record = contactRecord();
-                record.binX = static_cast<int32_t>(x);
-                record.binY = static_cast<int32_t>(y);
-                record.counts = c;
-                filteredRecords.push_back(record);
+                if (!isnan(c) && !isinf(c)) {
+                    contactRecord record = contactRecord();
+                    record.binX = static_cast<int32_t>(x);
+                    record.binY = static_cast<int32_t>(y);
+                    record.counts = c;
+                    filteredRecords.push_back(record);
+                }
             }
         }
     }
@@ -1859,9 +1862,15 @@ void dumpGenomeWideDataAtResolution(const std::string& matrixType,
                 if (mzd && mzd->foundFooter) {
                     // Process each block in the blockMap
                     for (const auto& blockMapEntry : mzd->blockMap) {
+                        // Create region indices that cover the entire chromosomes
+                        int64_t regionIndices[4] = {
+                            0, chr1.length/resolution,  // full length of first chromosome
+                            0, chr2.length/resolution   // full length of second chromosome
+                        };
+
                         BlockResult result = processBlock(
                             mzd->fileName, blockMapEntry.second, mzd->version,
-                            nullptr, resolution,  // nullptr since we want all records
+                            regionIndices, resolution,
                             mzd->norm, mzd->c1Norm, mzd->c2Norm, mzd->isIntra,
                             mzd->matrixType, mzd->expectedValues, mzd->avgCount
                         );
