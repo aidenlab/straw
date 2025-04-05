@@ -1463,7 +1463,7 @@ public:
         unsigned int maxThreads = thread::hardware_concurrency() - 1;
         unsigned int numThreads = max(1u, min(
             maxThreads,                // Don't use more than available cores minus one
-            blockNumbers.size()        // Don't create more threads than blocks
+            static_cast<unsigned int>(blockNumbers.size())  // Don't create more threads than blocks
         ));
         
         ThreadPool pool(numThreads);
