@@ -36,6 +36,11 @@
 #include <algorithm>
 #include "zlib.h"
 #include "straw.h"
+#include <thread>
+#include <mutex>
+#include <future>
+#include <queue>
+#include <condition_variable>
 
 using namespace std;
 
@@ -1180,6 +1185,134 @@ vector<double> readNormalizationVector(istream &bufferin, int32_t version) {
     return values;
 }
 
+// Modify the BlockResult struct to include block number for sorting
+struct BlockResult {
+    vector<contactRecord> records;
+    int32_t blockNumber;
+};
+
+// Add a comparison function for sorting BlockResults
+bool compareBlockResults(const BlockResult &a, const BlockResult &b) {
+    return a.blockNumber < b.blockNumber;
+}
+
+// Add this helper function that processes a single block
+BlockResult processBlock(const string &fileName, indexEntry idx, int32_t version,
+                        int64_t *origRegionIndices, int32_t resolution, 
+                        const string &norm, const vector<double> &c1Norm,
+                        const vector<double> &c2Norm, bool isIntra,
+                        const string &matrixType, const vector<double> &expectedValues,
+                        double avgCount) {
+    
+    BlockResult result;
+    vector<contactRecord> records = readBlock(fileName, idx, version);
+    vector<contactRecord> filteredRecords;
+    
+    for (contactRecord rec : records) {
+        int64_t x = rec.binX * resolution;
+        int64_t y = rec.binY * resolution;
+
+        if ((x >= origRegionIndices[0] && x <= origRegionIndices[1] &&
+             y >= origRegionIndices[2] && y <= origRegionIndices[3]) ||
+            (isIntra && y >= origRegionIndices[0] && y <= origRegionIndices[1] && 
+             x >= origRegionIndices[2] && x <= origRegionIndices[3])) {
+
+            float c = rec.counts;
+            if (norm != "NONE") {
+                c = static_cast<float>(c / (c1Norm[rec.binX] * c2Norm[rec.binY]));
+            }
+            if (matrixType == "oe") {
+                if (isIntra) {
+                    c = static_cast<float>(c / expectedValues[min(expectedValues.size() - 1,
+                                                              (size_t) floor(abs(y - x) /
+                                                                         resolution))]);
+                } else {
+                    c = static_cast<float>(c / avgCount);
+                }
+            } else if (matrixType == "expected") {
+                if (isIntra) {
+                    c = static_cast<float>(expectedValues[min(expectedValues.size() - 1,
+                                                          (size_t) floor(abs(y - x) /
+                                                                     resolution))]);
+                } else {
+                    c = static_cast<float>(avgCount);
+                }
+            }
+
+            if (!isnan(c) && !isinf(c)) {
+                contactRecord record = contactRecord();
+                record.binX = static_cast<int32_t>(x);
+                record.binY = static_cast<int32_t>(y);
+                record.counts = c;
+                filteredRecords.push_back(record);
+            }
+        }
+    }
+    
+    result.records = filteredRecords;
+    result.blockNumber = idx.position;
+    return result;
+}
+
+class ThreadPool {
+public:
+    explicit ThreadPool(size_t numThreads) : stop(false) {
+        for(size_t i = 0; i < numThreads; ++i) {
+            workers.emplace_back([this] {
+                while(true) {
+                    std::function<void()> task;
+                    {
+                        std::unique_lock<std::mutex> lock(queueMutex);
+                        condition.wait(lock, [this] { 
+                            return stop || !tasks.empty(); 
+                        });
+                        if(stop && tasks.empty()) {
+                            return;
+                        }
+                        task = std::move(tasks.front());
+                        tasks.pop();
+                    }
+                    task();
+                }
+            });
+        }
+    }
+
+    template<class F>
+    auto enqueue(F&& f) -> std::future<typename std::result_of<F()>::type> {
+        using return_type = typename std::result_of<F()>::type;
+        auto task = std::make_shared<std::packaged_task<return_type()>>(std::forward<F>(f));
+        std::future<return_type> res = task->get_future();
+        {
+            std::unique_lock<std::mutex> lock(queueMutex);
+            if(stop) {
+                throw std::runtime_error("enqueue on stopped ThreadPool");
+            }
+            tasks.emplace([task]() { (*task)(); });
+        }
+        condition.notify_one();
+        return res;
+    }
+
+    ~ThreadPool() {
+        {
+            std::unique_lock<std::mutex> lock(queueMutex);
+            stop = true;
+        }
+        condition.notify_all();
+        for(std::thread &worker: workers) {
+            worker.join();
+        }
+    }
+
+private:
+    std::vector<std::thread> workers;
+    std::queue<std::function<void()>> tasks;
+    std::mutex queueMutex;
+    std::condition_variable condition;
+    bool stop;
+};
+
 class MatrixZoomData {
 public:
     bool isIntra;
@@ -1323,54 +1456,55 @@ public:
         convertGenomeToBinPos(origRegionIndices, regionIndices, resolution);
 
         set<int32_t> blockNumbers = getBlockNumbers(regionIndices);
-        vector<contactRecord> records;
+        vector<BlockResult> allResults;
+        vector<future<BlockResult>> futures;
+        
+        // Adjust thread count based on block count and available cores
+        unsigned int maxThreads = thread::hardware_concurrency() - 1;
+        unsigned int numThreads = max(1u, min(
+            maxThreads,                // Don't use more than available cores minus one
+            blockNumbers.size()        // Don't create more threads than blocks
+        ));
+        
+        ThreadPool pool(numThreads);
+
+        // Submit all tasks to thread pool
         for (int32_t blockNumber : blockNumbers) {
-            // get contacts in this block
-            //cout << *it << " -- " << blockMap.size() << endl;
-            //cout << blockMap[*it].size << " " <<  blockMap[*it].position << endl;
-            vector<contactRecord> tmp_records = readBlock(fileName, blockMap[blockNumber], version);
-            for (contactRecord rec : tmp_records) {
-                int64_t x = rec.binX * resolution;
-                int64_t y = rec.binY * resolution;
-
-                if ((x >= origRegionIndices[0] && x <= origRegionIndices[1] &&
-                     y >= origRegionIndices[2] && y <= origRegionIndices[3]) ||
-                    // or check regions that overlap with lower left
-                    (isIntra && y >= origRegionIndices[0] && y <= origRegionIndices[1] && x >= origRegionIndices[2] &&
-                     x <= origRegionIndices[3])) {
-
-                    float c = rec.counts;
-                    if (norm != "NONE") {
-                        c = static_cast<float>(c / (c1Norm[rec.binX] * c2Norm[rec.binY]));
-                    }
-                    if (matrixType == "oe") {
-                        if (isIntra) {
-                            c = static_cast<float>(c / expectedValues[min(expectedValues.size() - 1,
-                                                                          (size_t) floor(abs(y - x) /
-                                                                                         resolution))]);
-                        } else {
-                            c = static_cast<float>(c / avgCount);
-                        }
-                    } else if (matrixType == "expected") {
-                        if (isIntra) {
-                            c = static_cast<float>(expectedValues[min(expectedValues.size() - 1,
-                                                                      (size_t) floor(abs(y - x) /
-                                                                                     resolution))]);
-                        } else {
-                            c = static_cast<float>(avgCount);
-                        }
-                    }
-
-                    if (!isnan(c) && !isinf(c)){
-                        contactRecord record = contactRecord();
-                        record.binX = static_cast<int32_t>(x);
-                        record.binY = static_cast<int32_t>(y);
-                        record.counts = c;
-                        records.push_back(record);
-                    }
-                }
-            }
+            futures.push_back(
+                pool.enqueue([this, blockNumber, &origRegionIndices]() {
+                    return processBlock(
+                        fileName, blockMap[blockNumber], version,
+                        origRegionIndices, resolution,
+                        norm, c1Norm, c2Norm, isIntra,
+                        matrixType, expectedValues, avgCount
+                    );
+                })
+            );
         }
+
+        // Collect all results
+        allResults.reserve(futures.size());
+        for (auto& future : futures) {
+            allResults.push_back(future.get());
+        }
+
+        // Sort results by block number to maintain consistent order
+        sort(allResults.begin(), allResults.end(), compareBlockResults);
+
+        // Combine all records in sorted order
+        vector<contactRecord> records;
+        size_t totalSize = 0;
+        for (const auto& result : allResults) {
+            totalSize += result.records.size();
+        }
+        records.reserve(totalSize);
+        
+        for (const auto& result : allResults) {
+            records.insert(records.end(), 
+                          result.records.begin(), 
+                          result.records.end());
+        }
+
         return records;
     }
 
