@@ -39,6 +39,8 @@
 #include <thread>
 #include <mutex>
 #include <future>
+#include <queue>
+#include <condition_variable>
 
 using namespace std;
 
@@ -1252,6 +1254,65 @@ BlockResult processBlock(const string &fileName, indexEntry idx, int32_t version
     return result;
 }
 
+class ThreadPool {
+public:
+    explicit ThreadPool(size_t numThreads) : stop(false) {
+        for(size_t i = 0; i < numThreads; ++i) {
+            workers.emplace_back([this] {
+                while(true) {
+                    std::function<void()> task;
+                    {
+                        std::unique_lock<std::mutex> lock(queueMutex);
+                        condition.wait(lock, [this] { 
+                            return stop || !tasks.empty(); 
+                        });
+                        if(stop && tasks.empty()) {
+                            return;
+                        }
+                        task = std::move(tasks.front());
+                        tasks.pop();
+                    }
+                    task();
+                }
+            });
+        }
+    }
+
+    template<class F>
+    auto enqueue(F&& f) -> std::future<typename std::result_of<F()>::type> {
+        using return_type = typename std::result_of<F()>::type;
+        auto task = std::make_shared<std::packaged_task<return_type()>>(std::forward<F>(f));
+        std::future<return_type> res = task->get_future();
+        {
+            std::unique_lock<std::mutex> lock(queueMutex);
+            if(stop) {
+                throw std::runtime_error("enqueue on stopped ThreadPool");
+            }
+            tasks.emplace([task]() { (*task)(); });
+        }
+        condition.notify_one();
+        return res;
+    }
+
+    ~ThreadPool() {
+        {
+            std::unique_lock<std::mutex> lock(queueMutex);
+            stop = true;
+        }
+        condition.notify_all();
+        for(std::thread &worker: workers) {
+            worker.join();
+        }
+    }
+
+private:
+    std::vector<std::thread> workers;
+    std::queue<std::function<void()>> tasks;
+    std::mutex queueMutex;
+    std::condition_variable condition;
+    bool stop;
+};
+
 class MatrixZoomData {
 public:
     bool isIntra;
@@ -1396,32 +1457,30 @@ public:
 
         set<int32_t> blockNumbers = getBlockNumbers(regionIndices);
         vector<BlockResult> allResults;
-        
-        // Determine number of threads to use (leave one core free)
-        unsigned int numThreads = max(1u, thread::hardware_concurrency() - 1);
         vector<future<BlockResult>> futures;
-
-        // Launch threads to process blocks
-        for (int32_t blockNumber : blockNumbers) {
-            futures.push_back(async(launch::async, processBlock,
-                                  fileName, blockMap[blockNumber], version,
-                                  origRegionIndices, resolution,
-                                  norm, c1Norm, c2Norm, isIntra,
-                                  matrixType, expectedValues, avgCount));
-            
-            // Limit number of concurrent threads
-            if (futures.size() >= numThreads) {
-                // Wait for some threads to complete and add their results
-                for (auto &f : futures) {
-                    allResults.push_back(f.get());
-                }
-                futures.clear();
-            }
-        }
         
-        // Get remaining results
-        for (auto &f : futures) {
-            allResults.push_back(f.get());
+        // Create thread pool with one less than available threads
+        unsigned int numThreads = max(1u, thread::hardware_concurrency() - 1);
+        ThreadPool pool(numThreads);
+
+        // Submit all tasks to thread pool
+        for (int32_t blockNumber : blockNumbers) {
+            futures.push_back(
+                pool.enqueue([this, blockNumber, &origRegionIndices]() {
+                    return processBlock(
+                        fileName, blockMap[blockNumber], version,
+                        origRegionIndices, resolution,
+                        norm, c1Norm, c2Norm, isIntra,
+                        matrixType, expectedValues, avgCount
+                    );
+                })
+            );
+        }
+
+        // Collect all results
+        allResults.reserve(futures.size());
+        for (auto& future : futures) {
+            allResults.push_back(future.get());
         }
 
         // Sort results by block number to maintain consistent order
@@ -1429,8 +1488,16 @@ public:
 
         // Combine all records in sorted order
         vector<contactRecord> records;
-        for (const auto &result : allResults) {
-            records.insert(records.end(), result.records.begin(), result.records.end());
+        size_t totalSize = 0;
+        for (const auto& result : allResults) {
+            totalSize += result.records.size();
+        }
+        records.reserve(totalSize);
+        
+        for (const auto& result : allResults) {
+            records.insert(records.end(), 
+                          result.records.begin(), 
+                          result.records.end());
         }
 
         return records;
