@@ -109,4 +109,60 @@ int64_t getNumRecordsForFile(const std::string& filename, int32_t binsize, bool 
 
 int64_t getNumRecordsForChromosomes(const std::string& filename, int32_t binsize, bool interOnly);
 
+class HiCFile {
+public:  // Make sure this is public
+    string prefix = "http"; // HTTP code
+    int64_t master = 0LL;
+    map<string, chromosome> chromosomeMap;
+    string genomeID;
+    int32_t numChromosomes = 0;
+    int32_t version = 0;
+    int64_t nviPosition = 0LL;
+    int64_t nviLength = 0LL;
+    vector<int32_t> resolutions;
+    static int64_t totalFileSize;
+    string fileName;
+
+    explicit HiCFile(const string &fileName);
+    string getGenomeID() const;
+    vector<int32_t> getResolutions() const;
+    vector<chromosome> getChromosomes();
+    MatrixZoomData* getMatrixZoomData(const string &chr1, const string &chr2, const string &matrixType,
+                                    const string &norm, const string &unit, int32_t resolution);
+
+    static size_t hdf(char *b, size_t size, size_t nitems, void *userdata);
+    static CURL *oneTimeInitCURL(const char *url);
+};
+
+class MatrixZoomData {
+public:  // Make sure this is public
+    bool isIntra;
+    string fileName;
+    int64_t myFilePos = 0LL;
+    vector<double> expectedValues;
+    bool foundFooter = false;
+    vector<double> c1Norm;
+    vector<double> c2Norm;
+    int32_t c1 = 0;
+    int32_t c2 = 0;
+    string matrixType;
+    string norm;
+    int32_t version = 0;
+    int32_t resolution = 0;
+    int32_t numBins1 = 0;
+    int32_t numBins2 = 0;
+    float sumCounts;
+    int32_t blockBinCount, blockColumnCount;
+    map<int32_t, indexEntry> blockMap;
+    double avgCount;
+
+    MatrixZoomData(const chromosome &chrom1, const chromosome &chrom2, const string &matrixType,
+                   const string &norm, const string &unit, int32_t resolution,
+                   int32_t &version, int64_t &master, int64_t &totalFileSize,
+                   const string &fileName);
+
+    vector<contactRecord> getRecords(int64_t gx0, int64_t gx1, int64_t gy0, int64_t gy1);
+    // ... other public methods ...
+};
+
 #endif
