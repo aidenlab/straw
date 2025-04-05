@@ -28,6 +28,12 @@
 #include <set>
 #include <vector>
 #include <map>
+#include <string>
+#include <curl/curl.h>
+
+// Forward declarations
+class HiCFile;
+class MatrixZoomData;
 
 // pointer structure for reading blocks or matrices, holds the size and position
 struct indexEntry {
@@ -37,9 +43,9 @@ struct indexEntry {
 
 // sparse matrixType entry
 struct contactRecord {
-  int32_t binX;
-  int32_t binY;
-  float counts;
+    int32_t binX;
+    int32_t binY;
+    float counts;
 };
 
 // chromosome
@@ -86,83 +92,18 @@ struct MemoryStruct {
     size_t size;
 };
 
-std::map<int32_t, indexEntry>
-readMatrixZoomData(std::istream &fin, const std::string &myunit, int32_t mybinsize, float &mySumCounts,
-                   int32_t &myBlockBinCount,
-                   int32_t &myBlockColumnCount, bool &found);
+// Function declarations
+std::vector<contactRecord> straw(const std::string& matrixType, const std::string& norm, const std::string& fname, 
+                               const std::string& chr1loc, const std::string& chr2loc, const std::string& unit, 
+                               int32_t binsize);
 
-std::map<int32_t, indexEntry>
-readMatrix(std::istream &fin, int32_t myFilePosition, std::string unit, int32_t resolution, float &mySumCounts,
-           int32_t &myBlockBinCount, int32_t &myBlockColumnCount);
-
-std::vector<double> readNormalizationVector(std::istream &fin, indexEntry entry);
-
-std::vector<contactRecord>
-straw(const std::string& matrixType, const std::string& norm, const std::string& fname, const std::string& chr1loc,
-      const std::string& chr2loc, const std::string &unit, int32_t binsize);
-
-std::vector<std::vector<float>>
-strawAsMatrix(const std::string &matrixType, const std::string &norm, const std::string &fileName,
-              const std::string &chr1loc, const std::string &chr2loc, const std::string &unit, int32_t binsize);
+std::vector<std::vector<float>> strawAsMatrix(const std::string& matrixType, const std::string& norm, 
+                                            const std::string& fileName, const std::string& chr1loc, 
+                                            const std::string& chr2loc, const std::string& unit, 
+                                            int32_t binsize);
 
 int64_t getNumRecordsForFile(const std::string& filename, int32_t binsize, bool interOnly);
 
 int64_t getNumRecordsForChromosomes(const std::string& filename, int32_t binsize, bool interOnly);
-
-class HiCFile {
-public:  // Make sure this is public
-    string prefix = "http"; // HTTP code
-    int64_t master = 0LL;
-    map<string, chromosome> chromosomeMap;
-    string genomeID;
-    int32_t numChromosomes = 0;
-    int32_t version = 0;
-    int64_t nviPosition = 0LL;
-    int64_t nviLength = 0LL;
-    vector<int32_t> resolutions;
-    static int64_t totalFileSize;
-    string fileName;
-
-    explicit HiCFile(const string &fileName);
-    string getGenomeID() const;
-    vector<int32_t> getResolutions() const;
-    vector<chromosome> getChromosomes();
-    MatrixZoomData* getMatrixZoomData(const string &chr1, const string &chr2, const string &matrixType,
-                                    const string &norm, const string &unit, int32_t resolution);
-
-    static size_t hdf(char *b, size_t size, size_t nitems, void *userdata);
-    static CURL *oneTimeInitCURL(const char *url);
-};
-
-class MatrixZoomData {
-public:  // Make sure this is public
-    bool isIntra;
-    string fileName;
-    int64_t myFilePos = 0LL;
-    vector<double> expectedValues;
-    bool foundFooter = false;
-    vector<double> c1Norm;
-    vector<double> c2Norm;
-    int32_t c1 = 0;
-    int32_t c2 = 0;
-    string matrixType;
-    string norm;
-    int32_t version = 0;
-    int32_t resolution = 0;
-    int32_t numBins1 = 0;
-    int32_t numBins2 = 0;
-    float sumCounts;
-    int32_t blockBinCount, blockColumnCount;
-    map<int32_t, indexEntry> blockMap;
-    double avgCount;
-
-    MatrixZoomData(const chromosome &chrom1, const chromosome &chrom2, const string &matrixType,
-                   const string &norm, const string &unit, int32_t resolution,
-                   int32_t &version, int64_t &master, int64_t &totalFileSize,
-                   const string &fileName);
-
-    vector<contactRecord> getRecords(int64_t gx0, int64_t gx1, int64_t gy0, int64_t gy1);
-    // ... other public methods ...
-};
 
 #endif

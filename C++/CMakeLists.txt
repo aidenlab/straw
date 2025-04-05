@@ -7,7 +7,7 @@ find_package(Threads REQUIRED)  # Add this line to find threading library
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x -lcurl -lz")
 
 # Add main.cpp file of project root directory as source file
-set(SOURCE_FILES main.cpp straw.cpp hic_slice.cpp)
+set(SOURCE_FILES main.cpp straw.cpp)
 add_executable(straw ${SOURCE_FILES})
 
 target_link_libraries(straw curl z Threads::Threads)
