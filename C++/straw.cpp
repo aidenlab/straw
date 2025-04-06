@@ -1156,7 +1156,7 @@ BlockResult processBlock(const string &filename, indexEntry idx, int32_t version
                        int64_t *regionIndices, int32_t resolution,
                        const string &norm, vector<double> &c1Norm, vector<double> &c2Norm,
                        bool isIntra, const string &matrixType, vector<double> &expectedValues,
-                       double avgCount, bool ignoreRegionBounds = false) {
+                       double avgCount) {
     BlockResult result;
     vector<contactRecord> records = readBlock(filename, idx, version);
     vector<contactRecord> filteredRecords;
@@ -1165,47 +1165,39 @@ BlockResult processBlock(const string &filename, indexEntry idx, int32_t version
         int64_t x = rec.binX * resolution;
         int64_t y = rec.binY * resolution;
 
-        if (ignoreRegionBounds) {
-            contactRecord record = contactRecord();
-            record.binX = static_cast<int32_t>(x);
-            record.binY = static_cast<int32_t>(y);
-            record.counts = rec.counts;
-            filteredRecords.push_back(record);
-        } else {
-            if ((x >= regionIndices[0] && x <= regionIndices[1] &&
-                 y >= regionIndices[2] && y <= regionIndices[3]) ||
-                (isIntra && y >= regionIndices[0] && y <= regionIndices[1] && 
-                 x >= regionIndices[2] && x <= regionIndices[3])) {
+        if ((x >= regionIndices[0] && x <= regionIndices[1] &&
+             y >= regionIndices[2] && y <= regionIndices[3]) ||
+            (isIntra && y >= regionIndices[0] && y <= regionIndices[1] && 
+             x >= regionIndices[2] && x <= regionIndices[3])) {
 
-                float c = rec.counts;
-                if (norm != "NONE") {
-                    c = static_cast<float>(c / (c1Norm[rec.binX] * c2Norm[rec.binY]));
+            float c = rec.counts;
+            if (norm != "NONE") {
+                c = static_cast<float>(c / (c1Norm[rec.binX] * c2Norm[rec.binY]));
+            }
+            if (matrixType == "oe") {
+                if (isIntra) {
+                    c = static_cast<float>(c / expectedValues[min(expectedValues.size() - 1,
+                                                              (size_t) floor(abs(y - x) /
+                                                                         resolution))]);
+                } else {
+                    c = static_cast<float>(c / avgCount);
                 }
-                if (matrixType == "oe") {
-                    if (isIntra) {
-                        c = static_cast<float>(c / expectedValues[min(expectedValues.size() - 1,
-                                                                  (size_t) floor(abs(y - x) /
-                                                                             resolution))]);
-                    } else {
-                        c = static_cast<float>(c / avgCount);
-                    }
-                } else if (matrixType == "expected") {
-                    if (isIntra) {
-                        c = static_cast<float>(expectedValues[min(expectedValues.size() - 1,
-                                                                  (size_t) floor(abs(y - x) /
-                                                                             resolution))]);
-                    } else {
-                        c = static_cast<float>(avgCount);
-                    }
+            } else if (matrixType == "expected") {
+                if (isIntra) {
+                    c = static_cast<float>(expectedValues[min(expectedValues.size() - 1,
+                                                              (size_t) floor(abs(y - x) /
+                                                                         resolution))]);
+                } else {
+                    c = static_cast<float>(avgCount);
                 }
+            }
 
-                if (!isnan(c) && !isinf(c)) {
-                    contactRecord record = contactRecord();
-                    record.binX = static_cast<int32_t>(x);
-                    record.binY = static_cast<int32_t>(y);
-                    record.counts = c;
-                    filteredRecords.push_back(record);
-                }
+            if (!isnan(c) && !isinf(c)) {
+                contactRecord record = contactRecord();
+                record.binX = static_cast<int32_t>(x);
+                record.binY = static_cast<int32_t>(y);
+                record.counts = c;
+                filteredRecords.push_back(record);
             }
         }
     }
