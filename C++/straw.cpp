@@ -428,21 +428,27 @@ bool readFooterURL(CURL *curl, int64_t master, int32_t version, int32_t c1, int3
     ss << c1 << "_" << c2;
     string key = ss.str();
 
+
     int32_t nEntries = readInt32FromFile(newFin);
+
     currentPointer += 4;
     delete buffer;
 
     int32_t bufferSize0 = nEntries * 50;
     buffer = getData(curl, currentPointer, bufferSize0);
+
     memstream newFin2(buffer, bufferSize0);
+
 
     bool found = false;
     for (int i = 0; i < nEntries; i++) {
         string keyStr;
+
         currentPointer += readStringFromURL(newFin2, keyStr);
 
         int64_t fpos = readInt64FromFile(newFin2);
         int32_t sizeinbytes = readInt32FromFile(newFin2);
+
         currentPointer += 12;
         if (keyStr == key) {
             myFilePos = fpos;
@@ -462,28 +468,34 @@ bool readFooterURL(CURL *curl, int64_t master, int32_t version, int32_t c1, int3
     // read in and ignore expected value maps; don't store; reading these to
     // get to norm vector index
     buffer = getData(curl, currentPointer, 100);
+
     memstream newFin3(buffer, 100);
 
     int32_t nExpectedValues = readInt32FromFile(newFin3);
+
     currentPointer += 4;
     delete buffer;
     for (int i = 0; i < nExpectedValues; i++) {
 
         buffer = getData(curl, currentPointer, 1000);
+
         memstream newFin4(buffer, 1000);
 
         string unit0;
         currentPointer += readStringFromURL(newFin4, unit0);
 
         int32_t binSize = readInt32FromFile(newFin4);
+
         currentPointer += 4;
 
         int64_t nValues;
         if (version > 8) {
+
             nValues = readInt64FromFile(newFin4);
             currentPointer += 8;
         } else {
             nValues = (int64_t) readInt32FromFile(newFin4);
+
             currentPointer += 4;
         }
 
@@ -495,8 +507,10 @@ bool readFooterURL(CURL *curl, int64_t master, int32_t version, int32_t c1, int3
         currentPointer += readThroughExpectedVectorURL(curl, currentPointer, version, expectedValues, nValues, store, resolution);
 
         buffer = getData(curl, currentPointer, 100);
+
         memstream newFin5(buffer, 100);
         int32_t nNormalizationFactors = readInt32FromFile(newFin5);
+
         currentPointer += 4;
         delete buffer;
 
@@ -512,12 +526,15 @@ bool readFooterURL(CURL *curl, int64_t master, int32_t version, int32_t c1, int3
     }
 
     buffer = getData(curl, currentPointer, 100);
+
     memstream newFin6(buffer, 100);
     nExpectedValues = readInt32FromFile(newFin6);
+
     currentPointer += 4;
     delete buffer;
     for (int i = 0; i < nExpectedValues; i++) {
         buffer = getData(curl, currentPointer, 1000);
+
         memstream newFin7(buffer, 1000);
 
         string nType, unit0;
@@ -525,14 +542,17 @@ bool readFooterURL(CURL *curl, int64_t master, int32_t version, int32_t c1, int3
         currentPointer += readStringFromURL(newFin7, unit0);
 
         int32_t binSize = readInt32FromFile(newFin7);
+
         currentPointer += 4;
 
         int64_t nValues;
         if (version > 8) {
+
             nValues = readInt64FromFile(newFin7);
             currentPointer += 8;
         } else {
             nValues = (int64_t) readInt32FromFile(newFin7);
+
             currentPointer += 4;
         }
         bool store = c1 == c2 && (matrixType == "oe" || matrixType == "expected") && nType == norm && unit0 == unit &&
@@ -543,8 +563,10 @@ bool readFooterURL(CURL *curl, int64_t master, int32_t version, int32_t c1, int3
         currentPointer += readThroughExpectedVectorURL(curl, currentPointer, version, expectedValues, nValues, store, resolution);
 
         buffer = getData(curl, currentPointer, 100);
+
         memstream newFin8(buffer, 100);
         int32_t nNormalizationFactors = readInt32FromFile(newFin8);
+
         currentPointer += 4;
         delete buffer;
 
@@ -559,8 +581,10 @@ bool readFooterURL(CURL *curl, int64_t master, int32_t version, int32_t c1, int3
     }
 
     buffer = getData(curl, currentPointer, 100);
+
     memstream newFin9(buffer, 100);
     nEntries = readInt32FromFile(newFin9);
+
     currentPointer += 4;
     delete buffer;
 
@@ -568,6 +592,7 @@ bool readFooterURL(CURL *curl, int64_t master, int32_t version, int32_t c1, int3
     bool found2 = false;
     int32_t bufferSize2 = nEntries*60;
     buffer = getData(curl, currentPointer, bufferSize2);
+
     memstream newFin10(buffer, bufferSize2);
 
     for (int i = 0; i < nEntries; i++) {
@@ -581,14 +606,17 @@ bool readFooterURL(CURL *curl, int64_t master, int32_t version, int32_t c1, int3
 
         int32_t resolution1 = readInt32FromFile(newFin10);
         int64_t filePosition = readInt64FromFile(newFin10);
+
         currentPointer += 12;
 
         int64_t sizeInBytes;
         if (version > 8) {
+
             sizeInBytes = readInt64FromFile(newFin10);
             currentPointer += 8;
         } else {
             sizeInBytes = (int64_t) readInt32FromFile(newFin10);
+
             currentPointer += 4;
         }
 
