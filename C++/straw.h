@@ -28,6 +28,12 @@
 #include <set>
 #include <vector>
 #include <map>
+#include <string>
+#include <curl/curl.h>
+
+// Forward declarations
+class HiCFile;
+class MatrixZoomData;
 
 // pointer structure for reading blocks or matrices, holds the size and position
 struct indexEntry {
@@ -37,9 +43,9 @@ struct indexEntry {
 
 // sparse matrixType entry
 struct contactRecord {
-  int32_t binX;
-  int32_t binY;
-  float counts;
+    int32_t binX;
+    int32_t binY;
+    float counts;
 };
 
 // chromosome
@@ -86,24 +92,15 @@ struct MemoryStruct {
     size_t size;
 };
 
-std::map<int32_t, indexEntry>
-readMatrixZoomData(std::istream &fin, const std::string &myunit, int32_t mybinsize, float &mySumCounts,
-                   int32_t &myBlockBinCount,
-                   int32_t &myBlockColumnCount, bool &found);
+// Function declarations
+std::vector<contactRecord> straw(const std::string& matrixType, const std::string& norm, const std::string& fname, 
+                               const std::string& chr1loc, const std::string& chr2loc, const std::string& unit, 
+                               int32_t binsize);
 
-std::map<int32_t, indexEntry>
-readMatrix(std::istream &fin, int32_t myFilePosition, std::string unit, int32_t resolution, float &mySumCounts,
-           int32_t &myBlockBinCount, int32_t &myBlockColumnCount);
-
-std::vector<double> readNormalizationVector(std::istream &fin, indexEntry entry);
-
-std::vector<contactRecord>
-straw(const std::string& matrixType, const std::string& norm, const std::string& fname, const std::string& chr1loc,
-      const std::string& chr2loc, const std::string &unit, int32_t binsize);
-
-std::vector<std::vector<float>>
-strawAsMatrix(const std::string &matrixType, const std::string &norm, const std::string &fileName,
-              const std::string &chr1loc, const std::string &chr2loc, const std::string &unit, int32_t binsize);
+std::vector<std::vector<float>> strawAsMatrix(const std::string& matrixType, const std::string& norm, 
+                                            const std::string& fileName, const std::string& chr1loc, 
+                                            const std::string& chr2loc, const std::string& unit, 
+                                            int32_t binsize);
 
 int64_t getNumRecordsForFile(const std::string& filename, int32_t binsize, bool interOnly);
 

@@ -24,13 +24,34 @@
 #include <iostream>
 #include <string>
 #include "straw.h"
+#include "hic_slice.h"
 using namespace std;
 
 int main(int argc, char *argv[])
 {
+    // Check if this is a dump command
+    if (argc > 1 && string(argv[1]) == "dump") {
+        if (argc != 8) {
+            cerr << "Incorrect arguments for dump command" << endl;
+            cerr << "Usage: straw dump <observed/oe/expected> <NONE/VC/VC_SQRT/KR> <hicFile> <BP/FRAG> <binsize> <outputFile>" << endl;
+            exit(1);
+        }
+        string matrixType = argv[2];
+        string norm = argv[3];
+        string fname = argv[4];
+        string unit = argv[5];
+        int32_t binsize = stoi(argv[6]);
+        string outputPath = argv[7];
+
+        dumpGenomeWideDataAtResolution(matrixType, norm, fname, unit, binsize, outputPath);
+        return 0;
+    }
+
+    // Original functionality
     if (argc != 7 && argc != 8) {
         cerr << "Incorrect arguments" << endl;
         cerr << "Usage: straw [observed/oe/expected] <NONE/VC/VC_SQRT/KR> <hicFile(s)> <chr1>[:x1:x2] <chr2>[:y1:y2] <BP/FRAG/MATRIX> <binsize>" << endl;
+        cerr << "   or: straw dump <observed/oe/expected> <NONE/VC/VC_SQRT/KR> <hicFile> <BP/FRAG> <binsize> <outputFile>" << endl;
         exit(1);
     }
     int offset = 0;
