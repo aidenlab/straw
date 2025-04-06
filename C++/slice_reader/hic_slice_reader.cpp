@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <cstring>
+#include <cmath>  // for isnan, isinf
 
 HicSliceReader::HicSliceReader(const std::string& filePath) : headerRead(false) {
     file = gzopen(filePath.c_str(), "rb");
@@ -129,8 +130,9 @@ std::vector<SliceContactRecord> HicSliceReader::readRecordsForChromosomePair(
     } compressedRecord;
 
     while (gzread(file, &compressedRecord, sizeof(compressedRecord)) == sizeof(compressedRecord)) {
-        if ((compressedRecord.chr1Key == chr1Key && compressedRecord.chr2Key == chr2Key) ||
-            (compressedRecord.chr1Key == chr2Key && compressedRecord.chr2Key == chr1Key)) {
+        // Only look for records in the correct orientation (chr1 <= chr2)
+        if (compressedRecord.chr1Key == chr1Key && compressedRecord.chr2Key == chr2Key &&
+            compressedRecord.value > 0 && !std::isnan(compressedRecord.value) && !std::isinf(compressedRecord.value)) {
             
             SliceContactRecord record;
             record.chr1 = getChromosomeFromKey(compressedRecord.chr1Key);
