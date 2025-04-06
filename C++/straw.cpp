@@ -1819,28 +1819,16 @@ void dumpGenomeWideDataAtResolution(const std::string& matrixType,
                 if (mzd && mzd->foundFooter) {
                     // Process each block in the blockMap
                     for (const auto& blockMapEntry : mzd->blockMap) {
-                        // Create region indices that cover the entire chromosomes
-                        int64_t regionIndices[4] = {
-                            0, chr1.length/resolution,  // full length of first chromosome
-                            0, chr2.length/resolution   // full length of second chromosome
-                        };
-
-                        BlockResult result = processBlock(
-                            mzd->fileName, blockMapEntry.second, mzd->version,
-                            regionIndices, resolution,
-                            mzd->norm, mzd->c1Norm, mzd->c2Norm, mzd->isIntra,
-                            mzd->matrixType, mzd->expectedValues, mzd->avgCount,
-                            true  // Add this to ignore region bounds and get all records
-                        );
-
-                        // Write records from this block directly to file
-                        for (const auto& record : result.records) {
+                        // Directly read and write records
+                        vector<contactRecord> records = readBlock(mzd->fileName, blockMapEntry.second, mzd->version);
+                        
+                        for (const contactRecord& rec : records) {
                             CompressedContactRecord compressedRecord;
                             compressedRecord.chr1Key = header.chromosomeKeys[chr1.name];
-                            compressedRecord.binX = record.binX;
+                            compressedRecord.binX = rec.binX;
                             compressedRecord.chr2Key = header.chromosomeKeys[chr2.name];
-                            compressedRecord.binY = record.binY;
-                            compressedRecord.value = record.counts;
+                            compressedRecord.binY = rec.binY;
+                            compressedRecord.value = rec.counts;
                             
                             writeContactRecord(outFile, compressedRecord);
                         }
