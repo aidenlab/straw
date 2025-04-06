@@ -280,46 +280,6 @@ vector<double> sliceVector(vector<double> &v, int64_t m, int64_t n) {
     return vec;
 }
 
-// assume always an odd number for length of vector;
-// eve if even, this calculation should be close enough
-double getMedian(vector<double> &v) {
-    size_t n = v.size() / 2;
-    nth_element(v.begin(), v.begin() + n, v.end());
-    return v[n];
-}
-
-void rollingMedian(vector<double> &initialValues, vector<double> &finalResult, int32_t window) {
-    // window is actually a ~wing-span
-    if (window < 1) {
-        finalResult = initialValues;
-        return;
-    }
-
-    /*
-    finalResult.push_back(initialValues[0]);
-    int64_t length = initialValues.size();
-    for (int64_t index = 1; index < length; index++) {
-        int64_t initialIndex;
-        int64_t finalIndex;
-        if (index < window) {
-            initialIndex = 0;
-            finalIndex = 2 * index;
-        } else {
-            initialIndex = index - window;
-            finalIndex = index + window;
-        }
-
-        if (finalIndex > length - 1) {
-            finalIndex = length - 1;
-        }
-
-        vector<double> subVector = sliceVector(initialValues, initialIndex, finalIndex);
-        finalResult.push_back(getMedian(subVector));
-    }
-    */
-    finalResult = initialValues;
-}
-
 void populateVectorWithFloats(istream &fin, vector<double> &vector, int64_t nValues) {
     for (int j = 0; j < nValues; j++) {
         double v = readFloatFromFile(fin);
@@ -344,14 +304,11 @@ int64_t readThroughExpectedVectorURL(CURL *curl, int64_t currentPointer, int32_t
         char *buffer = getData(curl, currentPointer, bufferSize);
         memstream fin(buffer, bufferSize);
 
-        vector<double> initialExpectedValues;
         if (version > 8) {
-            populateVectorWithFloats(fin, initialExpectedValues, nValues);
+            populateVectorWithFloats(fin, expectedValues, nValues);
         } else {
-            populateVectorWithDoubles(fin, initialExpectedValues, nValues);
+            populateVectorWithDoubles(fin, expectedValues, nValues);
         }
-        int32_t window = 5000000 / resolution;
-        rollingMedian(initialExpectedValues, expectedValues, window);
         delete buffer;
     }
 
@@ -365,14 +322,11 @@ int64_t readThroughExpectedVectorURL(CURL *curl, int64_t currentPointer, int32_t
 void readThroughExpectedVector(int32_t version, istream &fin, vector<double> &expectedValues, int64_t nValues,
                                bool store, int32_t resolution) {
     if (store) {
-        vector<double> initialExpectedValues;
         if (version > 8) {
-            populateVectorWithFloats(fin, initialExpectedValues, nValues);
+            populateVectorWithFloats(fin, expectedValues, nValues);
         } else {
-            populateVectorWithDoubles(fin, initialExpectedValues, nValues);
+            populateVectorWithDoubles(fin, expectedValues, nValues);
         }
-        int32_t window = 5000000 / resolution;
-        rollingMedian(initialExpectedValues, expectedValues, window);
     } else if (nValues > 0) {
         if (version > 8) {
             fin.seekg(nValues * sizeof(float), ios_base::cur);
@@ -1212,8 +1166,11 @@ BlockResult processBlock(const string &filename, indexEntry idx, int32_t version
         int64_t y = rec.binY * resolution;
 
         if (ignoreRegionBounds) {
-            // Include all records regardless of position
-            filteredRecords.push_back(rec);
+            contactRecord record = contactRecord();
+            record.binX = static_cast<int32_t>(x);
+            record.binY = static_cast<int32_t>(y);
+            record.counts = rec.counts;
+            filteredRecords.push_back(record);
         } else {
             if ((x >= regionIndices[0] && x <= regionIndices[1] &&
                  y >= regionIndices[2] && y <= regionIndices[3]) ||
@@ -1872,7 +1829,8 @@ void dumpGenomeWideDataAtResolution(const std::string& matrixType,
                             mzd->fileName, blockMapEntry.second, mzd->version,
                             regionIndices, resolution,
                             mzd->norm, mzd->c1Norm, mzd->c2Norm, mzd->isIntra,
-                            mzd->matrixType, mzd->expectedValues, mzd->avgCount
+                            mzd->matrixType, mzd->expectedValues, mzd->avgCount,
+                            true  // Add this to ignore region bounds and get all records
                         );
 
                         // Write records from this block directly to file
