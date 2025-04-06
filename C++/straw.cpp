@@ -1815,14 +1815,17 @@ void dumpGenomeWideDataAtResolution(const std::string& matrixType,
                         vector<contactRecord> records = readBlock(mzd->fileName, blockMapEntry.second, mzd->version);
                         
                         for (const contactRecord& rec : records) {
-                            CompressedContactRecord compressedRecord;
-                            compressedRecord.chr1Key = header.chromosomeKeys[chr1.name];
-                            compressedRecord.binX = rec.binX;
-                            compressedRecord.chr2Key = header.chromosomeKeys[chr2.name];
-                            compressedRecord.binY = rec.binY;
-                            compressedRecord.value = rec.counts;
-                            
-                            writeContactRecord(outFile, compressedRecord);
+                            // Only write records with valid, positive counts
+                            if (rec.counts > 0 && !isnan(rec.counts) && !isinf(rec.counts)) {
+                                CompressedContactRecord compressedRecord;
+                                compressedRecord.chr1Key = header.chromosomeKeys[chr1.name];
+                                compressedRecord.binX = rec.binX;
+                                compressedRecord.chr2Key = header.chromosomeKeys[chr2.name];
+                                compressedRecord.binY = rec.binY;
+                                compressedRecord.value = rec.counts;
+                                
+                                writeContactRecord(outFile, compressedRecord);
+                            }
                         }
                     }
                 }
