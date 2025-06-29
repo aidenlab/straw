@@ -1322,19 +1322,14 @@ public:
                    const string &fileName) {
         this->version = version;
         this->fileName = fileName;
-        int32_t c01 = chrom1.index;
-        int32_t c02 = chrom2.index;
-        if (c01 <= c02) { // default is ok
-            this->c1 = c01;
-            this->c2 = c02;
-            this->numBins1 = static_cast<int32_t>(chrom1.length / resolution);
-            this->numBins2 = static_cast<int32_t>(chrom2.length / resolution);
-        } else { // flip
-            this->c1 = c02;
-            this->c2 = c01;
-            this->numBins1 = static_cast<int32_t>(chrom2.length / resolution);
-            this->numBins2 = static_cast<int32_t>(chrom1.length / resolution);
+        if (chrom1.index > chrom2.index) { // forbid non-canonical ordering
+            throw std::runtime_error("Lower-numbered chromosome must come first; MatrixZoomData was given: " +
+                                     std::to_string(chrom1.index) + ", " + std::to_string(chrom2.index));
         }
+        this->c1 = chrom1.index;
+        this->c2 = chrom2.index;
+        this->numBins1 = static_cast<int32_t>(chrom1.length / resolution);
+        this->numBins2 = static_cast<int32_t>(chrom2.length / resolution);
         isIntra = c1 == c2;
 
         this->matrixType = matrixType;
